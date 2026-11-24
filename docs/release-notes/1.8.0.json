@@ -1,0 +1,83 @@
+{
+  "version": "1.8.0",
+  "translations": {
+    "en": [
+      "**Room voice communication.** Talk in rooms with selectable devices, mic testing, global shortcuts, noise suppression, sensitivity, up to 200% volume, and saved levels.",
+      "**Reliable room presence and reconnection.** Participants now appear consistently in rooms without disappearing or needing to reopen the app.",
+      "**Faster, dependable screen and camera loading.** Fixed long loading delays and stuck screens or cameras, including when sharing a still screen.",
+      "**Responsive app closing.** Closing the window no longer freezes the app or requires ending the process manually."
+    ],
+    "pt-BR": [
+      "**Comunicação por voz nas salas.** Converse com escolha de dispositivos, teste de microfone, atalhos globais, supressão de ruído, sensibilidade e volume salvo.",
+      "**Presença e reconexão mais estáveis.** Participantes agora aparecem de forma consistente nas salas, sem sumir ou exigir reiniciar o app.",
+      "**Carregamento mais rápido de telas e câmeras.** Corrigimos demoras longas e transmissões travadas ao carregar vídeo, mesmo em telas estáticas.",
+      "**Fechamento ágil do aplicativo.** Fechar a janela não congela mais o app nem exige encerrá-lo manualmente."
+    ],
+    "es": [
+      "**Comunicación por voz en salas.** Habla con selección de dispositivos, prueba de micrófono, atajos globales, supresión de ruido, sensibilidad y volumen guardado.",
+      "**Presencia y reconexión más estables.** Los participantes aparecen de forma constante en las salas, sin desaparecer ni exigir reiniciar la app.",
+      "**Carga más rápida de pantallas y cámaras.** Se corrigieron demoras largas y transmisiones bloqueadas, incluso al compartir una pantalla fija.",
+      "**Cierre ágil de la aplicación.** Cerrar la ventana ya no congela la app ni obliga a finalizar el proceso manualmente."
+    ],
+    "fr": [
+      "**Appels vocaux dans les salons.** Choisissez vos périphériques, testez le micro, utilisez des raccourcis globaux, la réduction du bruit et le volume par personne.",
+      "**Présence et reconnexion plus stables.** Les participants s'affichent de façon fiable dans les salons sans disparaître ni nécessiter un redémarrage.",
+      "**Chargement plus rapide des écrans et caméras.** Correction des longs délais et des flux bloqués, même lors du partage d'un écran fixe.",
+      "**Fermeture réactive de l'application.** Fermer la fenêtre ne fige plus l'application et ne nécessite plus de la fermer de force."
+    ],
+    "de": [
+      "**Sprachkommunikation in Räumen.** Wählen Sie Geräte, testen Sie Ihr Mikrofon, nutzen Sie globale Kurzbefehle, Rauschunterdrückung, Empfindlichkeit und Lautstärke.",
+      "**Zuverlässigere Raumpräsenz und Wiederverbindung.** Teilnehmer bleiben in Räumen sichtbar, ohne zu verschwinden oder einen Neustart zu erfordern.",
+      "**Schnelleres Laden von Bildschirmen und Kameras.** Lange Wartezeiten und hängende Streams wurden behoben, auch bei statischen Bildschirminhalten.",
+      "**Reaktionsschnelles Schließen der App.** Das Schließen des Fensters friert die App nicht mehr ein und erfordert kein manuelles Beenden."
+    ],
+    "it": [
+      "**Comunicazione vocale nelle stanze.** Scegli dispositivi, prova il microfono, usa scorciatoie globali, riduzione del rumore, sensibilità e volume per persona.",
+      "**Presenza e riconnessione più stabili.** I partecipanti restano visibili nelle stanze in modo costante, senza sparire né dover riavviare l'app.",
+      "**Caricamento più rapido di schermi e fotocamere.** Risolti i lunghi tempi di attesa e i flussi bloccati, anche condividendo uno schermo fermo.",
+      "**Chiusura reattiva dell'app.** Chiudere la finestra non blocca più l'applicazione né richiede la chiusura forzata manuale."
+    ],
+    "zh-CN": [
+      "**房间语音通话。** 支持选择设备、麦克风测试、全局快捷键、降噪、灵敏度调节、最高 200% 音量及独立保存成员音量。",
+      "**更稳定的房间成员状态与重连。** 成员在房间中能够稳定显示，不再无故消失或需要反复重启应用。",
+      "**更快更稳定的屏幕与摄像头加载。** 修复了画面长时间加载或卡住的问题，即使共享静止画面也能立即显示。",
+      "**响应迅速的应用关闭体验。** 关闭窗口不再导致应用卡死，也无需手动强制结束进程。"
+    ],
+    "zh-TW": [
+      "**房間語音通話。** 支援選擇裝置、麥克風測試、全域快速鍵、降噪、靈敏度調整、最高 200% 音量及獨立儲存成員音量。",
+      "**更穩定的房間成員狀態與重連。** 成員在房間中能穩定顯示，不再無故消失或需要反覆重開應用程式。",
+      "**更快更穩定的螢幕與攝影機載入。** 修復了畫面長時間載入或卡住的問題，即使分享靜止畫面也能立即顯示。",
+      "**順暢的應用程式關閉體驗。** 關閉視窗不再導致應用程式卡死，也無需手動強制結束處理程序。"
+    ],
+    "ja": [
+      "**ルーム内ボイス通話機能。** デバイス選択、マイクテスト、グローバルショートカット、ノイズ抑制、感度調整、相手ごとの音量保存に対応しました。",
+      "**ルーム参加表示と再接続の安定化。** 参加者が一覧から消えたり、アプリを再起動し直したりする必要なく安定して表示されるようになりました。",
+      "**画面とカメラの読み込みを高速化。** 映像が長時間読み込まれない問題や、静止画面の共有時に止まる不具合を修正しました。",
+      "**スムーズなアプリ終了。** ウィンドウを閉じてもアプリが応答不能にならず、手動で強制終了する必要がなくなりました。"
+    ],
+    "ko": [
+      "**방 음성 통화 지원.** 장치 선택, 마이크 테스트, 전역 단축키, 노이즈 제거, 감도 조절, 최대 200% 볼륨 및 사용자별 볼륨 저장을 지원합니다.",
+      "**더 안정적인 방 참여 표시 및 재연결.** 참여자가 목록에서 사라지거나 앱을 다시 열지 않아도 안정적으로 표시됩니다.",
+      "**더 빠르고 안정적인 화면 및 카메라 로딩.** 정지된 화면을 공유할 때를 포함해 영상이 오래 걸리거나 멈추는 문제를 수정했습니다.",
+      "**원활한 앱 종료.** 창을 닫을 때 앱이 멈추거나 수동으로 프로세스를 강제 종료할 필요가 없어졌습니다."
+    ],
+    "hi": [
+      "**रूम वॉइस संचार।** डिवाइस चयन, माइक जांच, ग्लोबल शॉर्टकट, शोर दमन, संवेदनशीलता, 200% वॉल्यूम और हर व्यक्ति के सहेजे गए स्तरों के साथ बात करें।",
+      "**भरोसेमंद रूम उपस्थिति और रीकनेक्शन।** अब सदस्य बिना गायब हुए या ऐप को बार-बार दोबारा खोले कमरे में लगातार दिखाई देते हैं।",
+      "**स्क्रीन और कैमरा तेज़ व स्थिर लोडिंग।** वीडियो लोड होने में लंबी देरी और अटकने की समस्या ठीक की गई, स्थिर स्क्रीन साझा करते समय भी।",
+      "**तेज़ ऐप बंद होना।** विंडो बंद करने पर ऐप अब हैंग नहीं होता और इसे मैन्युअल रूप से बंद करने की ज़रूरत नहीं पड़ती।"
+    ],
+    "fi": [
+      "**Huoneiden puheviestintä.** Valitse laitteet, testaa mikrofonia, käytä yleispikanäppäimiä, kohinanvaimennusta, herkkyyttä ja käyttäjäkohtaista äänenvoimakkuutta.",
+      "**Luotettavampi läsnäolo ja uudelleenyhdistäminen.** Osallistujat näkyvät huoneissa tasaisesti katoamatta tai vaatimatta sovelluksen uudelleenavaamista.",
+      "**Nopeampi ja varmempi näytön ja kameran lataus.** Korjattiin pitkät viiveet ja jumiutuneet lähetykset myös liikkumatonta näyttöä jaettaessa.",
+      "**Sujuva sovelluksen sulkeminen.** Ikkunan sulkeminen ei enää jumita sovellusta tai vaadi prosessin pakottamista kiinni."
+    ],
+    "ru": [
+      "**Голосовая связь в комнатах.** Выбор устройств, тест микрофона, глобальные сочетания клавиш, шумоподавление, чувствительность и громкость для участников.",
+      "**Стабильное отображение участников и переподключение.** Участники надёжно отображаются в комнатах, не пропадая и не требуя перезапуска приложения.",
+      "**Быстрая и надёжная загрузка экранов и камер.** Устранены долгие задержки и зависания трансляции, включая показ статичного экрана.",
+      "**Плавное закрытие приложения.** Закрытие окна больше не вызывает зависание и не требует принудительного завершения процесса."
+    ]
+  }
+}

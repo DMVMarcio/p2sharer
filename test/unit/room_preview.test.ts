@@ -94,7 +94,7 @@ test('discovery authenticates identities without requesting admission or sending
     const action = { send: async (data: any, options?: { target: string }) => {
       sent.push({ action: name, data, target: options?.target });
     } }; actions.set(name, action); return action;
-  }, getPeers: () => ({}), onPeerJoin: (_id: string) => {}, onPeerLeave: (_id: string) => {} };
+  }, getPeers: () => ({ member: {} }), onPeerJoin: (_id: string) => {}, onPeerLeave: (_id: string) => {} };
   const original = { join: signalingManager.joinRoom, leave: signalingManager.leaveRoom, announce: signalingManager.reannounce };
   let transportJoins = 0;
   signalingManager.joinRoom = () => { transportJoins++; return room; };
@@ -272,7 +272,7 @@ test('hostless waiting joiner shows verified preview participants and buffers ea
   const room = { makeAction(name: string) {
     const action = { send: async (data: any) => { sent.push({ action: name, data }); } };
     actions.set(name, action); return action;
-  }, getPeers: () => ({ member: {} }), onPeerJoin: (_id: string) => {}, onPeerLeave: (_id: string) => {} };
+  }, getPeers: () => ({ member: {}, admin: {} }), onPeerJoin: (_id: string) => {}, onPeerLeave: (_id: string) => {} };
   const original = { join: signalingManager.joinRoom, leave: signalingManager.leaveRoom, announce: signalingManager.reannounce };
   signalingManager.joinRoom = () => room;
   signalingManager.leaveRoom = async () => {};

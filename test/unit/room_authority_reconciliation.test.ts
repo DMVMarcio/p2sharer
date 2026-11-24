@@ -33,7 +33,7 @@ test('admitted peers reconcile signed commands; unauthenticated peers cannot req
       actions.set(name, action);
       return action;
     },
-    getPeers: () => ({}),
+    getPeers: () => ({ member: {} }),
     addStream: () => { mediaSends += 1; return []; },
     onPeerJoin: (_peerId: string) => {},
     onPeerLeave: (_peerId: string) => {},
@@ -161,6 +161,214 @@ test('admitted peers reconcile signed commands; unauthenticated peers cannot req
     assert.equal(manager.isPeerAdmin('member'), false);
   } finally {
     await manager.leave();
+    await savedRooms.remove(invite.roomId);
+    (signalingManager as any).joinRoom = originalJoin;
+    (signalingManager as any).leaveRoom = originalLeave;
+    (signalingManager as any).reannounce = originalReannounce;
+  }
+});
+
+test('relayed admission admits indirect newcomers through an admitted peer while rejecting invalid proofs and banned keys', async () => {
+  const created = await createAuthenticatedInvite('Relayed admission test');
+  const invite = parseRoomInvite(created.invite)!;
+  await savedRooms.put({
+    roomId: invite.roomId, invite: created.invite, name: 'Relayed admission test',
+    saved: true, owned: true, identity: created.identity,
+  });
+
+  const makeMockRoom = (peers: Record<string, object>) => {
+    const actions = new Map<string, Action>();
+    const sent: Array<{ action: string; data: any; target?: string }> = [];
+    const room = {
+      makeAction(name: string): Action {
+        const action: Action = {
+          send: async (data, options) => { sent.push({ action: name, data, target: options?.target }); },
+        };
+        actions.set(name, action);
+        return action;
+      },
+      getPeers: () => peers,
+      addStream: () => [],
+      onPeerJoin: (_peerId: string) => {},
+      onPeerLeave: (_peerId: string) => {},
+      onPeerStream: (_stream: MediaStream, _peerId: string) => {},
+    };
+    return { actions, sent, room };
+  };
+
+  const originalJoin = signalingManager.joinRoom;
+  const originalLeave = signalingManager.leaveRoom;
+  const originalReannounce = signalingManager.reannounce;
+  (signalingManager as any).leaveRoom = async () => {};
+  (signalingManager as any).reannounce = async () => {};
+
+  const callbacks = {
+    onStreamsUpdate: () => {}, onSlotsUpdate: () => {}, onChat: () => {},
+    onChatHistory: () => {}, onPeersUpdate: () => {}, onStatusChange: () => {},
+  };
+
+  const hostNet = makeMockRoom({ member: {} });
+  const relayNet = makeMockRoom({ host: {}, newcomer: {} });
+  const newcomerNet = makeMockRoom({ member: {} });
+
+  let currentRoom: any = hostNet.room;
+  (signalingManager as any).joinRoom = () => currentRoom;
+
+  const hostManager = new GroupRoomManager('Host', created.invite, '', true);
+  let relayManager: GroupRoomManager | undefined;
+  let newcomerManager: GroupRoomManager | undefined;
+
+  const verifyDirectPeer = async (
+    actions: Map<string, Action>,
+    sent: Array<{ action: string; data: any; target?: string }>,
+    peerId: string,
+    auth: PeerAuthenticator,
+  ) => {
+    const challenge = sent.findLast((item) => item.action === 'peer_identity' &&
+      item.data.kind === 'challenge' && item.target === peerId)!.data.nonce;
+    await actions.get('peer_identity')!.onMessage!({
+      kind: 'proof',
+      nonce: challenge,
+      key: auth.publicKey,
+      signature: await auth.signControl('identity', [invite.roomId, peerId, challenge]),
+    }, { peerId });
+  };
+
+  try {
+    currentRoom = hostNet.room;
+    await hostManager.join(callbacks);
+
+    // Isolate guest identity creation in shared process from host's savedRooms & localKeys cache.
+    await savedRooms.remove(invite.roomId);
+    const localAuthCache = (PeerAuthenticator as any).localKeys as Map<string, unknown>;
+    localAuthCache.delete(JSON.stringify([invite.roomId.toLowerCase(), hostManager.getLocalPeerId()]));
+
+    currentRoom = relayNet.room;
+    relayManager = new GroupRoomManager('MemberRelay', created.invite, '', false);
+    await relayManager.join(callbacks, false);
+
+    localAuthCache.delete(JSON.stringify([invite.roomId.toLowerCase(), relayManager.getLocalPeerId()]));
+    currentRoom = newcomerNet.room;
+    newcomerManager = new GroupRoomManager('Newcomer', created.invite, '', false);
+    await newcomerManager.join(callbacks, false);
+
+    const hostAuth = await PeerAuthenticator.create(invite.roomId, 'host', created.identity);
+    const memberAuth = await PeerAuthenticator.create(invite.roomId, 'member');
+    const newcomerAuth = await PeerAuthenticator.create(invite.roomId, 'newcomer');
+
+    // Host verifies and admits member directly
+    hostNet.room.onPeerJoin('member');
+    await verifyDirectPeer(hostNet.actions, hostNet.sent, 'member', memberAuth);
+    await hostNet.actions.get('room_admission')!.onMessage!({ kind: 'request', password: '' }, { peerId: 'member' });
+    const hostAdmittedMember = hostNet.sent.findLast((item) =>
+      item.action === 'room_admission' && item.data.kind === 'command' && item.data.command.kind === 'admit')!.data.command;
+
+    // Relay member authenticates host and applies its own admission
+    const relaySelfId = relayManager.getLocalPeerId();
+    const relaySelfKey = (relayManager as any).chatAuth.publicKey as string;
+    const hostAuthority = new RoomAuthority(invite.roomId, invite.rootKey, hostAuth);
+    const relaySelfAdmit = await hostAuthority.makeCommand('admit', { targetPeerId: relaySelfId, targetKey: relaySelfKey });
+    relayNet.room.onPeerJoin('host');
+    await verifyDirectPeer(relayNet.actions, relayNet.sent, 'host', hostAuth);
+    await relayNet.actions.get('room_admission')!.onMessage!({ kind: 'command', command: relaySelfAdmit }, { peerId: 'host' });
+    assert.equal(relayManager.hasAdmission(), true);
+
+    // Relay member connects directly to newcomer (which cannot reach host)
+    relayNet.room.onPeerJoin('newcomer');
+    await verifyDirectPeer(relayNet.actions, relayNet.sent, 'newcomer', newcomerAuth);
+    assert.ok(relayNet.sent.some((item) =>
+      item.action === 'room_admission' && item.target === 'newcomer' && item.data.kind === 'relay-ready'),
+      'admitted peer connected to host should advertise relay-ready to newcomer');
+
+    // Newcomer connects directly only to member and triggers relay-request
+    const newcomerSelfId = newcomerManager.getLocalPeerId();
+    const newcomerSelfKey = (newcomerManager as any).chatAuth.publicKey as string;
+    newcomerNet.room.onPeerJoin('member');
+    await verifyDirectPeer(newcomerNet.actions, newcomerNet.sent, 'member', memberAuth);
+    await newcomerNet.actions.get('room_admission')!.onMessage!({ kind: 'relay-ready' }, { peerId: 'member' });
+    const newcomerReq = newcomerNet.sent.findLast((item) =>
+      item.action === 'room_admission' && item.target === 'member' && item.data.kind === 'relay-request')!.data;
+    assert.equal(newcomerReq.password, '', 'relayed admission must not send a room password through third parties');
+    assert.equal(newcomerReq.targetPeerId, newcomerSelfId);
+    assert.equal(newcomerReq.targetKey, newcomerSelfKey);
+
+    // Relay rejects forged proof or banned key when acting on behalf of a newcomer on host
+    const forgedSig = `${'a'.repeat(128)}`;
+    hostNet.sent.length = 0;
+    await hostNet.actions.get('room_admission')!.onMessage!({
+      kind: 'relay-request',
+      targetPeerId: 'newcomer',
+      targetKey: newcomerAuth.publicKey,
+      password: '',
+      signature: forgedSig,
+    }, { peerId: 'member' });
+    assert.equal(hostNet.sent.some((item) => item.action === 'room_admission' && item.data.kind === 'command'), false);
+
+    // Admitted relay forwards newcomer's genuine signed relay-request to host
+    const sigForHost = await newcomerAuth.signControl('relay-admit', [invite.roomId, 'newcomer', newcomerAuth.publicKey]);
+    relayNet.sent.length = 0;
+    await relayNet.actions.get('room_admission')!.onMessage!({
+      kind: 'relay-request',
+      targetPeerId: 'newcomer',
+      targetKey: newcomerAuth.publicKey,
+      password: '',
+      signature: sigForHost,
+    }, { peerId: 'newcomer' });
+    const forwardedToHost = relayNet.sent.findLast((item) =>
+      item.action === 'room_admission' && item.target === 'host' && item.data.kind === 'relay-request')!.data;
+
+    hostNet.sent.length = 0;
+    await hostNet.actions.get('room_admission')!.onMessage!(forwardedToHost, { peerId: 'member' });
+    const issuedCommand = hostNet.sent.findLast((item) =>
+      item.action === 'room_admission' && item.target === 'member' && item.data.kind === 'command')?.data.command;
+    assert.ok(issuedCommand && issuedCommand.kind === 'admit' && issuedCommand.targetPeerId === 'newcomer');
+
+    // Relay receives host command and forwards [selfAdmit, newcomerAdmit, sync] to newcomer
+    relayNet.sent.length = 0;
+    await relayNet.actions.get('room_admission')!.onMessage!({ kind: 'command', command: issuedCommand }, { peerId: 'host' });
+    const packetsToNewcomer = relayNet.sent
+      .filter((item) => item.action === 'room_admission' && item.target === 'newcomer')
+      .map((item) => item.data);
+    assert.equal(packetsToNewcomer[0]?.kind, 'command');
+    assert.equal(packetsToNewcomer[0]?.command?.targetPeerId, relaySelfId);
+    assert.equal(packetsToNewcomer[1]?.kind, 'command');
+    assert.equal(packetsToNewcomer[1]?.command?.targetPeerId, 'newcomer');
+    assert.equal(packetsToNewcomer[2]?.kind, 'sync');
+
+    await relayNet.actions.get('presence')!.onMessage!({ username: 'Newcomer' }, { peerId: 'newcomer' });
+    assert.equal(relayManager.getConnectedPeers().some((peer) => peer.id === 'newcomer'), true,
+      'admitted relay must display the newly admitted newcomer after presence');
+
+    // Verify newcomer side admits both member (first command) and itself (second command), then accepts sync
+    const memberAdmitCmd = await hostAuthority.makeCommand('admit', { targetPeerId: 'member', targetKey: memberAuth.publicKey });
+    const newcomerAdmitCmd = await hostAuthority.makeCommand('admit', { targetPeerId: newcomerSelfId, targetKey: newcomerSelfKey });
+    await newcomerNet.actions.get('room_admission')!.onMessage!({ kind: 'command', command: memberAdmitCmd }, { peerId: 'member' });
+    await newcomerNet.actions.get('room_admission')!.onMessage!({ kind: 'command', command: newcomerAdmitCmd }, { peerId: 'member' });
+    await newcomerNet.actions.get('room_admission')!.onMessage!(
+      { kind: 'sync', commands: [hostAdmittedMember, memberAdmitCmd, newcomerAdmitCmd] },
+      { peerId: 'member' },
+    );
+    assert.equal(newcomerManager.hasAdmission(), true);
+    await newcomerNet.actions.get('presence')!.onMessage!({ username: 'MemberRelay' }, { peerId: 'member' });
+    assert.equal(newcomerManager.getConnectedPeers().some((peer) => peer.id === 'member'), true,
+      'relayed newcomer must accept trusted sync and display its relay peer');
+
+    // Banned keys must still be rejected on relay-request
+    const bannedAuth = await PeerAuthenticator.create(invite.roomId, 'banned-peer');
+    (hostManager as any).bannedKeys.add(bannedAuth.publicKey);
+    hostNet.sent.length = 0;
+    await hostNet.actions.get('room_admission')!.onMessage!({
+      kind: 'relay-request',
+      targetPeerId: 'banned-peer',
+      targetKey: bannedAuth.publicKey,
+      password: '',
+      signature: await bannedAuth.signControl('relay-admit', [invite.roomId, 'banned-peer', bannedAuth.publicKey]),
+    }, { peerId: 'member' });
+    assert.equal(hostNet.sent.some((item) => item.action === 'room_admission' && item.data.kind === 'command'), false);
+  } finally {
+    await newcomerManager?.leave();
+    await relayManager?.leave();
+    await hostManager.leave();
     await savedRooms.remove(invite.roomId);
     (signalingManager as any).joinRoom = originalJoin;
     (signalingManager as any).leaveRoom = originalLeave;

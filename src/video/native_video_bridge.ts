@@ -675,10 +675,11 @@ export class NativeVideoBridge implements VideoCaptureBridge {
           const frame = this.latestEncodedFrame || this.latestJpegFrame;
           logDiagnostic('INFO', 'capture.preview', 'First native preview frame decoded', {
             sessionId: this.sessionId, sourceId, encoder: wireEncoder,
+            nativeRtpEligible: receivedNativeEncoding,
             width: frame ? ('displayWidth' in frame ? frame.displayWidth : frame.width) : undefined,
             height: frame ? ('displayHeight' in frame ? frame.displayHeight : frame.height) : undefined,
             elapsedMs: Math.round(performance.now() - captureStarted) });
-          if (stream.getVideoTracks()[0]) {
+          if (receivedNativeEncoding && stream.getVideoTracks()[0]) {
             registerNativeSenderSource(stream.getVideoTracks()[0], { sessionId: this.sessionId, feedbackToken });
           }
           resolve();

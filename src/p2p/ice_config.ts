@@ -1,5 +1,6 @@
 import type { TurnConfig } from '../core/types.ts';
 import { t } from '../i18n/index.ts';
+import { logDiagnostic } from '../core/logger.ts';
 import { selectedIcePair } from '../core/ice_route.ts';
 import { diagnosticOpaqueId } from '../core/diagnostic_id.ts';
 import { classifyIceAddress, fingerprintIceAddress } from '../core/ice_address_diagnostics.ts';
@@ -161,6 +162,7 @@ export async function resolveTurnConfig(
     (typeof localStorage === 'undefined' || localStorage.getItem('p2sharer_turn_fallback') !== 'false');
 
   if (!fallbackEnabled) {
+    logDiagnostic('INFO', 'p2p.turn', 'Automatic TURN fallback disabled by user preference', {});
     return { enabled: false, forceRelay: false, fallbackEnabled: false };
   }
 
@@ -183,6 +185,7 @@ export async function resolveTurnConfig(
 
   const requestEpoch = ++fallbackEpoch;
   const task: Promise<TurnConfig> = (async () => {
+    const started = performance.now();
     const controller = typeof AbortController !== 'undefined' ? new AbortController() : null;
     const timeoutId = controller ? setTimeout(() => controller.abort(), 2500) : undefined;
     const cacheResult = (config: TurnConfig, ttlMs: number) => {
@@ -197,6 +200,10 @@ export async function resolveTurnConfig(
         ...(controller ? { signal: controller.signal } : {}),
       });
       if (!response.ok) {
+        logDiagnostic('WARN', 'p2p.turn', 'Automatic TURN endpoint returned non-OK status', {
+          status: response.status,
+          elapsedMs: Math.round(performance.now() - started),
+        });
         return cacheResult({ enabled: false, forceRelay: false, fallbackEnabled: true }, 30_000);
       }
       const data = await response.json() as {
@@ -230,11 +237,26 @@ export async function resolveTurnConfig(
             forceRelay: false,
             fallbackEnabled: true,
           };
+          logDiagnostic('INFO', 'p2p.turn', 'Automatic TURN fallback credentials resolved', {
+            serverCount: urls.length,
+            ttlSeconds,
+            elapsedMs: Math.round(performance.now() - started),
+          });
           return cacheResult(resolved, Math.max(30_000, (ttlSeconds - 300) * 1000));
         }
       }
+      logDiagnostic('WARN', 'p2p.turn', 'Automatic TURN endpoint returned no usable servers', {
+        enabled: data?.enabled === true,
+        hasUrls: Array.isArray(data?.urls) ? data.urls.length : 0,
+        elapsedMs: Math.round(performance.now() - started),
+      });
       return cacheResult({ enabled: false, forceRelay: false, fallbackEnabled: true }, 30_000);
-    } catch {
+    } catch (error) {
+      logDiagnostic('WARN', 'p2p.turn', 'Automatic TURN fetch failed', {
+        errorName: error instanceof Error ? error.name : typeof error,
+        errorMessage: error instanceof Error ? error.message : String(error),
+        elapsedMs: Math.round(performance.now() - started),
+      });
       return cacheResult({ enabled: false, forceRelay: false, fallbackEnabled: true }, 30_000);
     } finally {
       if (timeoutId !== undefined) clearTimeout(timeoutId);

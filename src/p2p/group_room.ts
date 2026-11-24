@@ -219,14 +219,43 @@ export class GroupRoomManager {
       void signalingManager.reannounce(this.signalingTopic);
     }
     for (const peerId of this.peerTracker.directConnectedPeers) {
-      if (this.chatAuth?.getKnownKey(peerId)) void this.previewAction?.send(
+      if (this.isLivePeerTarget(peerId) && this.chatAuth?.getKnownKey(peerId)) void this.previewAction?.send(
         { kind: 'request', nonce: this.previewNonce }, { target: peerId });
     }
   }
 
   private async requestAdmission(peerId: string): Promise<void> {
     if (this.previewOnly) { this.requestPreview(); return; }
+    if (!this.isLivePeerTarget(peerId)) return;
     await this.admissionAction?.send({ kind: 'request', password: this.password }, { target: peerId });
+  }
+
+  private findAdmissionRelayTarget(): string | null {
+    for (const peerId of this.peerTracker.directConnectedPeers) {
+      if (this.isLivePeerTarget(peerId) && this.chatAuth?.getKnownKey(peerId) &&
+          (this.authority?.isPeerHost(peerId) || this.isPeerAdmin(peerId))) {
+        return peerId;
+      }
+    }
+    return null;
+  }
+
+  private async sendRelayedAdmissionRequest(relayPeerId: string): Promise<void> {
+    if (this.previewOnly || !this.authority || !this.chatAuth || this.localAdmitted ||
+        this.admissionDenied || !this.admissionAction) return;
+    if (!this.isLivePeerTarget(relayPeerId)) return;
+    const signature = await this.chatAuth.signControl('relay-admit', [this.roomId, selfId, this.chatAuth.publicKey]);
+    if (!this.room || this.previewOnly || this.localAdmitted || this.admissionDenied || !this.isLivePeerTarget(relayPeerId)) return;
+    await this.admissionAction.send({
+      kind: 'relay-request',
+      targetPeerId: selfId,
+      targetKey: this.chatAuth.publicKey,
+      password: '',
+      signature,
+    }, { target: relayPeerId });
+    logDiagnostic('INFO', 'p2p.admission', 'Sent relayed admission request via admitted peer', {
+      relayPeer: relayPeerId.slice(0, 6),
+    });
   }
   private username: string;
   private roomId: string;
@@ -390,6 +419,7 @@ export class GroupRoomManager {
   );
   private payloadPeerAllowed(peer: string): boolean {
     return Boolean(this.room && !this.previewOnly && this.peerTracker.isVerified(peer) &&
+      this.isLivePeerTarget(peer) &&
       (!this.authority || (this.localAdmitted && this.isAdmittedPeer(peer))));
   }
   private async sendProfilePayload(packet: any, peer: string, banner = false): Promise<unknown> {
@@ -429,6 +459,7 @@ export class GroupRoomManager {
   private pendingChallenges = new Map<string, string>();
   private admissionHistory: HostCommand[] = [];
   private adminAdmissions = new Map<string, AdminAdmission>();
+  private relayedAdmissionPeers = new Set<string>();
   private latestPasswordCommand = -1;
   private passwordCommandEpoch = -1;
   private lastAuthoritySummary = 0;
@@ -1208,19 +1239,39 @@ export class GroupRoomManager {
       void savedRooms.get(this.roomId).then((record) => {
         if (record && this.authority && this.chatAuth) {
           if (this.authority.isLocalHost()) this.guestInOwnedRoom = false;
-          return savedRooms.put({ ...record, invite: this.invite ?? record.invite,
-            name: this.roomName, owned: this.authority.isLocalHost(),
+          const nextInvite = this.invite && parseRoomInvite(this.invite)?.roomId === record.roomId
+            ? this.invite
+            : record.invite;
+          const rawName = typeof this.roomName === 'string' && this.roomName.trim()
+            ? this.roomName.trim()
+            : record.name;
+          const nextName = rawName.slice(0, 80) || record.name;
+          return savedRooms.put({
+            ...record,
+            invite: nextInvite,
+            name: nextName,
+            customName: savedRoomCustomName(record),
+            owned: this.authority.isLocalHost(),
             identity: this.authority.isLocalHost() ? this.chatAuth.exportIdentity() : record.identity,
-            authorityChain: this.authority.history() });
+            authorityChain: this.authority.history().slice(-100),
+            hostCommands: record.hostCommands?.slice(-200),
+          });
         }
-      }).catch((error) => console.warn('[Rooms] Failed to persist host transition:', error));
+      }).catch((error) => {
+        console.warn('[Rooms] Failed to persist host transition:', error);
+        logDiagnostic('WARN', 'p2p.rooms', 'Failed to persist host transition', {
+          roomId: this.roomId.slice(0, 8),
+          errorName: error instanceof Error ? error.name : typeof error,
+          errorMessage: error instanceof Error ? error.message : String(error),
+        });
+      });
     }
     this.notifyPeersUpdate();
   }
 
   private announceToPeer(peerId: string): void {
     if (this.previewOnly) return;
-    if (!this.room || !this.peerTracker.isVerified(peerId)) return;
+    if (!this.room || !this.peerTracker.isVerified(peerId) || !this.isLivePeerTarget(peerId)) return;
     if (this.authority && (!this.localAdmitted || !this.isAdmittedPeer(peerId))) return;
     this.presenceAction?.send(this.buildPresencePayload(), { target: peerId });
     void this.profileTransfer?.announce(peerId).catch(() => {});
@@ -1236,6 +1287,7 @@ export class GroupRoomManager {
   private applyAdmittedPeer(peerId: string, key: string, batch = false): void {
     if (this.previewOnly && peerId === selfId) return;
     if (this.bannedKeys.has(key)) return;
+    const isNewAdmission = this.admittedPeers.get(peerId) !== key;
     this.admittedPeers.set(peerId, key);
     if (peerId === selfId) {
       this.localAdmitted = true;
@@ -1244,6 +1296,13 @@ export class GroupRoomManager {
       this.callbacks?.onStatusChange(this.turnConfig?.forceRelay
         ? 'P2P (Relay Seguro)'
         : `P2P Conectado (${signalingManager.getActiveTransport().toUpperCase()})`);
+    }
+    if (isNewAdmission) {
+      logDiagnostic('INFO', 'p2p.admission', 'Peer admitted to room', {
+        peer: peerId.slice(0, 6),
+        isSelf: peerId === selfId,
+        admittedCount: this.admittedPeers.size,
+      });
     }
     if (batch) return;
     if (this.chatAuth?.getKnownKey(peerId) === key && peerId !== selfId) this.announceToPeer(peerId);
@@ -1295,6 +1354,41 @@ export class GroupRoomManager {
     await this.admissionAction?.send({ kind: 'sync', commands: this.admissionHistory }, { target: peerId });
   }
 
+  private async deliverRelayedAdmission(
+    targetPeerId: string,
+    packet: Record<string, unknown>,
+    issuer: 'host' | 'admin',
+  ): Promise<void> {
+    if (!this.relayedAdmissionPeers.delete(targetPeerId) ||
+        !this.isLivePeerTarget(targetPeerId) ||
+        !this.admissionAction) return;
+    const selfKey = this.chatAuth?.publicKey;
+    let selfAdmit: HostCommand | undefined;
+    if (selfKey) {
+      for (let i = this.admissionHistory.length - 1; i >= 0; i--) {
+        const command = this.admissionHistory[i];
+        if (command.kind === 'admit' && command.targetPeerId === selfId && command.targetKey === selfKey) {
+          selfAdmit = command;
+          break;
+        }
+      }
+    }
+    if (selfAdmit) {
+      await this.admissionAction.send({ kind: 'command', command: selfAdmit }, { target: targetPeerId });
+    } else {
+      const selfAdminAdmit = this.adminAdmissions.get(selfId);
+      if (selfAdminAdmit) {
+        await this.admissionAction.send({ kind: 'admin-admit', admission: selfAdminAdmit }, { target: targetPeerId });
+      }
+    }
+    await this.admissionAction.send(packet, { target: targetPeerId });
+    await this.admissionAction.send({ kind: 'sync', commands: this.admissionHistory }, { target: targetPeerId });
+    logDiagnostic('INFO', 'p2p.admission', 'Delivered relayed admission to newcomer', {
+      targetPeer: targetPeerId.slice(0, 6),
+      issuer,
+    });
+  }
+
   private async acceptAdminAdmission(admission: AdminAdmission): Promise<void> {
     if (!this.authority || !this.chatAuth || !await this.authority.verifyAdminAdmission(admission) ||
         this.bannedKeys.has(admission.adminKey) || this.bannedKeys.has(admission.targetKey)) return;
@@ -1311,6 +1405,7 @@ export class GroupRoomManager {
     if (targetKey !== admission.targetKey) return;
     this.adminAdmissions.set(admission.targetPeerId, admission);
     this.applyAdmittedPeer(admission.targetPeerId, admission.targetKey);
+    await this.deliverRelayedAdmission(admission.targetPeerId, { kind: 'admin-admit', admission }, 'admin');
   }
 
   private async persistHostCommands(): Promise<void> {
@@ -1479,6 +1574,8 @@ export class GroupRoomManager {
             if (this.admittedPeers.has(peerId)) this.announceToPeer(peerId);
           }
         }
+      } else {
+        await this.deliverRelayedAdmission(command.targetPeerId, { kind: 'command', command }, 'host');
       }
     } else if (command.kind === 'kick' && command.targetPeerId && command.targetKey) {
       this.removeKickedPeer(command.targetPeerId, command.targetKey);
@@ -1703,7 +1800,12 @@ export class GroupRoomManager {
                    [this.roomId, meta.peerId, data.nonce], data.signature, data.key)) {
         if (this.room !== boundRoom || !this.chatAuth.pinDirect(meta.peerId, data.key)) return;
         this.pendingChallenges.delete(meta.peerId);
-        if (this.invite && this.snapshot) {
+        logDiagnostic('INFO', 'p2p.admission', 'Peer identity proof verified', {
+          peer: meta.peerId.slice(0, 6),
+          isHost: Boolean(this.authority?.isPeerHost(meta.peerId)),
+          isAdmin: this.isPeerAdmin(meta.peerId),
+        });
+        if (this.invite && this.snapshot && this.isLivePeerTarget(meta.peerId)) {
           await this.inviteAction?.send({ invite: this.invite }, { target: meta.peerId });
         }
         this.syncHostRole();
@@ -1718,21 +1820,26 @@ export class GroupRoomManager {
         }
         const pendingAdminAdmission = this.adminAdmissions.get(meta.peerId);
         if (pendingAdminAdmission) await this.acceptAdminAdmission(pendingAdminAdmission);
-        if (this.isRoomAdmin()) {
+        if (this.isRoomAdmin() && this.isLivePeerTarget(meta.peerId)) {
           for (const admission of this.adminAdmissions.values()) {
             await this.admissionAction?.send({ kind: 'admin-admit', admission }, { target: meta.peerId });
           }
         }
         if (this.admittedPeers.get(meta.peerId) === data.key) this.announceToPeer(meta.peerId);
-        if (this.admittedPeers.get(meta.peerId) === data.key) {
+        if (this.admittedPeers.get(meta.peerId) === data.key && this.isLivePeerTarget(meta.peerId)) {
           await this.sendAuthoritySummary(meta.peerId);
         }
         if (this.authority?.isPeerHost(meta.peerId) || this.isPeerAdmin(meta.peerId)) {
           await this.requestAdmission(meta.peerId);
         } else if (this.authority?.isLocalHost() || this.isRoomAdmin()) {
           if (this.isRoomAdmin()) await this.issueAdminAdmission(selfId);
-          await this.admissionAction?.send({ kind: 'prompt' }, { target: meta.peerId });
-        } else {
+          if (this.isLivePeerTarget(meta.peerId)) {
+            await this.admissionAction?.send({ kind: 'prompt' }, { target: meta.peerId });
+          }
+        } else if (this.isLivePeerTarget(meta.peerId)) {
+          if (this.localAdmitted && this.findAdmissionRelayTarget()) {
+            await this.admissionAction?.send({ kind: 'relay-ready' }, { target: meta.peerId });
+          }
           await this.admissionAction?.send({ kind: 'admin-hello-request' }, { target: meta.peerId });
         }
       }
@@ -1778,6 +1885,7 @@ export class GroupRoomManager {
     this.admissionAction.onMessage = async (data: {
       kind?: string; password?: string; command?: HostCommand; commands?: HostCommand[];
       admission?: AdminAdmission; epoch?: number; fingerprint?: string;
+      targetPeerId?: string; targetKey?: string; signature?: string;
     }, meta: { peerId: string }) => {
       if (this.previewOnly || !this.authority || !this.chatAuth || !data) return;
       const senderKey = this.chatAuth.getKnownKey(meta.peerId);
@@ -1795,20 +1903,120 @@ export class GroupRoomManager {
           this.admissionRequests.set(meta.peerId, now);
           if (this.authority.isLocalHost()) await this.issueAdmission(meta.peerId);
           else await this.issueAdminAdmission(meta.peerId);
-        } else if (key) {
+        } else if (key && this.isLivePeerTarget(meta.peerId)) {
           await this.admissionAction.send({ kind: 'denied' }, { target: meta.peerId });
         }
       } else if (data.kind === 'prompt') {
         if (this.authority.isPeerHost(meta.peerId) || this.isPeerAdmin(meta.peerId)) {
           await this.requestAdmission(meta.peerId);
-        } else if (!this.localAdmitted) {
+        } else if (!this.localAdmitted && this.isLivePeerTarget(meta.peerId)) {
           await this.admissionAction.send({ kind: 'admin-hello-request' }, { target: meta.peerId });
         }
       } else if (data.kind === 'admin-hello-request' && this.isRoomAdmin()) {
         await this.issueAdminAdmission(selfId);
-        await this.admissionAction.send({ kind: 'prompt' }, { target: meta.peerId });
+        if (this.isLivePeerTarget(meta.peerId)) {
+          await this.admissionAction.send({ kind: 'prompt' }, { target: meta.peerId });
+        }
+      } else if (data.kind === 'admin-hello-request' && this.localAdmitted &&
+                 this.findAdmissionRelayTarget() && this.isLivePeerTarget(meta.peerId)) {
+        await this.admissionAction.send({ kind: 'relay-ready' }, { target: meta.peerId });
+      } else if (data.kind === 'relay-ready') {
+        if (!this.localAdmitted && !this.admissionDenied && !this.findAdmissionRelayTarget()) {
+          await this.sendRelayedAdmissionRequest(meta.peerId);
+        }
+      } else if (data.kind === 'relay-request') {
+        const targetPeerId = typeof data.targetPeerId === 'string' &&
+          data.targetPeerId.length > 0 && data.targetPeerId.length <= 80 ? data.targetPeerId : null;
+        const targetKey = typeof data.targetKey === 'string' &&
+          /^04[0-9a-f]{128}$/.test(data.targetKey) ? data.targetKey : null;
+        const signature = typeof data.signature === 'string' &&
+          /^[0-9a-f]{128}$/.test(data.signature) ? data.signature : null;
+        if (!targetPeerId || !targetKey || !signature || this.bannedKeys.has(targetKey)) return;
+
+        if (this.authority.isLocalHost() || this.isRoomAdmin()) {
+          const relayAllowed = trustedStateSender || (meta.peerId === targetPeerId && senderKey === targetKey);
+          if (!relayAllowed || !await this.chatAuth.verifyControl('relay-admit',
+              [this.roomId, targetPeerId, targetKey], signature, targetKey)) {
+            logDiagnostic('WARN', 'p2p.admission', 'Relayed admission rejected (invalid relay proof)', {
+              targetPeer: targetPeerId.slice(0, 6), viaPeer: meta.peerId.slice(0, 6),
+            });
+            return;
+          }
+          const returningMember = this.admissionHistory.some((command) =>
+            command.kind === 'admit' && command.targetKey === targetKey);
+          if ((data.password ?? '') !== this.password && !returningMember) {
+            logDiagnostic('WARN', 'p2p.admission', 'Relayed admission rejected (password required)', {
+              targetPeer: targetPeerId.slice(0, 6), viaPeer: meta.peerId.slice(0, 6),
+            });
+            return;
+          }
+          const now = Date.now();
+          const previous = this.admissionRequests.get(targetPeerId);
+          if (previous !== undefined && now - previous < 1500) return;
+          this.admissionRequests.set(targetPeerId, now);
+
+          if (this.authority.isLocalHost()) {
+            const command = await this.authority.makeCommand('admit', { targetPeerId, targetKey });
+            this.admissionHistory.push(command);
+            this.retainAdmissionHistory();
+            await this.persistHostCommands();
+            this.applyAdmittedPeer(targetPeerId, targetKey);
+            if (this.isLivePeerTarget(meta.peerId)) {
+              await this.admissionAction.send({ kind: 'command', command }, { target: meta.peerId });
+            }
+            for (const target of this.admittedTargets()) {
+              if (target !== meta.peerId) {
+                await this.admissionAction.send({ kind: 'command', command }, { target });
+              }
+            }
+            logDiagnostic('INFO', 'p2p.admission', 'Host issued relayed admission', {
+              targetPeer: targetPeerId.slice(0, 6), viaPeer: meta.peerId.slice(0, 6),
+            });
+          } else {
+            const grant = this.adminGrant(this.chatAuth.publicKey);
+            if (!grant) return;
+            const admission = await this.authority.signAdminAdmission(targetPeerId, targetKey, grant);
+            this.adminAdmissions.set(targetPeerId, admission);
+            this.applyAdmittedPeer(targetPeerId, targetKey);
+            if (this.isLivePeerTarget(meta.peerId)) {
+              await this.admissionAction.send({ kind: 'admin-admit', admission }, { target: meta.peerId });
+            }
+            for (const target of this.admittedTargets()) {
+              if (target !== meta.peerId) {
+                await this.admissionAction.send({ kind: 'admin-admit', admission }, { target });
+              }
+            }
+            logDiagnostic('INFO', 'p2p.admission', 'Admin issued relayed admission', {
+              targetPeer: targetPeerId.slice(0, 6), viaPeer: meta.peerId.slice(0, 6),
+            });
+          }
+        } else if (this.localAdmitted) {
+          if (meta.peerId !== targetPeerId || senderKey !== targetKey) return;
+          const now = Date.now();
+          const previous = this.admissionRequests.get(targetPeerId);
+          if (previous !== undefined && now - previous < 1500) return;
+          this.admissionRequests.set(targetPeerId, now);
+          const hostTarget = this.findAdmissionRelayTarget();
+          if (!hostTarget) {
+            logDiagnostic('WARN', 'p2p.admission', 'Cannot relay admission request: no live host/admin connected', {
+              targetPeer: targetPeerId.slice(0, 6),
+            });
+            return;
+          }
+          this.relayedAdmissionPeers.add(targetPeerId);
+          await this.admissionAction.send({
+            kind: 'relay-request',
+            targetPeerId,
+            targetKey,
+            password: '',
+            signature,
+          }, { target: hostTarget });
+          logDiagnostic('INFO', 'p2p.admission', 'Forwarded relayed admission request to host/admin', {
+            targetPeer: targetPeerId.slice(0, 6), hostPeer: hostTarget.slice(0, 6),
+          });
+        }
       } else if (data.kind === 'sync-request' && this.localAdmitted && senderKey &&
-                  this.admittedPeers.get(meta.peerId) === senderKey) {
+                  this.admittedPeers.get(meta.peerId) === senderKey && this.isLivePeerTarget(meta.peerId)) {
         await this.admissionAction.send({ kind: 'sync', commands: this.admissionHistory }, { target: meta.peerId });
       } else if (data.kind === 'summary' && trustedStateSender && this.localAdmitted &&
                  Number.isSafeInteger(data.epoch) && typeof data.fingerprint === 'string' &&
@@ -2279,7 +2487,7 @@ export class GroupRoomManager {
           this.rumorIntermediaries.set(data.origin, meta.peerId);
           this.peerTracker.receivePeerExchange(data.origin, false, typeof p.username === 'string' ? p.username.slice(0, 80) : undefined);
 
-          if (typeof p.publicKey === 'string' && /^[0-9a-f]{66}$/i.test(p.publicKey)) {
+          if (typeof p.publicKey === 'string' && /^04[0-9a-f]{128}$/.test(p.publicKey)) {
             this.chatAuth?.pinDirect(data.origin, p.publicKey);
           }
           this.peerTracker.setPeerRelayed(data.origin, true);
@@ -2315,7 +2523,7 @@ export class GroupRoomManager {
           const p = data.payload || {};
           this.rumorIntermediaries.set(data.origin, meta.peerId);
           this.peerTracker.receivePeerExchange(data.origin, false, typeof p.username === 'string' ? p.username.slice(0, 80) : undefined);
-          if (typeof p.publicKey === 'string' && /^[0-9a-f]{66}$/i.test(p.publicKey)) {
+          if (typeof p.publicKey === 'string' && /^04[0-9a-f]{128}$/.test(p.publicKey)) {
             this.chatAuth?.pinDirect(data.origin, p.publicKey);
           }
           this.peerTracker.setPeerRelayed(data.origin, true);
@@ -2342,7 +2550,8 @@ export class GroupRoomManager {
     this.pongAction = this.room.makeAction('peer_pong');
 
     this.pingAction.onMessage = (data: { t: number }, meta: { peerId: string }) => {
-      if (Number.isFinite(data?.t) && Math.abs(Date.now() - data.t) < 30000 && this.pongAction) {
+      if (Number.isFinite(data?.t) && Math.abs(Date.now() - data.t) < 30000 && this.pongAction &&
+          this.isLivePeerTarget(meta.peerId)) {
         try {
           this.pongAction.send({ t: data.t }, { target: meta.peerId });
         } catch {}
@@ -2561,7 +2770,7 @@ export class GroupRoomManager {
 
   private syncVoiceWithPeer(peerId: string): void {
     if (!this.room || this.previewOnly) return;
-    if (!this.peerTracker.isVerified(peerId)) return;
+    if (!this.peerTracker.isVerified(peerId) || !this.isLivePeerTarget(peerId)) return;
     if (this.authority && (!this.localAdmitted || !this.isAdmittedPeer(peerId))) return;
     if (this.localVoiceState.inVoice) {
       try {
@@ -2604,8 +2813,7 @@ export class GroupRoomManager {
             void Promise.resolve(op).catch(() => {});
           }
         }
-      }
-      if (typeof room.addStream === 'function') {
+      } else if (typeof room.addStream === 'function') {
         for (const op of room.addStream(stream, { target: peerId, metadata }) || []) {
           void Promise.resolve(op).catch(() => {});
         }
@@ -2831,12 +3039,16 @@ export class GroupRoomManager {
       if (pendingAdmission && now - this.lastAdmissionRetry >= 4000) {
         this.lastAdmissionRetry = now;
         this.requestPreview();
+        const hasDirectAdmitter = Boolean(this.findAdmissionRelayTarget());
         for (const peerId of this.peerTracker.directConnectedPeers) {
-          if (!this.chatAuth?.getKnownKey(peerId)) continue;
+          if (!this.isLivePeerTarget(peerId) || !this.chatAuth?.getKnownKey(peerId)) continue;
           if (this.authority?.isPeerHost(peerId) || this.isPeerAdmin(peerId)) {
             void this.requestAdmission(peerId).catch(error => console.warn('[Rooms] Admission retry failed:', error));
           } else {
             void Promise.resolve(this.admissionAction?.send({ kind: 'admin-hello-request' }, { target: peerId })).catch(() => {});
+            if (!hasDirectAdmitter) {
+              void this.sendRelayedAdmissionRequest(peerId).catch(() => {});
+            }
           }
         }
       }
@@ -2907,6 +3119,7 @@ export class GroupRoomManager {
     }
     this.admissionRequests.delete(peerId);
     this.pendingAdminAdmissions.delete(peerId);
+    this.relayedAdmissionPeers.delete(peerId);
     this.verifiedPreviewByResponder.delete(peerId);
     this.verifiedPreviewCanAdmit.delete(peerId);
     profileStats.forget(peerId);
@@ -3186,8 +3399,7 @@ export class GroupRoomManager {
           operations.push(Promise.resolve(operation).catch(error => console.warn('[Media] Track dispatch failed:', error)));
         }
       }
-    }
-    if (typeof room.addStream === 'function') {
+    } else if (typeof room.addStream === 'function') {
       for (const operation of room.addStream(entry.stream, { target: peerId, metadata: entry.descriptor }) || []) {
         operations.push(Promise.resolve(operation).then(() => {
           if (this.room !== room || this.localMedia.get(entry.descriptor.id) !== entry) {
@@ -4556,6 +4768,7 @@ export class GroupRoomManager {
     this.previewRequests.clear();
     this.admissionRequests.clear();
     this.pendingAdminAdmissions.clear();
+    this.relayedAdmissionPeers.clear();
     this.verifiedPreviewByResponder.clear();
     this.verifiedPreviewCanAdmit.clear();
     this.roomJoinOptions = null;
