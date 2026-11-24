@@ -44,6 +44,7 @@ test('a banner offer negotiates binary transfer before any avatar offer arrives'
   const manager = new GroupRoomManager('Viewer', 'profile-capability-fixture', '', false);
   const internal = manager as any;
   internal.room = mock.room;
+  mock.room.getPeers = () => ({ peer: {} });
   internal.bindRoomActions();
   internal.peerTracker.receivePeerExchange('peer', true);
   const requests: any[] = [];

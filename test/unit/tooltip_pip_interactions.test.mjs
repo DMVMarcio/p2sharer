@@ -21,7 +21,7 @@ const bundle = await build({ stdin: {
 }, bundle: true, write: false, platform: 'node', format: 'esm', jsx: 'automatic', plugins: [{ name: 'dependencies', setup(builder) {
   builder.onResolve({ filter: /^@tauri-apps\/api\/(core|window)$/ }, args => ({ path: args.path, namespace: 'desktop' }));
   builder.onLoad({ filter: /.*/, namespace: 'desktop' }, args => ({ contents: args.path.endsWith('/core')
-    ? 'export const isTauri = () => true;'
+    ? 'export const isTauri = () => true; export const invoke = async () => undefined;'
     : 'export const getCurrentWindow = () => ({ startDragging: async () => { globalThis.pipDragCalls++; } });' }));
   builder.onResolve({ filter: /^[^./]/ }, args => ({ path: pathToFileURL(require.resolve(args.path)).href, external: true }));
 } }] });

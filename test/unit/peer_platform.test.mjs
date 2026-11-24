@@ -27,7 +27,7 @@ const bundle = await build({
       setup(builder) {
         builder.onResolve({ filter: /^@tauri-apps\/api\/core$/ }, () => ({ path: 'tauri-core', namespace: 'fixture' }));
         builder.onLoad({ filter: /.*/, namespace: 'fixture' }, () => ({
-          contents: 'export const isTauri = () => typeof window !== "undefined" && Boolean(window.__TAURI_INTERNALS__);',
+          contents: 'export const isTauri = () => typeof window !== "undefined" && Boolean(window.__TAURI_INTERNALS__); export const invoke = async () => undefined;',
           loader: 'js',
         }));
         builder.onResolve({ filter: /^[^./]/ }, args => ({

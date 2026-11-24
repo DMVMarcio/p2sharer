@@ -23,7 +23,7 @@ const bundle = await build({ stdin: { contents: `export { PipWindowControls } fr
   plugins: [{ name: 'pip-window', setup(builder) {
     builder.onResolve({ filter: /^@tauri-apps\/api\/(core|window)$/ }, args => ({ path: args.path, namespace: 'fixture' }));
     builder.onLoad({ filter: /.*/, namespace: 'fixture' }, args => ({ contents: args.path.endsWith('/core')
-      ? 'export const isTauri = () => true;'
+      ? 'export const isTauri = () => true; export const invoke = async () => undefined;'
       : 'export const getCurrentWindow = () => globalThis.pipWindowFixture;' }));
     builder.onResolve({ filter: /^[^./]/ }, args => ({ path: import.meta.resolve(args.path), external: true }));
   } }] });
