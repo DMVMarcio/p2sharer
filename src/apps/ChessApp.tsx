@@ -180,6 +180,11 @@ export const ChessApp: React.FC<RoomAppViewProps> = ({ instanceId, compact = fal
 
   const describeRoomStatus = (room: ChessRoomState): string => {
     const { game } = room;
+    if (game.status === 'playing' && room.lockedBy === model.localActor) {
+      return game.inCheck
+        ? `${t('chess.soloModeStatus')} · ${t('chess.check')}`
+        : t('chess.soloModeStatus');
+    }
     if (game.status === 'checkmate' && (game.winner === 'w' || game.winner === 'b')) {
       const winnerId = game.winner === 'w' ? room.players.seat1 : room.players.seat2;
       const person = resolveActor(winnerId, model.localActor);
@@ -289,8 +294,9 @@ export const ChessApp: React.FC<RoomAppViewProps> = ({ instanceId, compact = fal
             : room.players.seat2 === model.localActor
               ? 'b'
               : null;
-        const isMyTurn = game.status === 'playing' && myColor !== null && game.turn === myColor;
-        const flipped = myColor === 'b';
+        const isSoloMode = room.lockedBy === model.localActor;
+        const isMyTurn = game.status === 'playing' && myColor !== null && (isSoloMode || game.turn === myColor);
+        const flipped = isSoloMode ? game.moveHistory.length % 2 === 1 : myColor === 'b';
 
         const activeOrigin = dragging ? dragging.from : selectedSquare;
         const legalMoves: ChessCandidateMove[] =
@@ -610,10 +616,10 @@ export const ChessApp: React.FC<RoomAppViewProps> = ({ instanceId, compact = fal
                 setSelectedSquare(null);
                 clearPlanning();
               }}
-              onSwapSeats={() => {
+              onSwapSeats={!isSoloMode ? () => {
                 model.swapSides(room.id);
                 clearPlanning();
-              }}
+              } : undefined}
               canResign={game.status === 'playing' && myColor !== null}
               onResign={() => model.resign(room.id)}
               extraContent={

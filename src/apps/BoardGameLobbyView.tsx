@@ -9,6 +9,7 @@ import {
   Eye,
   Flag,
   Grid3x3,
+  LockKeyhole,
   Play,
   Plus,
   RotateCcw,
@@ -806,15 +807,24 @@ export function CozyRoomSidePanel<TGame>({
             </div>
           ) : (
             <div className="cozy-seat-open-row">
-              <span className="cozy-seat-open-label">{t('games.openSeat')}</span>
-              <button
-                type="button"
-                className="cozy-wood-seat-btn"
-                onClick={() => model.joinRole(room.id, seat)}
-              >
-                <Play size={11} />
-                <span>{t('games.play')}</span>
-              </button>
+              {room.lockedBy && room.lockedBy !== model.localActor ? (
+                <span className="cozy-seat-open-label is-locked">
+                  <LockKeyhole size={11} aria-hidden="true" />
+                  {t('games.roomLocked')}
+                </span>
+              ) : (
+                <>
+                  <span className="cozy-seat-open-label">{t('games.openSeat')}</span>
+                  <button
+                    type="button"
+                    className="cozy-wood-seat-btn"
+                    onClick={() => model.joinRole(room.id, seat)}
+                  >
+                    <Play size={11} />
+                    <span>{t('games.play')}</span>
+                  </button>
+                </>
+              )}
             </div>
           )}
         </div>

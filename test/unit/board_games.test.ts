@@ -92,6 +92,7 @@ test('chess model enforces legal moves, turn order, and checkmate across rooms',
 
     // Fool's mate sequence: 1. f3 e5 2. g4 Qh4#
     assert.equal(wModel.makeMove(roomId, indexOf(6, 5), indexOf(5, 5)), true); // f2->f3
+    assert.equal(wModel.getRoom(roomId)?.lockedBy, undefined);
     assert.equal(bModel.makeMove(roomId, indexOf(1, 4), indexOf(3, 4)), true); // e7->e5
     assert.equal(wModel.makeMove(roomId, indexOf(6, 6), indexOf(4, 6)), true); // g2->g4
     assert.equal(bModel.makeMove(roomId, indexOf(0, 3), indexOf(4, 7)), true); // d8->h4#
@@ -103,6 +104,41 @@ test('chess model enforces legal moves, turn order, and checkmate across rooms',
   } finally {
     whitePeer.reset();
     blackPeer.reset();
+  }
+});
+
+test('a chess room locks for its lone first mover and lets them play both sides', () => {
+  const solo = new RoomAppsService();
+  const guest = new RoomAppsService();
+  solo.attach((event) => guest.receive(event, 'solo'), 'solo');
+  guest.attach((event) => solo.receive(event, 'guest'), 'guest');
+
+  try {
+    const instanceId = solo.start('chess');
+    const soloModel = solo.getModel<ChessModel>(instanceId)!;
+    const guestModel = guest.getModel<ChessModel>(instanceId)!;
+    const roomId = soloModel.createRoom('Solo chess', 'seat1')!;
+
+    assert.equal(soloModel.setTimeLimit(roomId, 60_000), true);
+    assert.equal(soloModel.makeMove(roomId, indexOf(6, 4), indexOf(4, 4)), true);
+    assert.equal(soloModel.getRoom(roomId)?.lockedBy, 'solo');
+    assert.equal(guestModel.getRoom(roomId)?.lockedBy, 'solo');
+    assert.equal(soloModel.getRoom(roomId)?.game.clock, null);
+    assert.equal(guestModel.joinRole(roomId, 'seat2'), false);
+    assert.equal(guestModel.joinRole(roomId, 'spectator'), false);
+
+    assert.equal(soloModel.makeMove(roomId, indexOf(1, 4), indexOf(3, 4)), true);
+    assert.equal(soloModel.getRoom(roomId)?.game.moveHistory.length, 2);
+    assert.equal(soloModel.getRoom(roomId)?.game.turn, 'w');
+
+    const sharedRoomId = soloModel.createRoom('Spectated chess', 'seat1')!;
+    assert.equal(guestModel.joinRole(sharedRoomId, 'spectator'), true);
+    assert.equal(soloModel.makeMove(sharedRoomId, indexOf(6, 4), indexOf(4, 4)), true);
+    assert.equal(soloModel.getRoom(sharedRoomId)?.lockedBy, undefined);
+    assert.equal(guestModel.joinRole(sharedRoomId, 'seat2'), true);
+  } finally {
+    solo.reset();
+    guest.reset();
   }
 });
 

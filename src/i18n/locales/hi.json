@@ -2119,5 +2119,7 @@
   "voice.micPermissionError": "माइक्रोफ़ोन एक्सेस अस्वीकार किया गया। सिस्टम अनुमतियां जांचें और पुनः प्रयास करें।",
   "voice.micUnavailableError": "माइक्रोफ़ोन नहीं खोला जा सका।",
   "voice.mobileMic": "माइक चालू",
-  "voice.mobileMuted": "म्यूट"
+  "voice.mobileMuted": "म्यूट",
+  "chess.soloModeStatus": "एकल मोड · हर चाल के बाद बोर्ड पलटें",
+  "games.roomLocked": "कमरा लॉक है"
 }

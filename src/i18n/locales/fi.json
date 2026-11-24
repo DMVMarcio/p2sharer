@@ -2119,5 +2119,7 @@
   "voice.micPermissionError": "Mikrofonin käyttö estettiin. Tarkista järjestelmän käyttöoikeudet ja yritä uudelleen.",
   "voice.micUnavailableError": "Mikrofonin avaaminen epäonnistui.",
   "voice.mobileMic": "Mikro päällä",
-  "voice.mobileMuted": "Mykistetty"
+  "voice.mobileMuted": "Mykistetty",
+  "chess.soloModeStatus": "Yksinpeli · vaihda puolta jokaisen siirron jälkeen",
+  "games.roomLocked": "Huone lukittu"
 }

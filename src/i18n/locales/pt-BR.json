@@ -2119,5 +2119,7 @@
   "voice.micPermissionError": "O acesso ao microfone foi negado. Verifique as permissões do sistema e tente novamente.",
   "voice.micUnavailableError": "Não foi possível abrir o microfone.",
   "voice.mobileMic": "Mic ativo",
-  "voice.mobileMuted": "Mutado"
+  "voice.mobileMuted": "Mutado",
+  "chess.soloModeStatus": "Modo solo · alterne os lados a cada lance",
+  "games.roomLocked": "Sala trancada"
 }

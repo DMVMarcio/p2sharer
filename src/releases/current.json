@@ -4,67 +4,67 @@
     "en": [
       "**Smooth screen and camera switching.** Editing an active share to pick another monitor, window, or camera updates immediately without freezing your preview or viewers.",
       "**Better room entry and streaming stability.** Participants joining through peers or fallback connections appear reliably, with steadier sharing on restrictive networks.",
-      "**Save your chess games.** Copy or download completed matches in PGN format for sharing and analysis."
+      "**Play chess solo or save your games.** Lock an empty table after your first move, switch sides after every move, and copy or download completed games as PGN."
     ],
     "pt-BR": [
       "**Troca de tela e câmera sem travamentos.** Editar uma transmissão para mudar de monitor ou janela atualiza a prévia e os espectadores sem precisar reiniciar.",
       "**Entrada na sala e transmissão mais estáveis.** Quem entra por outros participantes ou conexão alternativa aparece bem, com envio mais estável em redes restritivas.",
-      "**Guarde suas partidas de xadrez.** Copie ou baixe partidas concluídas em PGN para compartilhar e analisar."
+      "**Jogue xadrez sozinho ou guarde suas partidas.** Tranque uma sala vazia após o primeiro lance, alterne os lados a cada jogada e copie ou baixe a partida em PGN."
     ],
     "es": [
       "**Cambio de pantalla y cámara sin congelamientos.** Al editar una transmisión para cambiar de monitor o ventana, la vista previa y el público se actualizan al instante.",
       "**Entrada a salas y streaming más estables.** Quienes se conectan por otros participantes o rutas de respaldo aparecen mejor, incluso en redes con restricciones.",
-      "**Guarda tus partidas de ajedrez.** Copia o descarga las partidas terminadas en PGN para compartirlas y analizarlas."
+      "**Juega al ajedrez en solitario o guarda tus partidas.** Bloquea una mesa vacía tras tu primer movimiento, cambia de lado en cada turno y copia o descarga la partida en PGN."
     ],
     "fr": [
       "**Changement de source fluide.** Modifier un partage actif pour changer d'écran ou de fenêtre met à jour l'aperçu et les spectateurs sans figer la vidéo.",
       "**Accès aux salons et flux plus fiables.** Les membres rejoignant via un autre pair ou un relais de secours s'affichent mieux, même sur les réseaux restrictifs.",
-      "**Conservez vos parties d’échecs.** Copiez ou téléchargez les parties terminées en PGN pour les partager et les analyser."
+      "**Jouez seul aux échecs ou conservez vos parties.** Verrouillez une table vide après votre premier coup, changez de côté à chaque tour et copiez ou téléchargez la partie en PGN."
     ],
     "de": [
       "**Flüssiger Quellenwechsel beim Teilen.** Beim Wechsel von Monitor, Fenster oder Kamera aktualisieren sich Vorschau und Zuschaueransicht ohne Einfrieren.",
       "**Stabilerer Raumbeitritt und Stream.** Teilnehmer über verbundene Mitglieder oder Ausweichverbindungen erscheinen zuverlässig, auch in restriktiven Netzen.",
-      "**Schachpartien speichern.** Kopiere oder lade beendete Partien als PGN herunter, um sie zu teilen und zu analysieren."
+      "**Spiele allein Schach oder speichere deine Partien.** Sperre einen leeren Tisch nach deinem ersten Zug, wechsle nach jedem Zug die Seite und kopiere oder lade die Partie als PGN herunter."
     ],
     "it": [
       "**Cambio di schermo e fotocamera fluido.** Modificare una condivisione attiva per cambiare monitor o finestra aggiorna anteprima e spettatori senza blocchi.",
       "**Accesso alle stanze e streaming più stabili.** Chi entra tramite altri partecipanti o connessioni di riserva appare subito, anche su reti con restrizioni.",
-      "**Conserva le partite a scacchi.** Copia o scarica le partite concluse in PGN per condividerle e analizzarle."
+      "**Gioca a scacchi da solo o conserva le partite.** Blocca un tavolo vuoto dopo la prima mossa, cambia lato a ogni turno e copia o scarica la partita in PGN."
     ],
     "zh-CN": [
       "**流畅切换共享画面与摄像头。** 编辑进行中的共享并切换显示器、窗口或摄像头时，本地预览与观众画面会立即刷新，不再卡住。",
       "**更稳定的入房显示与音视频传输。** 通过其他成员桥接或备用中继连接的用户也能正常显示，在受限网络下共享画面与语音更稳固。",
-      "**保存棋局。** 以 PGN 格式复制或下载已结束的对局，方便分享和分析。"
+      "**独自下棋或保存棋局。** 首步后锁定空棋桌，每步棋后切换方向，并以 PGN 格式复制或下载已结束的对局。"
     ],
     "zh-TW": [
       "**流暢切換分享畫面與攝影機。** 編輯進行中的分享並更換螢幕、視窗或攝影機時，本機預覽與觀眾畫面會立即更新，不再凍結。",
       "**更穩定的進房顯示與影音傳輸。** 透過其他成員轉接或備援中繼連線的使用者也能正常顯示，在受限網路下分享更穩定。",
-      "**保存棋局。** 以 PGN 格式複製或下載已結束的對局，方便分享與分析。"
+      "**獨自下棋或保存棋局。** 首步後鎖定空棋桌，每步棋後切換方向，並以 PGN 格式複製或下載已結束的對局。"
     ],
     "ja": [
       "**画面とカメラのスムーズな切り替え。** 配信を編集して別のモニターやウィンドウに切り替えても、プレビューや視聴画面が固まらず即座に反映されます。",
       "**入室表示と配信の安定性を向上。** 他メンバー経由や代替経路で参加した相手も正しく一覧に表示され、制限の厳しい回線でも共有が安定します。",
-      "**対局を保存。** 終了した対局をPGN形式でコピーまたはダウンロードして、共有や分析に活用できます。"
+      "**一人で対局したり棋譜を保存したりできます。** 最初の手の後に空いているテーブルをロックし、毎手ごとに盤面を反転できます。終了した対局はPGNでコピーまたはダウンロードできます。"
     ],
     "ko": [
       "**부드러운 화면 및 카메라 전환.** 송출을 편집해 다른 모니터나 창으로 바꿔도 미리보기와 시청 화면이 멈추지 않고 즉시 갱신됩니다.",
       "**더 안정적인 방 입장 및 전송 품질.** 다른 참여자나 보조 연결 경로로 들어온 멤버도 정상 표시되며 제한적인 네트워크에서도 공유가 안정적입니다.",
-      "**대국을 저장하세요.** 종료된 대국을 PGN으로 복사하거나 다운로드해 공유하고 분석할 수 있습니다."
+      "**혼자 대국하고 기보를 저장하세요.** 첫 수 후 빈 테이블을 잠그고 매 수마다 보드 방향을 바꿀 수 있습니다. 완료된 대국은 PGN으로 복사하거나 다운로드할 수 있습니다."
     ],
     "hi": [
       "**स्क्रीन और कैमरा सहजता से बदलें.** चलती शेयरिंग में दूसरा मॉनिटर या विंडो चुनने पर प्रीव्यू और दर्शकों की स्क्रीन बिना अटके तुरंत अपडेट होती है।",
       "**बेहतर रूम एंट्री और स्ट्रीमिंग स्थिरता.** अन्य सदस्यों या वैकल्पिक कनेक्शन से जुड़ने वाले लोग सही दिखते हैं, और सीमित नेटवर्क पर भी शेयरिंग स्थिर रहती है।",
-      "**शतरंज के खेल सहेजें।** समाप्त खेलों को PGN में कॉपी या डाउनलोड करके साझा और विश्लेषण करें।"
+      "**अकेले शतरंज खेलें और अपनी बाज़ियाँ सहेजें।** पहली चाल के बाद खाली टेबल लॉक करें, हर चाल पर बोर्ड पलटें, और पूरी बाज़ी को PGN में कॉपी या डाउनलोड करें।"
     ],
     "fi": [
       "**Sujuva näytön ja kameran vaihto.** Jaon muokkaus toiseen näyttöön tai ikkunaan päivittää esikatselun ja katsojien kuvan heti jäätymättä.",
       "**Varmempi liittyminen ja lähetys.** Muiden osallistujien tai varayhteyden kautta liittyvät näkyvät oikein, ja jako toimii vakaammin myös rajoitetuissa verkoissa.",
-      "**Tallenna shakkipelisi.** Kopioi tai lataa päättyneet pelit PGN-muodossa jakamista ja analysointia varten."
+      "**Pelaa shakkia yksin tai tallenna pelisi.** Lukitse tyhjä pöytä ensimmäisen siirron jälkeen, vaihda puolta jokaisella siirrolla ja kopioi tai lataa päättynyt peli PGN-muodossa."
     ],
     "ru": [
       "**Плавное переключение экрана и камеры.** Смена монитора или окна при редактировании трансляции сразу обновляет предпросмотр и поток без зависаний.",
       "**Стабильный вход в комнату и трансляция.** Участники через других пользователей или резервный маршрут отображаются верно, а связь устойчивее в строгих сетях.",
-      "**Сохраняйте шахматные партии.** Копируйте или скачивайте завершённые партии в PGN для обмена и анализа."
+      "**Играйте в шахматы в одиночку и сохраняйте партии.** Закройте пустой стол после первого хода, меняйте сторону после каждого хода и копируйте или скачивайте завершённую партию в PGN."
     ]
   }
 }

@@ -2119,5 +2119,7 @@
   "voice.micPermissionError": "Mikrofonzugriff verweigert. Prüfe die Systemberechtigungen und versuche es erneut.",
   "voice.micUnavailableError": "Mikrofon konnte nicht geöffnet werden.",
   "voice.mobileMic": "Mikro an",
-  "voice.mobileMuted": "Stumm"
+  "voice.mobileMuted": "Stumm",
+  "chess.soloModeStatus": "Einzelspiel · nach jedem Zug die Seite wechseln",
+  "games.roomLocked": "Gesperrt"
 }

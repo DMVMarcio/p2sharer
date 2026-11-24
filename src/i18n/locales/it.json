@@ -2119,5 +2119,7 @@
   "voice.micPermissionError": "Accesso al microfono negato. Controlla i permessi di sistema e riprova.",
   "voice.micUnavailableError": "Impossibile aprire il microfono.",
   "voice.mobileMic": "Mic attivo",
-  "voice.mobileMuted": "Muto"
+  "voice.mobileMuted": "Muto",
+  "chess.soloModeStatus": "Modalità in solitaria · cambia lato dopo ogni mossa",
+  "games.roomLocked": "Stanza bloccata"
 }

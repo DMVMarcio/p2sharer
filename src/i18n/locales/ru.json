@@ -2119,5 +2119,7 @@
   "voice.micPermissionError": "Доступ к микрофону отклонён. Проверьте системные разрешения и повторите попытку.",
   "voice.micUnavailableError": "Не удалось открыть микрофон.",
   "voice.mobileMic": "Микр. вкл.",
-  "voice.mobileMuted": "Без звука"
+  "voice.mobileMuted": "Без звука",
+  "chess.soloModeStatus": "Одиночный режим · меняйте сторону после каждого хода",
+  "games.roomLocked": "Комната закрыта"
 }

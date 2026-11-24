@@ -2119,5 +2119,7 @@
   "voice.micPermissionError": "麥克風存取被拒絕，請檢查系統權限後再試一次。",
   "voice.micUnavailableError": "無法開啟麥克風。",
   "voice.mobileMic": "麥克風開",
-  "voice.mobileMuted": "已靜音"
+  "voice.mobileMuted": "已靜音",
+  "chess.soloModeStatus": "單人模式 · 每步棋後切換棋盤方向",
+  "games.roomLocked": "房間已鎖定"
 }

@@ -1455,6 +1455,11 @@
   color: rgba(248, 233, 206, 0.72);
   font-style: italic;
 }
+.cozy-seat-open-label.is-locked {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
 
 .cozy-wood-seat-btn {
   display: inline-flex;

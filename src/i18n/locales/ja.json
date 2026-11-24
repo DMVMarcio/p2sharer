@@ -2119,5 +2119,7 @@
   "voice.micPermissionError": "マイクへのアクセスが拒否されました。システムの権限を確認して再試行してください。",
   "voice.micUnavailableError": "マイクを開けませんでした。",
   "voice.mobileMic": "マイクオン",
-  "voice.mobileMuted": "ミュート"
+  "voice.mobileMuted": "ミュート",
+  "chess.soloModeStatus": "ソロモード · 毎手ごとに盤面を反転",
+  "games.roomLocked": "ルームはロックされています"
 }

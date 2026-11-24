@@ -2119,5 +2119,7 @@
   "voice.micPermissionError": "麦克风访问被拒绝，请检查系统权限后重试。",
   "voice.micUnavailableError": "无法打开麦克风。",
   "voice.mobileMic": "麦克风开",
-  "voice.mobileMuted": "已静音"
+  "voice.mobileMuted": "已静音",
+  "chess.soloModeStatus": "单人模式 · 每步棋后切换棋盘方向",
+  "games.roomLocked": "房间已锁定"
 }

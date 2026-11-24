@@ -2119,5 +2119,7 @@
   "voice.micPermissionError": "마이크 접근이 거부되었습니다. 시스템 권한을 확인하고 다시 시도하세요.",
   "voice.micUnavailableError": "마이크를 열 수 없습니다.",
   "voice.mobileMic": "마이크 켜짐",
-  "voice.mobileMuted": "음소거됨"
+  "voice.mobileMuted": "음소거됨",
+  "chess.soloModeStatus": "혼자 하기 · 매 수마다 보드 방향 전환",
+  "games.roomLocked": "방 잠김"
 }
