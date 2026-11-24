@@ -296,6 +296,7 @@ export const ChessApp: React.FC<RoomAppViewProps> = ({ instanceId, compact = fal
               : null;
         const isSoloMode = room.lockedBy === model.localActor;
         const isMyTurn = game.status === 'playing' && myColor !== null && (isSoloMode || game.turn === myColor);
+        const moveColor = isSoloMode ? game.turn : myColor;
         const flipped = isSoloMode ? game.moveHistory.length % 2 === 1 : myColor === 'b';
 
         const activeOrigin = dragging ? dragging.from : selectedSquare;
@@ -311,13 +312,13 @@ export const ChessApp: React.FC<RoomAppViewProps> = ({ instanceId, compact = fal
         const checkedKingSquare = game.inCheck ? findKingSquare(game.board, game.turn) : -1;
 
         const commitMoveOrPromotion = (from: number, to: number) => {
-          if (!isMyTurn || !myColor) return false;
+          if (!isMyTurn || !moveColor) return false;
           const movesFromOrigin = getLegalChessMovesForSquare(game, from);
           const matches = movesFromOrigin.filter((m) => m.to === to);
           if (matches.length === 0) return false;
 
           if (matches.some((m) => m.promotion)) {
-            setPendingPromotion({ from, to, color: myColor });
+            setPendingPromotion({ from, to, color: moveColor });
           } else {
             model.makeMove(room.id, from, to);
             setSelectedSquare(null);
@@ -344,7 +345,7 @@ export const ChessApp: React.FC<RoomAppViewProps> = ({ instanceId, compact = fal
           // Left click clears local planning arrows
           clearPlanning();
 
-          if (!isMyTurn || !myColor) return;
+          if (!isMyTurn || !moveColor) return;
           const clickedPiece = game.board[sqIndex];
 
           if (selectedSquare !== null && legalTargets.has(sqIndex)) {
@@ -354,7 +355,7 @@ export const ChessApp: React.FC<RoomAppViewProps> = ({ instanceId, compact = fal
             return;
           }
 
-          if (!clickedPiece || clickedPiece.color !== myColor) {
+          if (!clickedPiece || clickedPiece.color !== moveColor) {
             setSelectedSquare(null);
             return;
           }
@@ -481,7 +482,7 @@ export const ChessApp: React.FC<RoomAppViewProps> = ({ instanceId, compact = fal
                     const isKingCheck = checkedKingSquare === sqIndex;
                     const showRank = visualIdx % 8 === 0;
                     const showFile = visualIdx >= 56;
-                    const isDraggablePiece = Boolean(isMyTurn && piece && piece.color === myColor);
+                    const isDraggablePiece = Boolean(isMyTurn && piece && piece.color === moveColor);
 
                     return (
                       <button
@@ -508,7 +509,7 @@ export const ChessApp: React.FC<RoomAppViewProps> = ({ instanceId, compact = fal
                           if (isMyTurn) {
                             if (selectedSquare !== null && legalTargets.has(sqIndex)) {
                               commitMoveOrPromotion(selectedSquare, sqIndex);
-                            } else if (piece && piece.color === myColor) {
+                            } else if (piece && piece.color === moveColor) {
                               setSelectedSquare(selectedSquare === sqIndex ? null : sqIndex);
                             }
                           }
