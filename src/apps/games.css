@@ -864,6 +864,29 @@
   aspect-ratio: 1;
 }
 
+.cozy-board-stage.has-chess-review-controls .chess-wood-frame {
+  width: min(100%, calc(100cqh - 68px), calc(100cqw - 292px));
+}
+
+.chess-review-controls {
+  display: flex;
+  flex: 0 0 auto;
+  justify-content: center;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.chess-review-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 48px;
+  height: 40px;
+  padding: 0;
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-sm);
+}
+
 .ttt-wood-frame {
   width: min(100%, calc(100cqh - 18px), calc(100cqw - 292px));
   max-width: 640px;
@@ -1817,6 +1840,9 @@
   .chess-wood-frame,
   .checkers-wood-frame {
     width: min(100%, 78cqh, 94cqw);
+  }
+  .cozy-board-stage.has-chess-review-controls .chess-wood-frame {
+    width: min(100%, calc(78cqh - 50px), 94cqw);
   }
   .ttt-wood-frame {
     width: min(100%, 70cqh, 88cqw);

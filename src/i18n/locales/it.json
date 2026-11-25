@@ -2121,5 +2121,11 @@
   "voice.mobileMic": "Mic attivo",
   "voice.mobileMuted": "Muto",
   "chess.soloModeStatus": "Modalità in solitaria · cambia lato dopo ogni mossa",
-  "games.roomLocked": "Stanza bloccata"
+  "games.roomLocked": "Stanza bloccata",
+  "chess.reviewControls": "Comandi per rivedere le mosse",
+  "chess.reviewFirst": "Prima mossa",
+  "chess.reviewPrevious": "Mossa precedente",
+  "chess.reviewNext": "Mossa successiva",
+  "chess.reviewLatest": "Torna alla posizione attuale",
+  "chess.reviewPosition": "Revisione della posizione {{move}} di {{total}}"
 }

@@ -2121,5 +2121,11 @@
   "voice.mobileMic": "Mikro päällä",
   "voice.mobileMuted": "Mykistetty",
   "chess.soloModeStatus": "Yksinpeli · vaihda puolta jokaisen siirron jälkeen",
-  "games.roomLocked": "Huone lukittu"
+  "games.roomLocked": "Huone lukittu",
+  "chess.reviewControls": "Siirtojen tarkastelun ohjaimet",
+  "chess.reviewFirst": "Ensimmäinen siirto",
+  "chess.reviewPrevious": "Edellinen siirto",
+  "chess.reviewNext": "Seuraava siirto",
+  "chess.reviewLatest": "Palaa nykyiseen asemaan",
+  "chess.reviewPosition": "Tarkastellaan asemaa {{move}} / {{total}}"
 }

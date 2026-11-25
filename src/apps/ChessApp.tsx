@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { Clipboard, ClipboardCheck, Crown, Download } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Clipboard, ClipboardCheck, Crown, Download, SkipBack, SkipForward } from 'lucide-react';
 import { t } from '../i18n/index.ts';
 import { useLocale } from '../hooks/useLocale.ts';
 import { roomAppsService } from './room_apps_service.ts';
@@ -8,6 +8,8 @@ import type { RoomAppViewProps } from './registry.ts';
 import type { ChessModel, ChessRoomState } from './board_game_model.ts';
 import {
   colOf,
+  applyChessMove,
+  createInitialChessState,
   findKingSquare,
   getLegalChessMovesForSquare,
   rowOf,
@@ -31,6 +33,33 @@ import { useBoardReturnAnimation } from './useBoardReturnAnimation.ts';
 import { useTimedBoardMatch } from './useTimedBoardMatch.ts';
 import { buildChessPgn } from './chess_pgn.ts';
 import { ModalDialog } from '../components/common/ModalDialog.tsx';
+import { TooltipButton } from '../components/common/TooltipButton.tsx';
+
+const chessHistoryPositionCache = new WeakMap<ChessRoomState['game']['moveHistory'], ChessRoomState['game'][]>();
+
+function getChessPositionAtPly(game: ChessRoomState['game'], ply: number): ChessRoomState['game'] {
+  const history = game.moveHistory;
+  let positions = chessHistoryPositionCache.get(history);
+  if (!positions) {
+    positions = [createInitialChessState(game.scores)];
+    chessHistoryPositionCache.set(history, positions);
+  }
+  while (positions.length <= ply) {
+    const move = history[positions.length - 1];
+    const nextPosition = move
+      ? applyChessMove(positions[positions.length - 1], move.from, move.to, move.promotion, { elapsedMs: 0 })
+      : null;
+    if (!nextPosition) break;
+    positions.push(nextPosition);
+  }
+  const position = positions[Math.min(ply, positions.length - 1)];
+  return {
+    ...position,
+    scores: game.scores,
+    clock: game.clock,
+    undoRequest: game.undoRequest,
+  };
+}
 
 interface DraggingPieceState {
   from: number;
@@ -62,6 +91,7 @@ export const ChessApp: React.FC<RoomAppViewProps> = ({ instanceId, compact = fal
   const [dragging, setDragging] = useState<DraggingPieceState | null>(null);
   const [pgnDialogOpen, setPgnDialogOpen] = useState(false);
   const [pgnCopied, setPgnCopied] = useState(false);
+  const [reviewPly, setReviewPly] = useState<number | null>(null);
   const suppressClickRef = useRef(false);
   const lastSoundSnapshotRef = useRef<{
     roomId: string;
@@ -88,6 +118,7 @@ export const ChessApp: React.FC<RoomAppViewProps> = ({ instanceId, compact = fal
       setSelectedSquare(null);
       setPendingPromotion(null);
       setDragging(null);
+      setReviewPly(null);
       clearPlanning();
     }
   }, [activeRoomId, model, clearPlanning]);
@@ -178,6 +209,7 @@ export const ChessApp: React.FC<RoomAppViewProps> = ({ instanceId, compact = fal
     setSelectedSquare(null);
     setPendingPromotion(null);
     setDragging(null);
+    setReviewPly(null);
     clearPlanning();
   };
 
@@ -291,6 +323,9 @@ export const ChessApp: React.FC<RoomAppViewProps> = ({ instanceId, compact = fal
     >
       {(room) => {
         const { game } = room;
+        const isReviewing = reviewPly !== null;
+        const currentReviewPly = reviewPly === null ? game.moveHistory.length : Math.min(reviewPly, game.moveHistory.length);
+        const displayGame = isReviewing ? getChessPositionAtPly(game, currentReviewPly) : game;
         const myColor: ChessColor | null =
           room.players.seat1 === model.localActor
             ? 'w'
@@ -298,7 +333,7 @@ export const ChessApp: React.FC<RoomAppViewProps> = ({ instanceId, compact = fal
               ? 'b'
               : null;
         const isSoloMode = room.lockedBy === model.localActor;
-        const isMyTurn = game.status === 'playing' && myColor !== null && (isSoloMode || game.turn === myColor);
+        const isMyTurn = !isReviewing && game.status === 'playing' && myColor !== null && (isSoloMode || game.turn === myColor);
         const moveColor = isSoloMode ? game.turn : myColor;
         const flipped = isSoloMode ? game.moveHistory.length % 2 === 1 : myColor === 'b';
 
@@ -312,7 +347,7 @@ export const ChessApp: React.FC<RoomAppViewProps> = ({ instanceId, compact = fal
           legalTargets.set(m.to, existing);
         }
 
-        const checkedKingSquare = game.inCheck ? findKingSquare(game.board, game.turn) : -1;
+        const checkedKingSquare = displayGame.inCheck ? findKingSquare(displayGame.board, displayGame.turn) : -1;
 
         const commitMoveOrPromotion = (from: number, to: number) => {
           if (!isMyTurn || !moveColor) return false;
@@ -435,8 +470,9 @@ export const ChessApp: React.FC<RoomAppViewProps> = ({ instanceId, compact = fal
                 ? 'turn'
                 : 'waiting';
 
-        const statusText =
-          game.status === 'playing' && game.inCheck
+        const statusText = isReviewing
+          ? t('chess.reviewPosition', { move: currentReviewPly, total: game.moveHistory.length })
+          : game.status === 'playing' && game.inCheck
             ? `${t('chess.checkAlert')} · ${describeRoomStatus(room)}`
             : describeRoomStatus(room);
 
@@ -455,7 +491,7 @@ export const ChessApp: React.FC<RoomAppViewProps> = ({ instanceId, compact = fal
 
         return (
           <div className="cozy-match-layout">
-            <div className="cozy-board-stage">
+            <div className="cozy-board-stage has-chess-review-controls">
               <div className="wood-board-frame chess-wood-frame">
                 <span className="wood-frame-stud stud-tl" aria-hidden="true" />
                 <span className="wood-frame-stud stud-tr" aria-hidden="true" />
@@ -475,13 +511,13 @@ export const ChessApp: React.FC<RoomAppViewProps> = ({ instanceId, compact = fal
                     const r = rowOf(sqIndex);
                     const c = colOf(sqIndex);
                     const isDark = (r + c) % 2 === 1;
-                    const piece = game.board[sqIndex];
+                    const piece = displayGame.board[sqIndex];
                     const isSelected = activeOrigin === sqIndex;
                     const isLegalDest = legalTargets.has(sqIndex);
                     const isDragHover = dragging?.hoverSquare === sqIndex && isLegalDest;
                     const isBeingDragged = dragging?.from === sqIndex;
                     const isLastMove =
-                      game.lastMove?.from === sqIndex || game.lastMove?.to === sqIndex;
+                      displayGame.lastMove?.from === sqIndex || displayGame.lastMove?.to === sqIndex;
                     const isKingCheck = checkedKingSquare === sqIndex;
                     const showRank = visualIdx % 8 === 0;
                     const showFile = visualIdx >= 56;
@@ -561,6 +597,20 @@ export const ChessApp: React.FC<RoomAppViewProps> = ({ instanceId, compact = fal
                   />
                 </div>
               </div>
+              <div className="chess-review-controls" role="group" aria-label={t('chess.reviewControls')}>
+                <TooltipButton className="btn btn-secondary btn-sm chess-review-button" tooltip={t('chess.reviewFirst')}
+                  aria-label={t('chess.reviewFirst')} disabled={game.moveHistory.length === 0 || currentReviewPly === 0}
+                  onClick={() => setReviewPly(0)}><SkipBack size={18} aria-hidden="true" /></TooltipButton>
+                <TooltipButton className="btn btn-secondary btn-sm chess-review-button" tooltip={t('chess.reviewPrevious')}
+                  aria-label={t('chess.reviewPrevious')} disabled={game.moveHistory.length === 0 || currentReviewPly === 0}
+                  onClick={() => setReviewPly(Math.max(0, currentReviewPly - 1))}><ChevronLeft size={20} aria-hidden="true" /></TooltipButton>
+                <TooltipButton className="btn btn-secondary btn-sm chess-review-button" tooltip={t('chess.reviewNext')}
+                  aria-label={t('chess.reviewNext')} disabled={!isReviewing || currentReviewPly >= game.moveHistory.length}
+                  onClick={() => setReviewPly(currentReviewPly + 1 >= game.moveHistory.length ? null : currentReviewPly + 1)}><ChevronRight size={20} aria-hidden="true" /></TooltipButton>
+                <TooltipButton className="btn btn-secondary btn-sm chess-review-button" tooltip={t('chess.reviewLatest')}
+                  aria-label={t('chess.reviewLatest')} disabled={!isReviewing}
+                  onClick={() => setReviewPly(null)}><SkipForward size={18} aria-hidden="true" /></TooltipButton>
+              </div>
             </div>
 
             {dragging &&
@@ -613,11 +663,13 @@ export const ChessApp: React.FC<RoomAppViewProps> = ({ instanceId, compact = fal
               onNewMatch={() => {
                 model.newGame(room.id, false);
                 setSelectedSquare(null);
+                setReviewPly(null);
                 clearPlanning();
               }}
               onResetScores={() => {
                 model.newGame(room.id, true);
                 setSelectedSquare(null);
+                setReviewPly(null);
                 clearPlanning();
               }}
               onSwapSeats={!isSoloMode ? () => {
@@ -635,10 +687,10 @@ export const ChessApp: React.FC<RoomAppViewProps> = ({ instanceId, compact = fal
                         <span>{t('games.white')}</span>
                       </span>
                       <div className="cozy-captured-tray">
-                        {game.capturedByWhite.length === 0 ? (
+                        {displayGame.capturedByWhite.length === 0 ? (
                           <span className="cozy-captured-empty">—</span>
                         ) : (
-                          [...game.capturedByWhite]
+                          [...displayGame.capturedByWhite]
                             .sort((a, b) => CHESS_CAPTURE_ORDER[a] - CHESS_CAPTURE_ORDER[b])
                             .map((type, idx) => (
                               <span key={idx} className="cozy-captured-piece">
@@ -654,10 +706,10 @@ export const ChessApp: React.FC<RoomAppViewProps> = ({ instanceId, compact = fal
                         <span>{t('games.black')}</span>
                       </span>
                       <div className="cozy-captured-tray">
-                        {game.capturedByBlack.length === 0 ? (
+                        {displayGame.capturedByBlack.length === 0 ? (
                           <span className="cozy-captured-empty">—</span>
                         ) : (
-                          [...game.capturedByBlack]
+                          [...displayGame.capturedByBlack]
                             .sort((a, b) => CHESS_CAPTURE_ORDER[a] - CHESS_CAPTURE_ORDER[b])
                             .map((type, idx) => (
                               <span key={idx} className="cozy-captured-piece">

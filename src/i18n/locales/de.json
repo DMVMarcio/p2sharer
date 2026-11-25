@@ -2121,5 +2121,11 @@
   "voice.mobileMic": "Mikro an",
   "voice.mobileMuted": "Stumm",
   "chess.soloModeStatus": "Einzelspiel · nach jedem Zug die Seite wechseln",
-  "games.roomLocked": "Gesperrt"
+  "games.roomLocked": "Gesperrt",
+  "chess.reviewControls": "Steuerung zum Überprüfen der Züge",
+  "chess.reviewFirst": "Erster Zug",
+  "chess.reviewPrevious": "Vorheriger Zug",
+  "chess.reviewNext": "Nächster Zug",
+  "chess.reviewLatest": "Zur aktuellen Stellung zurückkehren",
+  "chess.reviewPosition": "Stellung {{move}} von {{total}} wird überprüft"
 }

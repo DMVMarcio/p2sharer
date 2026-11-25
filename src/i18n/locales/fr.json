@@ -2121,5 +2121,11 @@
   "voice.mobileMic": "Micro actif",
   "voice.mobileMuted": "Coupé",
   "chess.soloModeStatus": "Mode solo · changez de côté après chaque coup",
-  "games.roomLocked": "Salle verrouillée"
+  "games.roomLocked": "Salle verrouillée",
+  "chess.reviewControls": "Commandes de révision des coups",
+  "chess.reviewFirst": "Premier coup",
+  "chess.reviewPrevious": "Coup précédent",
+  "chess.reviewNext": "Coup suivant",
+  "chess.reviewLatest": "Revenir à la position actuelle",
+  "chess.reviewPosition": "Révision de la position {{move}} sur {{total}}"
 }

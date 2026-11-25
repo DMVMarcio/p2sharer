@@ -2121,5 +2121,11 @@
   "voice.mobileMic": "माइक चालू",
   "voice.mobileMuted": "म्यूट",
   "chess.soloModeStatus": "एकल मोड · हर चाल के बाद बोर्ड पलटें",
-  "games.roomLocked": "कमरा लॉक है"
+  "games.roomLocked": "कमरा लॉक है",
+  "chess.reviewControls": "चालों की समीक्षा के नियंत्रण",
+  "chess.reviewFirst": "पहली चाल",
+  "chess.reviewPrevious": "पिछली चाल",
+  "chess.reviewNext": "अगली चाल",
+  "chess.reviewLatest": "वर्तमान स्थिति पर लौटें",
+  "chess.reviewPosition": "{{total}} में से {{move}}वीं स्थिति की समीक्षा"
 }

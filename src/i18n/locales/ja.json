@@ -2121,5 +2121,11 @@
   "voice.mobileMic": "マイクオン",
   "voice.mobileMuted": "ミュート",
   "chess.soloModeStatus": "ソロモード · 毎手ごとに盤面を反転",
-  "games.roomLocked": "ルームはロックされています"
+  "games.roomLocked": "ルームはロックされています",
+  "chess.reviewControls": "棋譜確認コントロール",
+  "chess.reviewFirst": "最初の手",
+  "chess.reviewPrevious": "前の手",
+  "chess.reviewNext": "次の手",
+  "chess.reviewLatest": "現在の局面に戻る",
+  "chess.reviewPosition": "{{total}} 手中 {{move}} 手目を確認中"
 }

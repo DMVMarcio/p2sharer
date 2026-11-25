@@ -2121,5 +2121,11 @@
   "voice.mobileMic": "Mic activo",
   "voice.mobileMuted": "Silenciado",
   "chess.soloModeStatus": "Modo individual · cambia de lado tras cada movimiento",
-  "games.roomLocked": "Sala bloqueada"
+  "games.roomLocked": "Sala bloqueada",
+  "chess.reviewControls": "Controles para revisar las jugadas",
+  "chess.reviewFirst": "Primera jugada",
+  "chess.reviewPrevious": "Jugada anterior",
+  "chess.reviewNext": "Jugada siguiente",
+  "chess.reviewLatest": "Volver a la posición actual",
+  "chess.reviewPosition": "Revisando la posición {{move}} de {{total}}"
 }

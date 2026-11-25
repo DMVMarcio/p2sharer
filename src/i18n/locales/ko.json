@@ -2121,5 +2121,11 @@
   "voice.mobileMic": "마이크 켜짐",
   "voice.mobileMuted": "음소거됨",
   "chess.soloModeStatus": "혼자 하기 · 매 수마다 보드 방향 전환",
-  "games.roomLocked": "방 잠김"
+  "games.roomLocked": "방 잠김",
+  "chess.reviewControls": "기보 검토 컨트롤",
+  "chess.reviewFirst": "첫 수",
+  "chess.reviewPrevious": "이전 수",
+  "chess.reviewNext": "다음 수",
+  "chess.reviewLatest": "현재 위치로 돌아가기",
+  "chess.reviewPosition": "전체 {{total}}수 중 {{move}}수 검토 중"
 }

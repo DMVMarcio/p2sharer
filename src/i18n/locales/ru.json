@@ -2121,5 +2121,11 @@
   "voice.mobileMic": "Микр. вкл.",
   "voice.mobileMuted": "Без звука",
   "chess.soloModeStatus": "Одиночный режим · меняйте сторону после каждого хода",
-  "games.roomLocked": "Комната закрыта"
+  "games.roomLocked": "Комната закрыта",
+  "chess.reviewControls": "Управление просмотром ходов",
+  "chess.reviewFirst": "Первый ход",
+  "chess.reviewPrevious": "Предыдущий ход",
+  "chess.reviewNext": "Следующий ход",
+  "chess.reviewLatest": "Вернуться к текущей позиции",
+  "chess.reviewPosition": "Просмотр позиции {{move}} из {{total}}"
 }

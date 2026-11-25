@@ -2121,5 +2121,11 @@
   "voice.mobileMic": "麦克风开",
   "voice.mobileMuted": "已静音",
   "chess.soloModeStatus": "单人模式 · 每步棋后切换棋盘方向",
-  "games.roomLocked": "房间已锁定"
+  "games.roomLocked": "房间已锁定",
+  "chess.reviewControls": "复盘棋步控制",
+  "chess.reviewFirst": "第一步",
+  "chess.reviewPrevious": "上一步",
+  "chess.reviewNext": "下一步",
+  "chess.reviewLatest": "返回当前局面",
+  "chess.reviewPosition": "正在复盘第 {{move}} 步，共 {{total}} 步"
 }
