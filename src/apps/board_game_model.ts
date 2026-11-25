@@ -547,7 +547,7 @@ export class TimedBoardGameModel<TGame extends TimedBoardGameState> extends Boar
     const actor = this.localActor;
     return this.updateGame(roomId, (room) => {
       const expectedActor = room.game.turn === 'w' ? room.players.seat1 : room.players.seat2;
-      if (!actor || expectedActor !== actor) return null;
+      if (!actor || (expectedActor !== actor && room.lockedBy !== actor)) return null;
       const { clock } = room.game;
       if (!clock || room.game.status !== 'playing' || room.game.moveHistory.length === 0) return null;
 
@@ -581,6 +581,7 @@ export class TimedBoardGameModel<TGame extends TimedBoardGameState> extends Boar
       const isPlayer =
         room.players.seat1 === actor ||
         room.players.seat2 === actor ||
+        room.lockedBy === actor ||
         (room.createdBy === actor && (!room.players.seat1 || !room.players.seat2));
       if (!isPlayer) return null;
 
@@ -715,7 +716,12 @@ export class ChessModel extends TimedBoardGameModel<ChessGameState> {
     this.writeRoom({
       ...room,
       lockedBy: shouldLockForSolo ? actor : room.lockedBy,
-      game: shouldLockForSolo ? { ...nextGame, clock: null } : nextGame,
+      game: shouldLockForSolo ? {
+        ...nextGame,
+        clock: nextGame.clock
+          ? { ...nextGame.clock, syncSeq: nextGame.clock.syncSeq + 1 }
+          : null,
+      } : nextGame,
       updatedAt: now,
     });
     return true;

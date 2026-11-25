@@ -45,7 +45,7 @@ export function useTimedBoardMatch<TGame extends TimedBoardGameState>(
         return;
       }
 
-      const activeActor = turn === 'w' ? room.players.seat1 : room.players.seat2;
+      const activeActor = room.lockedBy ?? (turn === 'w' ? room.players.seat1 : room.players.seat2);
       const otherActor = turn === 'w' ? room.players.seat2 : room.players.seat1;
 
       if (activeActor === model.localActor) {
@@ -74,7 +74,7 @@ export function useTimedBoardMatch<TGame extends TimedBoardGameState>(
   // Periodically publish a clock sync from the active player during long turns so all peers stay aligned.
   useEffect(() => {
     if (!room || !clock || !isClockRunning) return;
-    const activeActor = turn === 'w' ? room.players.seat1 : room.players.seat2;
+    const activeActor = room.lockedBy ?? (turn === 'w' ? room.players.seat1 : room.players.seat2);
     if (activeActor !== model.localActor) return;
 
     const timer = window.setInterval(() => {
