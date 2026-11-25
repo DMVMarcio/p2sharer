@@ -1,57 +1,44 @@
 {
-  "version": "1.8.2",
+  "version": "1.8.3",
   "translations": {
     "en": [
-      "**Lower latency with direct-first connections.** Rooms now prioritize direct peer routes first and only use relay fallback when a network blocks direct connections.",
-      "**No more peer drops when starting a share.** Starting a screen or camera broadcast no longer briefly disconnects participants already in the room."
+      "**More reliable voice in rooms.** Fixed an issue where participants could stop hearing each other when joining or switching rooms, with automatic voice recovery."
     ],
     "pt-BR": [
-      "**Menor latência priorizando conexão direta.** As salas tentam rota direta entre participantes primeiro e só recorrem ao servidor alternativo quando a rede exige.",
-      "**Sem quedas ao iniciar transmissões.** Começar a compartilhar tela ou câmera não desconecta mais temporariamente quem já está na sala."
+      "**Voz mais confiável nas salas.** Corrigido um problema em que participantes deixavam de se ouvir ao entrar ou trocar de sala, com recuperação automática."
     ],
     "es": [
-      "**Menor latencia priorizando conexión directa.** Las salas intentan primero la ruta directa entre participantes y solo usan el servidor de respaldo cuando hace falta.",
-      "**Sin desconexiones al iniciar transmisiones.** Comenzar a compartir pantalla o cámara ya no desconecta brevemente a quienes están en la sala."
+      "**Voz más confiable en las salas.** Se corrigió un problema por el cual los participantes dejaban de escucharse al entrar o cambiar de sala, con recuperación automática."
     ],
     "fr": [
-      "**Latence réduite en priorité directe.** Les salons privilégient d'abord les connexions directes et n'utilisent le relais de secours que si le réseau l'impose.",
-      "**Plus de déconnexions au lancement d'un partage.** Démarrer un partage d'écran ou de caméra ne fait plus disparaître brièvement les participants du salon."
+      "**Voix plus fiable dans les salons.** Correction d'un problème où les participants ne s'entendaient plus en rejoignant ou changeant de salon, avec reprise automatique."
     ],
     "de": [
-      "**Geringere Latenz durch Direktverbindungen.** Räume bevorzugen jetzt direkte Routen zwischen Teilnehmern und nutzen Relay-Fallback nur bei blockierten Netzen.",
-      "**Keine Abbrüche beim Starten von Streams.** Das Starten einer Bildschirm- oder Kamerafreigabe trennt anwesende Teilnehmer nicht mehr kurzzeitig."
+      "**Zuverlässigere Sprache in Räumen.** Behoben, dass Teilnehmer sich beim Betreten oder Wechseln von Räumen nicht mehr hörten, nun mit automatischer Wiederherstellung."
     ],
     "it": [
-      "**Latenza ridotta con priorità diretta.** Le stanze tentano prima la connessione diretta tra i partecipanti e usano il server di riserva solo quando serve.",
-      "**Nessuna disconnessione all'avvio di uno stream.** Avviare la condivisione di schermo o fotocamera non scollega più brevemente chi è già nella stanza."
+      "**Voce più affidabile nelle stanze.** Risolto un problema per cui i partecipanti non si sentivano entrando o cambiando stanza, con ripristino automatico."
     ],
     "zh-CN": [
-      "**优先直连以降低延迟。** 房间现在优先建立成员间的直接连接，仅在网络受阻无法直连时才自动切换到备用中继。",
-      "**开始共享不再导致成员掉线。** 启动屏幕或摄像头共享时，不再短暂断开房间内其他在线成员的连接。"
+      "**房间语音更加稳定可靠。** 修复了加入或切换房间时成员可能听不到彼此声音的问题，并支持语音自动恢复。"
     ],
     "zh-TW": [
-      "**優先直連以降低延遲。** 房間現在優先建立成員間的直接連線，僅在網路受阻無法直連時才自動切換至備援中繼。",
-      "**開始分享不再導致成員斷線。** 啟動螢幕或攝影機分享時，不再短暫中斷房間內其他線上成員的連線。"
+      "**房間語音更加穩定可靠。** 修復了加入或切換房間時成員可能聽不到彼此聲音的問題，並支援語音自動恢復。"
     ],
     "ja": [
-      "**直接接続を優先して低遅延化。** ルームは参加者同士の直接ルートを先に試し、ネットワーク制限で接続できない場合のみ中継サーバーへ切り替えます。",
-      "**配信開始時のメンバー離脱を解消。** 画面やカメラの共有を始めた際に、入室中の参加者が一時的に切断される問題を修正しました。"
+      "**ルーム内の通話がより安定。** 入室時やルーム切り替え時に相手の声が聞こえなくなる問題を修正し、音声を自動復旧できるようになりました。"
     ],
     "ko": [
-      "**직접 연결 우선으로 지연 시간 단축.** 방에서 참여자 간 직접 경로를 먼저 시도하고, 네트워크 제한으로 연결이 불가할 때만 보조 중계를 사용합니다.",
-      "**공유 시작 시 참여자 이탈 방지.** 화면이나 카메라 송출을 시작할 때 방에 있던 참여자가 일시적으로 사라지는 문제를 수정했습니다."
+      "**방 음성 통화 안정성 향상.** 방에 들어가거나 이동할 때 서로의 목소리가 들리지 않던 문제를 수정하고 음성을 자동으로 복구합니다."
     ],
     "hi": [
-      "**सीधे कनेक्शन से कम लेटेंसी.** रूम अब पहले सीधे पीयर रूट को प्राथमिकता देते हैं और नेटवर्क बाधा होने पर ही वैकल्पिक रिले का उपयोग करते हैं।",
-      "**शेयरिंग शुरू करने पर ड्रॉप नहीं.** स्क्रीन या कैमरा प्रसारण शुरू करने पर रूम में मौजूद सदस्य अब थोड़ी देर के लिए डिस्कनेक्ट नहीं होते।"
+      "**रूम में अधिक भरोसेमंद वॉइस।** रूम में जुड़ने या बदलने पर एक-दूसरे की आवाज़ न सुनाई देने की समस्या ठीक की गई, अब वॉइस अपने-आप बहाल होती है।"
     ],
     "fi": [
-      "**Pienempi viive suorilla yhteyksillä.** Huoneet suosivat nyt suoria yhteyksiä ja käyttävät varavälitystä vain silloin, kun verkko estää suoran reitin.",
-      "**Ei enää katkeamisia jaon alkaessa.** Näytön tai kameran jakamisen aloittaminen ei enää pudota huoneessa olevia osallistujia hetkellisesti pois."
+      "**Luotettavampi puhe huoneissa.** Korjattu ongelma, jossa osallistujat eivät kuulleet toisiaan huoneeseen liittyessä tai vaihdettaessa, automaattisella palautuksella."
     ],
     "ru": [
-      "**Меньше задержка за счёт прямых соединений.** Комнаты сначала выбирают прямой маршрут между участниками и используют резервный ретранслятор лишь при необходимости.",
-      "**Без разрывов при запуске трансляции.** Начало показа экрана или камеры больше не отключает на несколько секунд уже находящихся в комнате участников."
+      "**Более надёжная голосовая связь.** Исправлена проблема, из-за которой участники переставали слышать друг друга при входе или смене комнаты, с автовосстановлением."
     ]
   }
 }
