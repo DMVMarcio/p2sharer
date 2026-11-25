@@ -814,7 +814,8 @@ export class VoiceManager {
     if (
       prev.inputDeviceId !== next.inputDeviceId ||
       prev.echoCancellation !== next.echoCancellation ||
-      prev.autoGainControl !== next.autoGainControl
+      prev.autoGainControl !== next.autoGainControl ||
+      (prev.noiseSuppressionMode === 'off') !== (next.noiseSuppressionMode === 'off')
     ) {
       await this.swapMicrophoneInput(next);
     }
@@ -900,7 +901,8 @@ export class VoiceManager {
       if (
         prev.inputDeviceId !== activeIn.inputDeviceId ||
         prev.echoCancellation !== activeIn.echoCancellation ||
-        prev.autoGainControl !== activeIn.autoGainControl
+        prev.autoGainControl !== activeIn.autoGainControl ||
+        (prev.noiseSuppressionMode === 'off') !== (activeIn.noiseSuppressionMode === 'off')
       ) {
         await this.swapMicrophoneInput(activeIn);
       }

@@ -794,4 +794,80 @@ test('VoiceNoiseGateProcessor normalizes quiet microphones cleanly without clipp
   const boosted = runSignal(0.08, 2.0);
   assert.ok(boosted.outRms > quiet.outRms, '200% input gain should increase output loudness');
   assert.ok(boosted.peak <= 0.90, `peak limiter must prevent clipping, got peak ${boosted.peak.toFixed(3)}`);
+
+  // High suppression rejects steady fan noise and short mouse clicks while opening cleanly for speech.
+  const highProc = new RegisteredClass!();
+  highProc.port.onmessage?.({
+    data: { noiseSuppressionMode: 'high', autoSensitivity: true, sensitivityDb: -50, muted: false, inputGain: 1.0 },
+  });
+  let prng = 1234567;
+  const nextRand = () => {
+    prng = (prng * 1664525 + 1013904223) >>> 0;
+    return (prng / 0x100000000) * 2 - 1;
+  };
+  const makeFanBlock = (blockIndex: number) =>
+    new Float32Array(128).map((_, i) => {
+      const t = (blockIndex * 128 + i) / 48000;
+      return 0.028 * Math.sin(2 * Math.PI * 105 * t) + 0.022 * nextRand();
+    });
+
+  // 1) Steady fan noise for ~1.5s settles cleanly with gate closed.
+  let fanOutSq = 0;
+  let fanSamples = 0;
+  for (let b = 0; b < 560; b += 1) {
+    const out = new Float32Array(128);
+    highProc.process([[makeFanBlock(b)]], [[out]]);
+    if (b >= 500) {
+      for (let i = 0; i < 128; i += 1) {
+        fanOutSq += out[i] * out[i];
+        fanSamples += 1;
+      }
+    }
+  }
+  const fanOutRms = Math.sqrt(fanOutSq / fanSamples);
+  assert.ok(fanOutRms < 0.003, `steady fan noise should be suppressed on high mode, got RMS ${fanOutRms.toFixed(5)}`);
+
+  // 2) Short high-frequency mouse click (2 blocks = 5.3 ms) must not open the gate.
+  let clickOutSq = 0;
+  let clickSamples = 0;
+  for (let b = 560; b < 590; b += 1) {
+    const inp = makeFanBlock(b);
+    if (b === 562 || b === 563) {
+      for (let i = 0; i < 128; i += 1) {
+        const t = (b * 128 + i) / 48000;
+        inp[i] += 0.18 * Math.sin(2 * Math.PI * 6200 * t) + 0.12 * nextRand();
+      }
+    }
+    const out = new Float32Array(128);
+    highProc.process([[inp]], [[out]]);
+    for (let i = 0; i < 128; i += 1) {
+      clickOutSq += out[i] * out[i];
+      clickSamples += 1;
+    }
+  }
+  const clickOutRms = Math.sqrt(clickOutSq / clickSamples);
+  assert.ok(clickOutRms < 0.005, `short mouse click should be rejected on high mode, got RMS ${clickOutRms.toFixed(5)}`);
+
+  // 3) Sustained voice formants over the same fan noise open the gate and pass through clearly.
+  let speechOutSq = 0;
+  let speechSamples = 0;
+  for (let b = 590; b < 680; b += 1) {
+    const inp = makeFanBlock(b);
+    for (let i = 0; i < 128; i += 1) {
+      const t = (b * 128 + i) / 48000;
+      inp[i] += 0.055 * Math.sin(2 * Math.PI * 380 * t)
+        + 0.045 * Math.sin(2 * Math.PI * 920 * t)
+        + 0.025 * Math.sin(2 * Math.PI * 1850 * t);
+    }
+    const out = new Float32Array(128);
+    highProc.process([[inp]], [[out]]);
+    if (b >= 620) {
+      for (let i = 0; i < 128; i += 1) {
+        speechOutSq += out[i] * out[i];
+        speechSamples += 1;
+      }
+    }
+  }
+  const speechOutRms = Math.sqrt(speechOutSq / speechSamples);
+  assert.ok(speechOutRms > 0.05, `voice formants over fan noise must pass clearly, got RMS ${speechOutRms.toFixed(4)}`);
 });

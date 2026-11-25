@@ -65,7 +65,7 @@ class VoiceNoiseGateProcessor extends AudioWorkletProcessor {
     this.hpX2 = 0;
     this.hpY1 = 0;
     this.hpY2 = 0;
-    this.updateHighPassCoeffs(sampleRate || 48000, 85);
+    this.updateHighPassCoeffs(sampleRate || 48000, 95);
 
     // Pre-allocated STFT / overlap-add buffers.
     this.window = createHannWindow(FFT_SIZE);
@@ -81,6 +81,12 @@ class VoiceNoiseGateProcessor extends AudioWorkletProcessor {
 
     this.noisePsd = new Float32Array(NUM_BINS);
     this.noisePsd.fill(1e-7);
+    this.minPsdCurr = new Float32Array(NUM_BINS);
+    this.minPsdCurr.fill(1e6);
+    this.minPsdPrev = new Float32Array(NUM_BINS);
+    this.minPsdPrev.fill(1e6);
+    this.minWindowFrames = 0;
+    this.prevHighBandEnergy = 1e-6;
     this.prevPostSnr = new Float32Array(NUM_BINS);
     this.prevGain = new Float32Array(NUM_BINS);
     this.prevGain.fill(1);
@@ -88,9 +94,15 @@ class VoiceNoiseGateProcessor extends AudioWorkletProcessor {
     this.smoothedBinGain = new Float32Array(NUM_BINS);
     this.magSq = new Float32Array(NUM_BINS);
     this.noiseInitFrames = 0;
+    this.lastSpeechBandRatio = 1;
+    this.lastSpeechSnrDb = 20;
 
     // VAD / Gate state.
     this.noiseFloorDb = -65;
+    this.minFloorDbCurr = 0;
+    this.minFloorDbPrev = -65;
+    this.minFloorFrames = 0;
+    this.onsetFrames = 0;
     this.gateOpen = false;
     this.holdRemainingSamples = 0;
     this.gateEnvelope = 0;
@@ -114,6 +126,7 @@ class VoiceNoiseGateProcessor extends AudioWorkletProcessor {
         data.noiseSuppressionMode === 'high'
       ) {
         this.noiseSuppressionMode = data.noiseSuppressionMode;
+        this.updateHighPassCoeffs(sampleRate || 48000, data.noiseSuppressionMode === 'high' ? 135 : 95);
       }
       if (typeof data.autoSensitivity === 'boolean') {
         this.autoSensitivity = data.autoSensitivity;
@@ -203,38 +216,83 @@ class VoiceNoiseGateProcessor extends AudioWorkletProcessor {
     this.runFft(re, im, false);
 
     const isHigh = this.noiseSuppressionMode === 'high';
-    const oversub = isHigh ? 2.4 : 1.0;
-    const gainFloor = isHigh ? 0.03 : 0.14;
-    const alpha = 0.92;
+    const baseOversub = isHigh ? 3.8 : 1.8;
+    const gainFloor = isHigh ? 0.008 : 0.05;
+    const alpha = isHigh ? 0.90 : 0.92;
+    const gainExp = isHigh ? 1.35 : 1.0;
 
     let frameEnergy = 0;
     let noiseEnergy = 0;
+    let speechBandEnergy = 0;
+    let speechNoiseEnergy = 0;
+    let highBandEnergy = 0;
+    let totalAudibleEnergy = 0;
     for (let k = 0; k < NUM_BINS; k += 1) {
       const m2 = re[k] * re[k] + im[k] * im[k];
       this.magSq[k] = m2;
       frameEnergy += m2;
       noiseEnergy += this.noisePsd[k];
+      if (k >= 1 && k <= 96) {
+        totalAudibleEnergy += m2;
+      }
+      // Core voice band (~187 Hz - 3.4 kHz at 48 kHz) vs high click/hiss band (> 3.5 kHz).
+      if (k >= 1 && k <= 18) {
+        speechBandEnergy += m2;
+        speechNoiseEnergy += this.noisePsd[k];
+      } else if (k >= 19 && k <= 96) {
+        highBandEnergy += m2;
+      }
     }
 
-    const initPhase = this.noiseInitFrames < 10;
+    const initPhase = this.noiseInitFrames < 15;
     if (initPhase) {
       this.noiseInitFrames += 1;
     }
+
+    // Two-window minimum-statistics tracker (~0.6s per sub-window) continuously adapts to
+    // stationary fan/AC noise even if the fan starts mid-call or while the gate is open.
+    this.minWindowFrames += 1;
+    const rotateMinWindow = this.minWindowFrames >= 225;
+    if (rotateMinWindow) {
+      this.minWindowFrames = 0;
+    }
+
     const likelySpeech = !initPhase && (this.gateOpen || frameEnergy > noiseEnergy * 2.5);
+    const impulseClick =
+      isHigh &&
+      !initPhase &&
+      highBandEnergy > this.prevHighBandEnergy * 4.5 &&
+      highBandEnergy > speechBandEnergy * 0.9;
+    this.prevHighBandEnergy = this.prevHighBandEnergy * 0.85 + highBandEnergy * 0.15;
 
     for (let k = 0; k < NUM_BINS; k += 1) {
       const m2 = this.magSq[k];
       let psd = this.noisePsd[k];
 
+      if (m2 < this.minPsdCurr[k]) {
+        this.minPsdCurr[k] = m2;
+      }
+      if (rotateMinWindow) {
+        this.minPsdPrev[k] = this.minPsdCurr[k];
+        this.minPsdCurr[k] = m2;
+      }
+
       if (initPhase) {
-        psd = Math.max(1e-8, psd * 0.7 + m2 * 0.3);
-      } else if (!this.gateOpen && m2 < psd) {
-        psd = Math.max(1e-8, psd * 0.94 + m2 * 0.06);
-      } else if (!likelySpeech) {
-        psd = Math.max(1e-8, psd * 0.992 + m2 * 0.008);
+        psd = Math.max(1e-8, psd * 0.65 + m2 * 0.35);
+      } else {
+        const minEst = Math.min(this.minPsdPrev[k], this.minPsdCurr[k]) * 1.45;
+        if (m2 < psd) {
+          psd = Math.max(1e-8, psd * 0.88 + m2 * 0.12);
+        } else if (minEst < 1e5 && minEst > psd) {
+          // Stationary floor rose (e.g. fan turned on): pull noisePsd up reliably even if gate is open.
+          psd = Math.max(1e-8, psd * 0.96 + minEst * 0.04);
+        } else if (!likelySpeech) {
+          psd = Math.max(1e-8, psd * 0.985 + m2 * 0.015);
+        }
       }
       this.noisePsd[k] = psd;
 
+      const oversub = isHigh && (k <= 1 || k >= 24) ? 5.5 : baseOversub;
       const postSnr = Math.min(100, m2 / (psd * oversub + 1e-10));
       const priorSnr = Math.max(
         0,
@@ -242,12 +300,21 @@ class VoiceNoiseGateProcessor extends AudioWorkletProcessor {
           (1 - alpha) * Math.max(0, postSnr - 1),
       );
       let gain = priorSnr / (1 + priorSnr);
+      if (gainExp !== 1.0) {
+        gain = Math.pow(gain, gainExp);
+      }
+      if (impulseClick && k >= 19) {
+        gain *= 0.12;
+      }
       if (gain < gainFloor) gain = gainFloor;
 
       this.prevPostSnr[k] = postSnr;
       this.prevGain[k] = gain;
       this.binGain[k] = gain;
     }
+
+    this.lastSpeechBandRatio = totalAudibleEnergy > 1e-10 ? speechBandEnergy / totalAudibleEnergy : 0;
+    this.lastSpeechSnrDb = 10 * Math.log10((speechBandEnergy + 1e-10) / (speechNoiseEnergy + 1e-10));
 
     if (isHigh) {
       this.smoothedBinGain[0] = this.binGain[0];
@@ -366,33 +433,62 @@ class VoiceNoiseGateProcessor extends AudioWorkletProcessor {
     const levelDb = Math.max(-100, Math.min(0, rms > 1e-6 ? 20 * Math.log10(rms) : -100));
 
     if (this.autoSensitivity) {
+      if (levelDb < this.minFloorDbCurr) {
+        this.minFloorDbCurr = levelDb;
+      }
+      this.minFloorFrames += 1;
+      if (this.minFloorFrames >= 250) {
+        this.minFloorDbPrev = this.minFloorDbCurr;
+        this.minFloorDbCurr = levelDb;
+        this.minFloorFrames = 0;
+      }
+      const stationaryFloorDb = Math.min(this.minFloorDbPrev, this.minFloorDbCurr);
+
       if (levelDb < this.noiseFloorDb) {
         this.noiseFloorDb = this.noiseFloorDb * 0.85 + levelDb * 0.15;
+      } else if (stationaryFloorDb > this.noiseFloorDb) {
+        this.noiseFloorDb = this.noiseFloorDb * 0.96 + stationaryFloorDb * 0.04;
       } else if (!this.gateOpen && levelDb < this.noiseFloorDb + 10) {
         this.noiseFloorDb = this.noiseFloorDb * 0.992 + levelDb * 0.008;
       }
     }
 
+    const autoMarginDb = this.noiseSuppressionMode === 'high' ? 11 : 8;
     const thresholdDb = this.autoSensitivity
-      ? Math.max(-72, Math.min(-26, this.noiseFloorDb + 8))
+      ? Math.max(-72, Math.min(-24, this.noiseFloorDb + autoMarginDb))
       : this.sensitivityDb;
     this.lastPublishedThresholdDb = thresholdDb;
 
+    const isHigh = this.noiseSuppressionMode === 'high';
+    const requiredOnsetFrames = !useSuppression ? 1 : isHigh ? 4 : 2;
+    const minSpeechBandRatio = !useSuppression ? 0 : isHigh ? 0.42 : 0.28;
+    const minSpeechSnrDb = !useSuppression ? -100 : isHigh ? 5.5 : 2.5;
+    const speechLike =
+      !useSuppression ||
+      (this.lastSpeechBandRatio >= minSpeechBandRatio && this.lastSpeechSnrDb >= minSpeechSnrDb);
+
     if (this.muted) {
       this.gateOpen = false;
+      this.onsetFrames = 0;
       this.holdRemainingSamples = 0;
-    } else if (levelDb >= thresholdDb) {
-      this.gateOpen = true;
-      this.holdRemainingSamples = this.holdSamples;
+    } else if (levelDb >= thresholdDb && speechLike) {
+      this.onsetFrames = Math.min(requiredOnsetFrames, this.onsetFrames + 1);
+      if (this.gateOpen || this.onsetFrames >= requiredOnsetFrames) {
+        this.gateOpen = true;
+        this.holdRemainingSamples = this.holdSamples;
+      }
     } else if (this.gateOpen) {
-      if (levelDb >= thresholdDb - 4) {
+      if (levelDb >= thresholdDb - 4 && speechLike) {
         this.holdRemainingSamples = this.holdSamples;
       } else if (this.holdRemainingSamples > len) {
         this.holdRemainingSamples -= len;
       } else {
         this.holdRemainingSamples = 0;
+        this.onsetFrames = 0;
         this.gateOpen = false;
       }
+    } else {
+      this.onsetFrames = 0;
     }
 
     let blockPeak = 0;
