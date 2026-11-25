@@ -1,122 +1,70 @@
 {
-  "version": "1.8.3",
+  "version": "1.8.4",
   "translations": {
     "en": [
-      "**Smooth screen and camera switching.** Editing an active share to pick another monitor, window, or camera updates immediately without freezing your preview or viewers.",
-      "**Better room entry and streaming stability.** Participants joining through peers or fallback connections appear reliably, with steadier sharing on restrictive networks.",
-      "**Play chess solo or save your games.** Lock an empty table after your first move, switch sides after every move, and copy or download completed games as PGN.",
-      "**Clearer chess arrows.** Arrows follow a straight line or a knight-shaped L and appear only when you finish drawing them.",
-      "**Review chess games.** Step through earlier moves and return to the current position without changing the shared game."
+      "**Play chess solo.** Play both colors with individual clocks; the room reopens when you reset the score and closes when you leave.",
+      "**Export and review games.** Download completed games as PGN and review moves during play with four navigation buttons.",
+      "**Draw clearer chess arrows.** They follow straight or knight paths and appear when drawing is complete."
     ],
     "pt-BR": [
-      "**Troca de tela e câmera sem travamentos.** Editar uma transmissão para mudar de monitor ou janela atualiza a prévia e os espectadores sem precisar reiniciar.",
-      "**Entrada na sala e transmissão mais estáveis.** Quem entra por outros participantes ou conexão alternativa aparece bem, com envio mais estável em redes restritivas.",
-      "**Jogue xadrez sozinho ou guarde suas partidas.** Tranque uma sala vazia após o primeiro lance, alterne os lados a cada jogada e copie ou baixe a partida em PGN.",
-      "**Voz mais confiável nas salas.** Corrigido um problema em que participantes deixavam de se ouvir ao entrar ou trocar de sala, com recuperação automática.",
-      "**Participantes aparecem na hora ao entrar.** Corrigido um atraso em que o anfitrião ou membros já na sala podiam demorar alguns segundos para aparecer.",
-      "**Setas de xadrez mais claras.** Elas seguem uma linha reta ou um L de cavalo e só aparecem quando você termina de desenhá-las.",
-      "**Revise partidas de xadrez.** Navegue pelos lances anteriores e retome a posição atual sem alterar a partida compartilhada."
+      "**Jogue xadrez solo.** Jogue com as duas cores e relógios por jogador; zerar o placar reabre a sala e sair a fecha.",
+      "**Exporte e revise partidas.** Baixe partidas concluídas em PGN e revise os lances durante o jogo com quatro botões.",
+      "**Setas de xadrez mais claras.** Elas seguem linhas retas ou trajetos de cavalo e aparecem ao concluir o desenho."
     ],
     "es": [
-      "**Cambio de pantalla y cámara sin congelamientos.** Al editar una transmisión para cambiar de monitor o ventana, la vista previa y el público se actualizan al instante.",
-      "**Entrada a salas y streaming más estables.** Quienes se conectan por otros participantes o rutas de respaldo aparecen mejor, incluso en redes con restricciones.",
-      "**Juega al ajedrez en solitario o guarda tus partidas.** Bloquea una mesa vacía tras tu primer movimiento, cambia de lado en cada turno y copia o descarga la partida en PGN.",
-      "**Voz más confiable en las salas.** Se corrigió un problema por el cual los participantes dejaban de escucharse al entrar o cambiar de sala, con recuperación automática.",
-      "**Los participantes aparecen al instante.** Se corrigió un retraso por el cual el anfitrión o miembros ya presentes tardaban unos segundos en mostrarse al entrar.",
-      "**Flechas de ajedrez más claras.** Siguen una línea recta o una L de caballo y solo aparecen al terminar de dibujarlas.",
-      "**Revisa partidas de ajedrez.** Recorre las jugadas anteriores y vuelve a la posición actual sin cambiar la partida compartida."
+      "**Juega al ajedrez en solitario.** Juega con ambos colores y reloj por jugador; reiniciar el marcador reabre la mesa y salir la cierra.",
+      "**Exporta y repasa partidas.** Descarga partidas terminadas en PGN y repasa jugadas durante la partida con cuatro botones.",
+      "**Flechas de ajedrez más claras.** Siguen líneas rectas o recorridos de caballo y aparecen al terminar de dibujarlas."
     ],
     "fr": [
-      "**Changement de source fluide.** Modifier un partage actif pour changer d'écran ou de fenêtre met à jour l'aperçu et les spectateurs sans figer la vidéo.",
-      "**Accès aux salons et flux plus fiables.** Les membres rejoignant via un autre pair ou un relais de secours s'affichent mieux, même sur les réseaux restrictifs.",
-      "**Jouez seul aux échecs ou conservez vos parties.** Verrouillez une table vide après votre premier coup, changez de côté à chaque tour et copiez ou téléchargez la partie en PGN.",
-      "**Voix plus fiable dans les salons.** Correction d'un problème où les participants ne s'entendaient plus en rejoignant ou changeant de salon, avec reprise automatique.",
-      "**Participants visibles dès l'entrée.** Correction d'un délai où l'hôte ou des membres déjà présents pouvaient mettre quelques secondes à apparaître.",
-      "**Flèches d’échecs plus claires.** Elles suivent une ligne droite ou un L de cavalier et n’apparaissent qu’une fois le tracé terminé.",
-      "**Revoyez vos parties d’échecs.** Parcourez les coups précédents et revenez à la position actuelle sans modifier la partie partagée."
+      "**Jouez seul aux échecs.** Jouez les deux couleurs avec un chronomètre par joueur ; réinitialiser le score rouvre la table, quitter la ferme.",
+      "**Exportez et révisez vos parties.** Téléchargez les parties terminées en PGN et révisez les coups en cours avec quatre boutons.",
+      "**Des flèches plus claires.** Elles suivent une ligne droite ou un trajet de cavalier et apparaissent une fois le tracé terminé."
     ],
     "de": [
-      "**Flüssiger Quellenwechsel beim Teilen.** Beim Wechsel von Monitor, Fenster oder Kamera aktualisieren sich Vorschau und Zuschaueransicht ohne Einfrieren.",
-      "**Stabilerer Raumbeitritt und Stream.** Teilnehmer über verbundene Mitglieder oder Ausweichverbindungen erscheinen zuverlässig, auch in restriktiven Netzen.",
-      "**Spiele allein Schach oder speichere deine Partien.** Sperre einen leeren Tisch nach deinem ersten Zug, wechsle nach jedem Zug die Seite und kopiere oder lade die Partie als PGN herunter.",
-      "**Zuverlässigere Sprache in Räumen.** Behoben, dass Teilnehmer sich beim Betreten oder Wechseln von Räumen nicht mehr hörten, nun mit automatischer Wiederherstellung.",
-      "**Teilnehmer sofort beim Beitritt sichtbar.** Behoben, dass Host oder anwesende Mitglieder nach dem Betreten eines Raums erst verzögert erschienen.",
-      "**Klarere Schachpfeile.** Sie verlaufen gerade oder in einer Springer-L-Form und erscheinen erst, wenn du sie fertig gezeichnet hast.",
-      "**Schachpartien nachspielen.** Gehe frühere Züge durch und kehre zur aktuellen Stellung zurück, ohne die gemeinsame Partie zu ändern."
+      "**Spiele allein Schach.** Spiele beide Farben mit eigener Bedenkzeit. Beim Zurücksetzen öffnet sich der Tisch wieder, beim Verlassen wird er geschlossen.",
+      "**Exportiere und überprüfe Partien.** Lade beendete Partien als PGN herunter und gehe laufende Züge mit vier Schaltflächen durch.",
+      "**Klarere Schachpfeile.** Sie folgen geraden oder Springerzügen und erscheinen nach dem Zeichnen."
     ],
     "it": [
-      "**Cambio di schermo e fotocamera fluido.** Modificare una condivisione attiva per cambiare monitor o finestra aggiorna anteprima e spettatori senza blocchi.",
-      "**Accesso alle stanze e streaming più stabili.** Chi entra tramite altri partecipanti o connessioni di riserva appare subito, anche su reti con restrizioni.",
-      "**Gioca a scacchi da solo o conserva le partite.** Blocca un tavolo vuoto dopo la prima mossa, cambia lato a ogni turno e copia o scarica la partita in PGN.",
-      "**Voce più affidabile nelle stanze.** Risolto un problema per cui i partecipanti non si sentivano entrando o cambiando stanza, con ripristino automatico.",
-      "**Partecipanti visibili subito all'ingresso.** Risolto un ritardo per cui l'host o i membri già presenti potevano impiegare alcuni secondi ad apparire.",
-      "**Frecce degli scacchi più chiare.** Seguono una linea retta o una L del cavallo e appaiono solo quando hai finito di tracciarle.",
-      "**Rivedi le partite a scacchi.** Esamina le mosse precedenti e torna alla posizione attuale senza modificare la partita condivisa."
+      "**Gioca a scacchi da solo.** Gioca con entrambi i colori e il tempo per giocatore; azzerare il punteggio riapre il tavolo, uscire lo chiude.",
+      "**Esporta e rivedi le partite.** Scarica le partite concluse in PGN e rivedi le mosse durante la partita con quattro pulsanti.",
+      "**Frecce più chiare.** Seguono linee dritte o percorsi del cavallo e appaiono al termine del disegno."
     ],
     "zh-CN": [
-      "**流畅切换共享画面与摄像头。** 编辑进行中的共享并切换显示器、窗口或摄像头时，本地预览与观众画面会立即刷新，不再卡住。",
-      "**更稳定的入房显示与音视频传输。** 通过其他成员桥接或备用中继连接的用户也能正常显示，在受限网络下共享画面与语音更稳固。",
-      "**独自下棋或保存棋局。** 首步后锁定空棋桌，每步棋后切换方向，并以 PGN 格式复制或下载已结束的对局。",
-      "**房间语音更加稳定可靠。** 修复了加入或切换房间时成员可能听不到彼此声音的问题，并支持语音自动恢复。",
-      "**进入房间立即显示成员。** 修复了加入房间后房主或已在线成员可能需要等待几秒才显示的问题。",
-      "**棋盘箭头更清晰。** 箭头沿直线绘制，或按马步画成 L 形，并且只会在完成绘制后显示。",
-      "**复盘棋局。** 查看之前的棋步并返回当前局面，不会更改共享棋局。"
+      "**独自下棋。** 可操作双方棋子并使用各自计时；重置比分会重新开放棋桌，离开时关闭棋桌。",
+      "**导出并复盘棋局。** 下载已结束对局的 PGN，并在对局进行时用四个按钮回顾棋步。",
+      "**更清晰的棋盘箭头。** 箭头沿直线或马步路径绘制，并在完成后显示。"
     ],
     "zh-TW": [
-      "**流暢切換分享畫面與攝影機。** 編輯進行中的分享並更換螢幕、視窗或攝影機時，本機預覽與觀眾畫面會立即更新，不再凍結。",
-      "**更穩定的進房顯示與影音傳輸。** 透過其他成員轉接或備援中繼連線的使用者也能正常顯示，在受限網路下分享更穩定。",
-      "**獨自下棋或保存棋局。** 首步後鎖定空棋桌，每步棋後切換方向，並以 PGN 格式複製或下載已結束的對局。",
-      "**房間語音更加穩定可靠。** 修復了加入或切換房間時成員可能聽不到彼此聲音的問題，並支援語音自動恢復。",
-      "**進入房間立即顯示成員。** 修復了加入房間後房主或已在線成員可能需要等待幾秒才顯示的問題。",
-      "**棋盤箭頭更清楚。** 箭頭沿直線繪製，或依照騎士步法畫成 L 形，並且只會在完成繪製後顯示。",
-      "**回顧棋局。** 查看先前棋步並返回目前局面，不會變更共享棋局。"
+      "**獨自下棋。** 可操作雙方棋子並使用各自計時；重設比分會重新開放棋桌，離開時關閉棋桌。",
+      "**匯出並回顧棋局。** 下載已結束對局的 PGN，並在對局進行時用四個按鈕回顧棋步。",
+      "**更清楚的棋盤箭頭。** 箭頭沿直線或騎士步法路徑繪製，並在完成後顯示。"
     ],
     "ja": [
-      "**画面とカメラのスムーズな切り替え。** 配信を編集して別のモニターやウィンドウに切り替えても、プレビューや視聴画面が固まらず即座に反映されます。",
-      "**入室表示と配信の安定性を向上。** 他メンバー経由や代替経路で参加した相手も正しく一覧に表示され、制限の厳しい回線でも共有が安定します。",
-      "**一人で対局したり棋譜を保存したりできます。** 最初の手の後に空いているテーブルをロックし、毎手ごとに盤面を反転できます。終了した対局はPGNでコピーまたはダウンロードできます。",
-      "**ルーム内の通話がより安定。** 入室時やルーム切り替え時に相手の声が聞こえなくなる問題を修正し、音声を自動復旧できるようになりました。",
-      "**入室直後から参加者を即表示。** ルームに入った際、ホストや入室済みメンバーの表示が数秒遅れる問題を修正しました。",
-      "**チェスの矢印がより明確に。** 直線またはナイトのL字に沿って描かれ、描き終えた後に表示されます。",
-      "**対局を振り返る。** 共有中の対局を変更せずに過去の手を確認し、現在の局面に戻れます。"
+      "**一人で対局できます。** 両方の色を操作でき、持ち時間にも対応。スコアをリセットすると再開放され、退出すると終了します。",
+      "**棋譜を出力して振り返れます。** 終了した対局をPGNでダウンロードし、対局中も4つのボタンで手を確認できます。",
+      "**チェスの矢印がより明確に。** 直線またはナイトの経路に沿って描かれ、描画完了後に表示されます。"
     ],
     "ko": [
-      "**부드러운 화면 및 카메라 전환.** 송출을 편집해 다른 모니터나 창으로 바꿔도 미리보기와 시청 화면이 멈추지 않고 즉시 갱신됩니다.",
-      "**더 안정적인 방 입장 및 전송 품질.** 다른 참여자나 보조 연결 경로로 들어온 멤버도 정상 표시되며 제한적인 네트워크에서도 공유가 안정적입니다.",
-      "**혼자 대국하고 기보를 저장하세요.** 첫 수 후 빈 테이블을 잠그고 매 수마다 보드 방향을 바꿀 수 있습니다. 완료된 대국은 PGN으로 복사하거나 다운로드할 수 있습니다.",
-      "**방 음성 통화 안정성 향상.** 방에 들어가거나 이동할 때 서로의 목소리가 들리지 않던 문제를 수정하고 음성을 자동으로 복구합니다.",
-      "**입장 즉시 참여자 표시.** 방에 들어갔을 때 호스트나 기존 참여자가 몇 초 뒤에 나타나던 지연 문제를 수정했습니다.",
-      "**체스 화살표를 더 명확하게 표시합니다.** 직선이나 나이트의 L자 경로를 따르며, 그리기를 마친 뒤에만 나타납니다.",
-      "**대국을 복기하세요.** 공유 대국을 변경하지 않고 이전 수를 살펴본 뒤 현재 위치로 돌아올 수 있습니다."
+      "**혼자 체스를 두세요.** 양쪽 말을 움직이고 각 색의 시간을 사용하세요. 점수 초기화 시 방이 다시 열리고 나가면 닫힙니다.",
+      "**기보를 내보내고 복기하세요.** 완료된 대국을 PGN으로 다운로드하고, 대국 중 네 버튼으로 수를 살펴보세요.",
+      "**더 명확한 체스 화살표.** 직선이나 나이트 경로를 따르며 그리기를 마치면 표시됩니다."
     ],
     "hi": [
-      "**स्क्रीन और कैमरा सहजता से बदलें.** चलती शेयरिंग में दूसरा मॉनिटर या विंडो चुनने पर प्रीव्यू और दर्शकों की स्क्रीन बिना अटके तुरंत अपडेट होती है।",
-      "**बेहतर रूम एंट्री और स्ट्रीमिंग स्थिरता.** अन्य सदस्यों या वैकल्पिक कनेक्शन से जुड़ने वाले लोग सही दिखते हैं, और सीमित नेटवर्क पर भी शेयरिंग स्थिर रहती है।",
-      "**अकेले शतरंज खेलें और अपनी बाज़ियाँ सहेजें।** पहली चाल के बाद खाली टेबल लॉक करें, हर चाल पर बोर्ड पलटें, और पूरी बाज़ी को PGN में कॉपी या डाउनलोड करें।",
-      "**रूम में अधिक भरोसेमंद वॉइस।** रूम में जुड़ने या बदलने पर एक-दूसरे की आवाज़ न सुनाई देने की समस्या ठीक की गई, अब वॉइस अपने-आप बहाल होती है।",
-      "**प्रवेश करते ही सदस्य तुरंत दिखें।** रूम में जुड़ने के बाद होस्ट या मौजूदा सदस्यों के दिखने में कुछ सेकंड की देरी की समस्या ठीक की गई।",
-      "**शतरंज के तीर अब अधिक स्पष्ट हैं।** वे सीधी रेखा या घोड़े के L आकार में चलते हैं और बनाना पूरा होने पर ही दिखते हैं।",
-      "**शतरंज की बाज़ियों की समीक्षा करें।** साझा बाज़ी बदले बिना पिछली चालें देखें और वर्तमान स्थिति पर लौटें।"
+      "**अकेले शतरंज खेलें।** दोनों रंगों से खेलें और हर खिलाड़ी का समय इस्तेमाल करें। स्कोर रीसेट करने पर टेबल फिर खुलेगी; बाहर निकलने पर बंद होगी।",
+      "**बाज़ियाँ निर्यात करें और दोहराएँ।** पूरी बाज़ियाँ PGN में डाउनलोड करें और खेल के दौरान चार बटनों से चालें देखें।",
+      "**शतरंज के तीर स्पष्ट हैं।** वे सीधी रेखा या घोड़े के रास्ते चलते हैं और ड्रॉ पूरा होने पर दिखते हैं।"
     ],
     "fi": [
-      "**Sujuva näytön ja kameran vaihto.** Jaon muokkaus toiseen näyttöön tai ikkunaan päivittää esikatselun ja katsojien kuvan heti jäätymättä.",
-      "**Varmempi liittyminen ja lähetys.** Muiden osallistujien tai varayhteyden kautta liittyvät näkyvät oikein, ja jako toimii vakaammin myös rajoitetuissa verkoissa.",
-      "**Pelaa shakkia yksin tai tallenna pelisi.** Lukitse tyhjä pöytä ensimmäisen siirron jälkeen, vaihda puolta jokaisella siirrolla ja kopioi tai lataa päättynyt peli PGN-muodossa.",
-      "**Luotettavampi puhe huoneissa.** Korjattu ongelma, jossa osallistujat eivät kuulleet toisiaan huoneeseen liittyessä tai vaihdettaessa, automaattisella palautuksella.",
-      "**Osallistujat näkyvät heti liittyessä.** Korjattiin viive, jossa isäntä tai huoneessa jo olleet jäsenet ilmestyivät näkyviin vasta muutaman sekunnin kuluttua.",
-      "**Selkeämmät shakkinuolet.** Ne kulkevat suoraan tai ratsun L-muodossa ja näkyvät vasta, kun piirtäminen on valmis.",
-      "**Käy shakkipelit läpi.** Tarkastele aiempia siirtoja ja palaa nykyiseen asemaan muuttamatta yhteistä peliä."
+      "**Pelaa shakkia yksin.** Pelaa molemmilla väreillä ja käytä pelaajakohtaista aikaa. Pisteiden nollaus avaa pöydän, poistuminen sulkee sen.",
+      "**Vie ja tarkastele pelejä.** Lataa päättyneet pelit PGN-muodossa ja tarkastele siirtoja pelin aikana neljällä painikkeella.",
+      "**Selkeämmät shakkinuolet.** Ne seuraavat suoraa tai ratsun reittiä ja näkyvät piirtämisen valmistuttua."
     ],
     "ru": [
-      "**Плавное переключение экрана и камеры.** Смена монитора или окна при редактировании трансляции сразу обновляет предпросмотр и поток без зависаний.",
-      "**Стабильный вход в комнату и трансляция.** Участники через других пользователей или резервный маршрут отображаются верно, а связь устойчивее в строгих сетях.",
-      "**Играйте в шахматы в одиночку и сохраняйте партии.** Закройте пустой стол после первого хода, меняйте сторону после каждого хода и копируйте или скачивайте завершённую партию в PGN.",
-      "**More reliable voice in rooms.** Fixed an issue where participants could stop hearing each other when joining or switching rooms, with automatic voice recovery.",
-      "**Participants appear immediately on entry.** Fixed a delay where the host or existing members could take a few seconds to show up after joining a room.",
-      "**Более надёжная голосовая связь.** Исправлена проблема, из-за которой участники переставали слышать друг друга при входе или смене комнаты, с автовосстановлением.",
-      "**Участники видны сразу при входе.** Исправлена задержка, из-за которой хост или уже находящиеся в комнате участники появлялись лишь через пару секунд.",
-      "**Стрелки в шахматах стали понятнее.** Они идут по прямой или по L-образному ходу коня и появляются только после завершения рисования.",
-      "**Просматривайте шахматные партии.** Изучайте предыдущие ходы и возвращайтесь к текущей позиции, не меняя общую партию."
+      "**Играйте в шахматы в одиночку.** Играйте за оба цвета с отдельным временем. Сброс счёта открывает стол, выход закрывает его.",
+      "**Экспортируйте и просматривайте партии.** Скачивайте завершённые партии в PGN и просматривайте ходы во время игры четырьмя кнопками.",
+      "**Более понятные стрелки.** Они идут по прямой или по ходу коня и появляются после завершения рисования."
     ]
   }
 }
