@@ -13,6 +13,13 @@ export interface PlanningHighlight {
   color: PlanningColor;
 }
 
+export interface BoardPlanningOptions {
+  /** Keep the in-progress arrow hidden until the pointer is released. */
+  showDraft?: boolean;
+  /** Snap non-knight arrows to the closest horizontal, vertical, or diagonal square. */
+  constrainChessArrows?: boolean;
+}
+
 const COLOR_STROKE: Record<PlanningColor, string> = {
   green: 'rgba(118, 206, 86, 0.88)',
   amber: 'rgba(244, 179, 62, 0.9)',
@@ -84,10 +91,43 @@ function waypointsKey(waypoints: number[]): string {
   return waypoints.join('-');
 }
 
-export function useBoardPlanning(gridSize = 8) {
+export function useBoardPlanning(gridSize = 8, options: BoardPlanningOptions = {}) {
   const [arrows, setArrows] = useState<PlanningArrow[]>([]);
   const [highlights, setHighlights] = useState<PlanningHighlight[]>([]);
   const [draftArrow, setDraftArrow] = useState<PlanningArrow | null>(null);
+  const showDraft = options.showDraft ?? true;
+
+  const normalizeChessWaypoints = useCallback((startSq: number, endSq: number): number[] => {
+    const startRow = Math.floor(startSq / gridSize);
+    const startCol = startSq % gridSize;
+    const endRow = Math.floor(endSq / gridSize);
+    const endCol = endSq % gridSize;
+    const rowDelta = endRow - startRow;
+    const colDelta = endCol - startCol;
+
+    if (Math.abs(rowDelta) === 2 && Math.abs(colDelta) === 1) {
+      return [startSq, startRow * gridSize + endCol, endSq];
+    }
+    if (Math.abs(rowDelta) === 1 && Math.abs(colDelta) === 2) {
+      return [startSq, endRow * gridSize + startCol, endSq];
+    }
+
+    const candidates: Array<{ square: number; distance: number; progress: number; diagonal: boolean }> = [];
+    for (let square = 0; square < gridSize * gridSize; square++) {
+      if (square === startSq) continue;
+      const row = Math.floor(square / gridSize);
+      const col = square % gridSize;
+      const dr = Math.abs(row - startRow);
+      const dc = Math.abs(col - startCol);
+      const diagonal = dr === dc;
+      if (row !== startRow && col !== startCol && !diagonal) continue;
+      const distance = (row - endRow) ** 2 + (col - endCol) ** 2;
+      candidates.push({ square, distance, progress: dr + dc, diagonal });
+    }
+
+    candidates.sort((a, b) => a.distance - b.distance || b.progress - a.progress || Number(b.diagonal) - Number(a.diagonal));
+    return candidates[0] ? [startSq, candidates[0].square] : [startSq];
+  }, [gridSize]);
 
   const clearPlanning = useCallback(() => {
     setArrows([]);
@@ -133,7 +173,7 @@ export function useBoardPlanning(gridSize = 8) {
 
       const color = colorFromModifiers(event);
       const visited: number[] = [startSq];
-      setDraftArrow({ waypoints: [startSq], color });
+      if (showDraft) setDraftArrow({ waypoints: [startSq], color });
 
       const onMove = (moveEvent: PointerEvent) => {
         const hovered = resolveSquareFromPoint(moveEvent.clientX, moveEvent.clientY);
@@ -146,7 +186,7 @@ export function useBoardPlanning(gridSize = 8) {
             visited.push(hovered);
           }
         }
-        setDraftArrow({ waypoints: buildWaypoints(visited, hovered), color });
+        if (showDraft) setDraftArrow({ waypoints: buildWaypoints(visited, hovered), color });
       };
 
       const onUp = (upEvent: PointerEvent) => {
@@ -166,7 +206,9 @@ export function useBoardPlanning(gridSize = 8) {
           return;
         }
 
-        const waypoints = buildWaypoints(visited, endSq);
+        const waypoints = options.constrainChessArrows
+          ? normalizeChessWaypoints(startSq, endSq)
+          : buildWaypoints(visited, endSq);
         if (waypoints.length < 2) return;
 
         const targetKey = waypointsKey(waypoints);
@@ -188,7 +230,7 @@ export function useBoardPlanning(gridSize = 8) {
       window.addEventListener('pointerup', onUp);
       window.addEventListener('pointercancel', onUp);
     },
-    [buildWaypoints, gridSize],
+    [buildWaypoints, gridSize, normalizeChessWaypoints, options.constrainChessArrows, showDraft],
   );
 
   return {

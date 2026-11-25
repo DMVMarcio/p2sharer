@@ -70,7 +70,10 @@ export const ChessApp: React.FC<RoomAppViewProps> = ({ instanceId, compact = fal
     inCheck: boolean;
   } | null>(null);
 
-  const { arrows, highlights, draftArrow, clearPlanning, startRightPlanning } = useBoardPlanning(8);
+  const { arrows, highlights, draftArrow, clearPlanning, startRightPlanning } = useBoardPlanning(8, {
+    showDraft: false,
+    constrainChessArrows: true,
+  });
 
   useEffect(() => {
     return roomAppsService.subscribe(() => setTick((n) => n + 1));
