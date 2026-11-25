@@ -309,6 +309,8 @@ export class GroupRoomManager {
   };
   private remoteVoiceStates = new Map<string, { inVoice: boolean; muted: boolean; deafened: boolean }>();
   private remoteVoiceStreams = new Map<string, MediaStream>();
+  private pendingVoiceStreams = new Map<string, MediaStream>();
+  private voiceRecoveryTimers = new Map<string, ReturnType<typeof setTimeout>[]>();
   private voiceDispatches = new Map<string, { room: unknown; stream: MediaStream }>();
   private observedVoiceStreams = new WeakSet<MediaStream>();
 
@@ -1316,6 +1318,7 @@ export class GroupRoomManager {
     this.historyAction?.send({ history: this.chatHistory }, { target: peerId });
     this.historyAction?.send({ request: true }, { target: peerId });
     if (this.localStream) this.sendStreamToPeer(peerId);
+    this.flushPendingVoiceStreams(peerId);
     this.syncVoiceWithPeer(peerId);
   }
 
@@ -1340,7 +1343,14 @@ export class GroupRoomManager {
       });
     }
     if (batch) return;
-    if (this.chatAuth?.getKnownKey(peerId) === key && peerId !== selfId) this.announceToPeer(peerId);
+    if (peerId === selfId) {
+      this.flushPendingVoiceStreams();
+      for (const target of this.admittedTargets()) {
+        this.syncVoiceWithPeer(target);
+      }
+    } else if (this.chatAuth?.getKnownKey(peerId) === key) {
+      this.announceToPeer(peerId);
+    }
     this.notifyPeersUpdate();
     void this.sendAuthoritySummary(peerId === selfId ? undefined : peerId).catch((error) =>
       console.warn('[Rooms] Initial authority reconciliation failed:', error));
@@ -1700,6 +1710,7 @@ export class GroupRoomManager {
         return;
       }
       const peerId = meta.peerId;
+      const requestVoice = payload.requestVoice === true;
       const state = {
         inVoice: payload.inVoice,
         muted: payload.muted,
@@ -1708,9 +1719,16 @@ export class GroupRoomManager {
       this.remoteVoiceStates.set(peerId, state);
       if (state.inVoice) {
         if (this.localVoiceState.inVoice && this.localVoiceStream) {
-          this.sendVoiceStreamToPeer(peerId);
+          this.sendVoiceStreamToPeer(peerId, requestVoice);
+        }
+        if (!state.muted && !this.hasLiveRemoteVoiceStream(peerId)) {
+          this.scheduleVoiceStreamRecovery(peerId);
+        } else {
+          this.clearVoiceRecovery(peerId);
         }
       } else {
+        this.clearVoiceRecovery(peerId);
+        this.pendingVoiceStreams.delete(peerId);
         if (this.remoteVoiceStreams.has(peerId)) {
           this.remoteVoiceStreams.delete(peerId);
           this.callbacks?.onRemoteVoiceStream?.(peerId, null);
@@ -2764,10 +2782,73 @@ export class GroupRoomManager {
 
   }
 
+  private hasLiveRemoteVoiceStream(peerId: string): boolean {
+    const stream = this.remoteVoiceStreams.get(peerId);
+    return Boolean(stream && stream.getAudioTracks().some((track) => track.readyState === 'live'));
+  }
+
+  private clearVoiceRecovery(peerId?: string): void {
+    for (const [id, timers] of this.voiceRecoveryTimers) {
+      if (peerId !== undefined && id !== peerId) continue;
+      timers.forEach(clearTimeout);
+      this.voiceRecoveryTimers.delete(id);
+    }
+  }
+
+  private scheduleVoiceStreamRecovery(peerId: string): void {
+    if (this.previewOnly || !this.room) return;
+    if (this.hasLiveRemoteVoiceStream(peerId)) {
+      this.clearVoiceRecovery(peerId);
+      return;
+    }
+    if (this.voiceRecoveryTimers.has(peerId)) return;
+    const boundRoom = this.room;
+    const timers: ReturnType<typeof setTimeout>[] = [];
+    [1200, 3500, 7000].forEach((delay) => {
+      timers.push(setTimeout(() => {
+        if (this.room !== boundRoom || this.previewOnly) {
+          this.clearVoiceRecovery(peerId);
+          return;
+        }
+        const remote = this.remoteVoiceStates.get(peerId);
+        if (!remote || !remote.inVoice || remote.muted || this.hasLiveRemoteVoiceStream(peerId)) {
+          this.clearVoiceRecovery(peerId);
+          return;
+        }
+        if (!this.peerTracker.isVerified(peerId) || !this.isLivePeerTarget(peerId)) return;
+        if (this.authority && (!this.localAdmitted || !this.isAdmittedPeer(peerId))) return;
+        try {
+          this.voiceAction?.send({ ...this.localVoiceState, requestVoice: true }, { target: peerId });
+        } catch {}
+      }, delay));
+    });
+    this.voiceRecoveryTimers.set(peerId, timers);
+  }
+
+  private flushPendingVoiceStreams(peerId?: string): void {
+    if (peerId !== undefined) {
+      const pending = this.pendingVoiceStreams.get(peerId);
+      if (pending) {
+        this.pendingVoiceStreams.delete(peerId);
+        this.receiveVoiceStream(pending, peerId);
+      }
+      return;
+    }
+    for (const [id, pending] of Array.from(this.pendingVoiceStreams.entries())) {
+      this.pendingVoiceStreams.delete(id);
+      this.receiveVoiceStream(pending, id);
+    }
+  }
+
   private receiveVoiceStream(stream: MediaStream, peerId: string): void {
     if (this.previewOnly) return;
-    if (!this.peerTracker.isVerified(peerId)) return;
-    if (this.authority && (!this.localAdmitted || !this.isAdmittedPeer(peerId))) return;
+    if (!this.peerTracker.isVerified(peerId) || (this.authority && (!this.localAdmitted || !this.isAdmittedPeer(peerId)))) {
+      // Buffer voice tracks that arrive before admission/verification completes so Trystero's
+      // one-shot track emission is never permanently lost.
+      this.pendingVoiceStreams.set(peerId, stream);
+      return;
+    }
+    this.pendingVoiceStreams.delete(peerId);
     this.peerTracker.touchPeer(peerId);
     if (!this.observedVoiceStreams.has(stream)) {
       this.observedVoiceStreams.add(stream);
@@ -2778,6 +2859,7 @@ export class GroupRoomManager {
     const audioTracks = stream.getAudioTracks().filter((track) => track.readyState === 'live');
     if (audioTracks.length === 0) return;
 
+    this.clearVoiceRecovery(peerId);
     this.remoteVoiceStreams.set(peerId, stream);
     this.callbacks?.onRemoteVoiceStream?.(peerId, stream);
 
@@ -2789,6 +2871,10 @@ export class GroupRoomManager {
         if (!stillLive) {
           this.remoteVoiceStreams.delete(peerId);
           this.callbacks?.onRemoteVoiceStream?.(peerId, null);
+          const remote = this.remoteVoiceStates.get(peerId);
+          if (remote?.inVoice && !remote.muted) {
+            this.scheduleVoiceStreamRecovery(peerId);
+          }
         }
       });
     });
@@ -2831,29 +2917,64 @@ export class GroupRoomManager {
     }
   }
 
-  private sendVoiceStreamToPeer(peerId: string): void {
+  private sendVoiceStreamToPeer(peerId: string, recovery = false): void {
     const room = this.room;
     const stream = this.localVoiceStream;
     if (!room || !stream || !this.localVoiceState.inVoice) return;
-    if (!this.peerTracker.isVerified(peerId)) return;
+    if (!this.peerTracker.isVerified(peerId) || !this.isLivePeerTarget(peerId)) return;
     if (this.authority && (!this.localAdmitted || !this.isAdmittedPeer(peerId))) return;
+    const liveTracks = stream.getAudioTracks().filter((track) => track.readyState !== 'ended');
+    if (liveTracks.length === 0) return;
+
     const existing = this.voiceDispatches.get(peerId);
-    if (existing && existing.room === room && existing.stream === stream) return;
+    if (!recovery && existing && existing.room === room && existing.stream === stream) return;
     this.voiceDispatches.set(peerId, { room, stream });
+
+    const peers = room.getPeers?.() || {};
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const peerObj: any = peers[peerId];
+    const pc: RTCPeerConnection | undefined = peerObj?.connection || peerObj?.pc || peerObj;
+    if (pc) {
+      MediaCoordinator.patchPeerConnectionSdp(pc);
+    }
+
     const metadata = { kind: 'voice', id: 'voice' };
+    const operations: Promise<unknown>[] = [];
     try {
       if (typeof room.addTrack === 'function') {
-        for (const track of stream.getAudioTracks()) {
+        for (const track of liveTracks) {
           for (const op of room.addTrack(track, stream, { target: peerId, metadata }) || []) {
-            void Promise.resolve(op).catch(() => {});
+            operations.push(Promise.resolve(op).catch((err) => {
+              if (this.voiceDispatches.get(peerId)?.stream === stream) {
+                this.voiceDispatches.delete(peerId);
+              }
+              console.warn('[Voice] Track dispatch failed:', peerId, err);
+            }));
           }
         }
       } else if (typeof room.addStream === 'function') {
         for (const op of room.addStream(stream, { target: peerId, metadata }) || []) {
-          void Promise.resolve(op).catch(() => {});
+          operations.push(Promise.resolve(op).catch((err) => {
+            if (this.voiceDispatches.get(peerId)?.stream === stream) {
+              this.voiceDispatches.delete(peerId);
+            }
+            console.warn('[Voice] Stream dispatch failed:', peerId, err);
+          }));
         }
       }
+      if (recovery && typeof room.renegotiate === 'function') {
+        void Promise.allSettled(operations).then(() => {
+          if (this.room === room && this.localVoiceStream === stream && this.localVoiceState.inVoice) {
+            for (const pending of room.renegotiate(peerId) || []) {
+              void Promise.resolve(pending).catch(() => {});
+            }
+          }
+        });
+      }
     } catch (err) {
+      if (this.voiceDispatches.get(peerId)?.stream === stream) {
+        this.voiceDispatches.delete(peerId);
+      }
       console.warn('[Voice] Failed to dispatch voice stream to peer:', peerId, err);
     }
   }
@@ -3145,6 +3266,8 @@ export class GroupRoomManager {
   private removePeer(peerId: string) {
     this.clearMediaDispatch(peerId);
     this.removeVoiceDispatchFromPeer(peerId);
+    this.clearVoiceRecovery(peerId);
+    this.pendingVoiceStreams.delete(peerId);
     if (this.remoteVoiceStreams.has(peerId)) {
       this.remoteVoiceStreams.delete(peerId);
       this.callbacks?.onRemoteVoiceStream?.(peerId, null);
@@ -4812,6 +4935,8 @@ export class GroupRoomManager {
     this.bannerTransfer?.close();
     this.bannerTransfer = null;
     this.setLocalVoiceState({ inVoice: false, muted: false, deafened: false }, null);
+    this.clearVoiceRecovery();
+    this.pendingVoiceStreams.clear();
     this.remoteVoiceStates.clear();
     this.remoteVoiceStreams.clear();
     this.voiceDispatches.clear();

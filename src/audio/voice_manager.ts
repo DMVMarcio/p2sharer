@@ -929,6 +929,7 @@ export class VoiceManager {
       tracks.every((t) => existing.tracks.includes(t))
     ) {
       this.refreshRemotePeerIdentity(peerId, publicKey, username);
+      this.outputRecovery?.resume();
       if (existing.pullElement.paused) void existing.pullElement.play()?.catch(() => {});
       return;
     }
@@ -957,6 +958,15 @@ export class VoiceManager {
     pullElement.srcObject = audioStream;
     document.body.appendChild(pullElement);
     void pullElement.play()?.catch(() => {});
+
+    // WebRTC audio tracks often start muted until the first RTP packet arrives; wake playback on unmute.
+    tracks.forEach((track) => {
+      track.addEventListener?.('unmute', () => {
+        if (this.remotePeers.get(peerId)?.pullElement !== pullElement) return;
+        this.outputRecovery?.resume();
+        if (pullElement.paused) void pullElement.play()?.catch(() => {});
+      });
+    });
 
     this.remotePeers.set(peerId, {
       peerId,
