@@ -217,7 +217,7 @@ export const ChessApp: React.FC<RoomAppViewProps> = ({ instanceId, compact = fal
     const { game } = room;
     if (game.status === 'playing' && room.lockedBy === model.localActor) {
       return game.inCheck
-        ? `${t('chess.soloModeStatus')} · ${t('chess.check')}`
+        ? t('chess.checkAlert')
         : t('chess.soloModeStatus');
     }
     if (game.status === 'checkmate' && (game.winner === 'w' || game.winner === 'b')) {
@@ -335,7 +335,7 @@ export const ChessApp: React.FC<RoomAppViewProps> = ({ instanceId, compact = fal
         const isSoloMode = room.lockedBy === model.localActor;
         const isMyTurn = !isReviewing && game.status === 'playing' && myColor !== null && (isSoloMode || game.turn === myColor);
         const moveColor = isSoloMode ? game.turn : myColor;
-        const flipped = isSoloMode ? game.moveHistory.length % 2 === 1 : myColor === 'b';
+        const flipped = !isSoloMode && myColor === 'b';
 
         const activeOrigin = dragging ? dragging.from : selectedSquare;
         const legalMoves: ChessCandidateMove[] =
@@ -473,7 +473,7 @@ export const ChessApp: React.FC<RoomAppViewProps> = ({ instanceId, compact = fal
         const statusText = isReviewing
           ? t('chess.reviewPosition', { move: currentReviewPly, total: game.moveHistory.length })
           : game.status === 'playing' && game.inCheck
-            ? `${t('chess.checkAlert')} · ${describeRoomStatus(room)}`
+            ? t('chess.checkAlert')
             : describeRoomStatus(room);
 
         const lastMoveRecord = game.moveHistory[game.moveHistory.length - 1];
