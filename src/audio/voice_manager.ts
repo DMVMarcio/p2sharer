@@ -473,7 +473,7 @@ export class VoiceManager {
       );
     }
     if (this.inputGainNode && this.inputCtx) {
-      const targetPreGain = this.workletNode ? 1 : (clampVoiceVolume(prefs.inputVolume) / 100) * 3.5;
+      const targetPreGain = this.workletNode ? 1 : (clampVoiceVolume(prefs.inputVolume) / 100) * 2.2;
       this.inputGainNode.gain.setTargetAtTime(
         targetPreGain,
         this.inputCtx.currentTime,
@@ -814,7 +814,8 @@ export class VoiceManager {
     if (
       prev.inputDeviceId !== next.inputDeviceId ||
       prev.echoCancellation !== next.echoCancellation ||
-      prev.autoGainControl !== next.autoGainControl
+      prev.autoGainControl !== next.autoGainControl ||
+      (prev.noiseSuppressionMode === 'off') !== (next.noiseSuppressionMode === 'off')
     ) {
       await this.swapMicrophoneInput(next);
     }
@@ -900,7 +901,8 @@ export class VoiceManager {
       if (
         prev.inputDeviceId !== activeIn.inputDeviceId ||
         prev.echoCancellation !== activeIn.echoCancellation ||
-        prev.autoGainControl !== activeIn.autoGainControl
+        prev.autoGainControl !== activeIn.autoGainControl ||
+        (prev.noiseSuppressionMode === 'off') !== (activeIn.noiseSuppressionMode === 'off')
       ) {
         await this.swapMicrophoneInput(activeIn);
       }
@@ -927,6 +929,7 @@ export class VoiceManager {
       tracks.every((t) => existing.tracks.includes(t))
     ) {
       this.refreshRemotePeerIdentity(peerId, publicKey, username);
+      this.outputRecovery?.resume();
       if (existing.pullElement.paused) void existing.pullElement.play()?.catch(() => {});
       return;
     }
@@ -956,6 +959,15 @@ export class VoiceManager {
     document.body.appendChild(pullElement);
     void pullElement.play()?.catch(() => {});
 
+    // WebRTC audio tracks often start muted until the first RTP packet arrives; wake playback on unmute.
+    tracks.forEach((track) => {
+      track.addEventListener?.('unmute', () => {
+        if (this.remotePeers.get(peerId)?.pullElement !== pullElement) return;
+        this.outputRecovery?.resume();
+        if (pullElement.paused) void pullElement.play()?.catch(() => {});
+      });
+    });
+
     this.remotePeers.set(peerId, {
       peerId,
       stream,
@@ -970,6 +982,16 @@ export class VoiceManager {
       muted: saved.muted,
       speaking: false,
       holdUntil: 0,
+    });
+
+    logDiagnostic('INFO', 'voice.playback', 'Remote voice audio attached', {
+      peer: peerId.slice(0, 6),
+      trackCount: tracks.length,
+      mutedTracks: tracks.map((t) => t.muted),
+      contextState: ctx.state,
+      volume: saved.volume,
+      userMuted: saved.muted,
+      deafened: this.deafened,
     });
 
     this.ensureRemoteSpeakTimer();

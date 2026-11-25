@@ -4,7 +4,7 @@ import { validStreamDescriptors, type StreamDescriptor } from '../core/media_str
 import { nativeSenderSource, type NativeSenderSource } from '../video/native_sender_source.ts';
 import { MediaCoordinator } from './media_coordinator.ts';
 import { logDiagnostic } from '../core/logger.ts';
-import { summarizeIceDescription, summarizeIceStats } from './ice_config.ts';
+import { buildNativeIceServers, summarizeIceDescription, summarizeIceStats } from './ice_config.ts';
 
 const SETUP_TIMEOUT_MS = 10_000;
 const FIRST_VIDEO_TIMEOUT_MS = 6_000;
@@ -23,7 +23,7 @@ interface Incoming { id: string; peer: string; descriptor: StreamDescriptor; pc?
   iceSummary?: ReturnType<typeof summarizeIceStats>; sampledAt?: number;
   videoStats?: { bytesReceived: number; framesReceived: number; framesDecoded: number; keyFramesDecoded: number } }
 interface TransportConfig {
-  rtc: () => RTCConfiguration | Promise<RTCConfiguration>;
+  rtc: (peerId?: string) => RTCConfiguration | Promise<RTCConfiguration>;
   send: (peer: string, signal: Signal) => void;
   permitted: (peer: string, descriptor?: StreamDescriptor) => boolean;
   receive: (peer: string, stream: MediaStream, descriptor: StreamDescriptor) => void;
@@ -75,15 +75,15 @@ export class NativeVideoTransport {
   private async open(route: Outgoing): Promise<void> {
     await this.ensureListener();
     if (!this.current(route)) return;
-    const rtc = await this.config.rtc();
+    const rtc = await this.config.rtc(route.peer);
     if (!this.current(route)) return;
+    const nativeIceServers = buildNativeIceServers(rtc.iceServers);
     logDiagnostic('INFO', 'transmission.native.ice', 'Creating native sender offer', {
       routeId: route.id, mediaId: route.descriptor.id, relayOnly: rtc.iceTransportPolicy === 'relay',
-      serverCount: rtc.iceServers?.length ?? 0, elapsedMs: Math.round(performance.now() - route.started) });
+      serverCount: nativeIceServers.length, elapsedMs: Math.round(performance.now() - route.started) });
     const sdp = await invoke<string>('create_native_video_offer', { id: route.id, ...route.source,
       peerId: route.peer, streamId: route.descriptor.id, trackId: route.track.id, bitrate: Math.round(route.descriptor.bitrate * 1000),
-      iceServers: (rtc.iceServers ?? []).map(s => ({ urls: Array.isArray(s.urls) ? s.urls : [s.urls],
-        username: s.username ?? '', credential: s.credential ?? '' })), relayOnly: rtc.iceTransportPolicy === 'relay' });
+      iceServers: nativeIceServers, relayOnly: rtc.iceTransportPolicy === 'relay' });
     if (!this.current(route)) { await this.closeNative(route); return; }
     route.offer = { id: route.id, mediaId: route.descriptor.id, kind: 'offer', descriptor: route.descriptor, sdp };
     logDiagnostic('INFO', 'transmission.native.ice', 'Native sender offer created', {
@@ -156,7 +156,7 @@ export class NativeVideoTransport {
         started: performance.now(), timer: setInterval(() => { void this.checkReceiver(incoming); }, 500) };
       this.incoming.set(key, incoming);
       try {
-        const rtc = await this.config.rtc();
+        const rtc = await this.config.rtc(peer);
         if (this.closed || this.incoming.get(key) !== incoming || !this.config.permitted(peer, signal.descriptor)) return;
         const pc = new RTCPeerConnection(rtc);
         incoming.pc = pc;

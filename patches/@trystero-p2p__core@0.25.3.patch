@@ -169,7 +169,7 @@ index 7340a4f4bd7192c2c9f064d40311433436effc0f..76076fb6d1649100358ca3c7d12b51bb
  	makeOffer;
  	pool = [];
 diff --git a/dist/peer.mjs b/dist/peer.mjs
-index 8003df9196a808650bc233f9243be5eae14b4a1d..01ec4ab7f36da64b17e6ceffbf9d1b2f508f53e4 100644
+index 8003df9196a808650bc233f9243be5eae14b4a1d..cd0f0d721f4902b8979daf412ba01a2a4f00888c 100644
 --- a/dist/peer.mjs
 +++ b/dist/peer.mjs
 @@ -1,13 +1,21 @@
@@ -285,7 +285,7 @@ index 8003df9196a808650bc233f9243be5eae14b4a1d..01ec4ab7f36da64b17e6ceffbf9d1b2f
  		},
  		async signal(sdp) {
  			if (sdp.type === "candidate") {
-@@ -238,34 +280,90 @@ var peer_default = (initiator, { trickleIce, rtcConfig, rtcPolyfill, turnConfig,
+@@ -238,34 +280,95 @@ var peer_default = (initiator, { trickleIce, rtcConfig, rtcPolyfill, turnConfig,
  				}
  				return;
  			}
@@ -365,8 +365,13 @@ index 8003df9196a808650bc233f9243be5eae14b4a1d..01ec4ab7f36da64b17e6ceffbf9d1b2f
 +								if (pc.signalingState === "stable" && pc.connectionState !== "closed") void createOffer(false);
 +							});
 +						}
- 					}
++					}
 +				} catch (err) {
++					const isStaleAnswerMismatch = sdp.type === answerType && dataChannel?.readyState === "open" && pc.connectionState !== "failed" && pc.connectionState !== "closed" && /order of m-lines|wrong state|InvalidStateError|InvalidAccessError/i.test(String(err?.message ?? err?.name ?? ""));
++					if (isStaleAnswerMismatch) {
++						console.warn("trystero: ignoring stale answer m-line mismatch on open peer:", err);
++						return;
++					}
 +					if (dataChannel?.readyState === "open" && pc.connectionState !== "failed" && pc.connectionState !== "closed" && !isFatalSdpError(err) && consecutiveNegotiationErrors < 3) {
 +						consecutiveNegotiationErrors++;
 +						console.warn("trystero: signal failed on open peer, recovering:", err);
@@ -375,7 +380,7 @@ index 8003df9196a808650bc233f9243be5eae14b4a1d..01ec4ab7f36da64b17e6ceffbf9d1b2f
 +							localOfferCreatedAt = null;
 +						}
 +						return;
-+					}
+ 					}
 +					handlers.error?.(toError(err, "failed to apply remote signal"));
  				}
 -			} catch (err) {
@@ -398,7 +403,7 @@ index 8003df9196a808650bc233f9243be5eae14b4a1d..01ec4ab7f36da64b17e6ceffbf9d1b2f
  		sendData: (data) => dataChannel?.send(data),
  		destroy: () => {
  			clearDisconnectedCloseTimer();
-@@ -273,6 +371,9 @@ var peer_default = (initiator, { trickleIce, rtcConfig, rtcPolyfill, turnConfig,
+@@ -273,6 +376,9 @@ var peer_default = (initiator, { trickleIce, rtcConfig, rtcPolyfill, turnConfig,
  			pc.close();
  			makingOffer = false;
  			isSettingRemoteAnswerPending = false;
@@ -408,7 +413,7 @@ index 8003df9196a808650bc233f9243be5eae14b4a1d..01ec4ab7f36da64b17e6ceffbf9d1b2f
  			emitClose();
  		},
  		setHandlers: (newHandlers) => {
-@@ -286,9 +387,9 @@ var peer_default = (initiator, { trickleIce, rtcConfig, rtcPolyfill, turnConfig,
+@@ -286,9 +392,9 @@ var peer_default = (initiator, { trickleIce, rtcConfig, rtcPolyfill, turnConfig,
  			});
  		},
  		offerPromise,
@@ -565,18 +570,163 @@ index 5fca48a89e823ad3a5665d121f390b505ecf9345..f692fd4dc6ac4ec1092b82d4a87380db
  	getSignalBinding(shared) {
  		if (shared.controlRoomId) {
 diff --git a/dist/signal-handler.mjs b/dist/signal-handler.mjs
-index cf12b0b808d11b85878e2a038138e8a64b5c40ba..bf5ab30db118736c30499e48cab33208197e3275 100644
+index cf12b0b808d11b85878e2a038138e8a64b5c40ba..bb4f98473c2b0ad347f4719a3270f44d94564e18 100644
 --- a/dist/signal-handler.mjs
 +++ b/dist/signal-handler.mjs
-@@ -5,7 +5,7 @@ import { getConnectedPeerHealth } from "./shared-peer.mjs";
+@@ -5,7 +5,8 @@ import { getConnectedPeerHealth } from "./shared-peer.mjs";
  //#region src/signal-handler.ts
  const offerPostAnswerTtlMs = 23333;
  const offerIdSize = 12;
 -const disconnectedPeerGraceMs = 7533;
 +const disconnectedPeerGraceMs = 25e3;
++const directFallbackTimeoutMs = 6e3;
  const answeringTtlMs = 23333;
  const legacyCandidateKey = "__legacy__";
  const offerRelayPlaceholder = "offer-placeholder";
+@@ -49,13 +50,48 @@ const makeState = () => ({
+ 	answeringPeer: null,
+ 	answerSent: false,
+ 	connectionErrorReported: false,
++	useFallbackRtc: false,
++	directFallbackTimer: null,
+ 	pendingCandidates: {}
+ });
+ const hasTurnServer = (config) => {
+-	return [...config.turnConfig ?? [], ...config.rtcConfig?.iceServers ?? []].some(({ urls }) => {
++	return [...config.turnConfig ?? [], ...config.rtcConfig?.iceServers ?? [], ...config.fallbackRtcConfig?.iceServers ?? []].some(({ urls }) => {
+ 		return (Array.isArray(urls) ? urls : [urls]).some((url) => /^turns?:/i.test(url));
+ 	});
+ };
++const getPeerConfig = (ctx, state) => state.useFallbackRtc && ctx.config.fallbackRtcConfig ? {
++	...ctx.config,
++	rtcConfig: ctx.config.fallbackRtcConfig
++} : ctx.config;
++const clearDirectFallbackTimer = (state) => {
++	state.directFallbackTimer = resetTimer(state.directFallbackTimer);
++};
++const escalateToFallbackRtc = (ctx, state, peerId, reason) => {
++	if (ctx.isLeaving() || state.connectedPeer || state.useFallbackRtc || !ctx.config.fallbackRtcConfig) return false;
++	state.useFallbackRtc = true;
++	clearDirectFallbackTimer(state);
++	console.warn(`[P2P/ICE] Direct P2P failed for peer ${peerId.slice(0, 6)} (${reason}); retrying with automatic TURN fallback`);
++	return true;
++};
++const scheduleDirectFallback = (ctx, state, peerId, peer, role) => {
++	if (state.useFallbackRtc || !ctx.config.fallbackRtcConfig) return;
++	clearDirectFallbackTimer(state);
++	state.directFallbackTimer = setTimeout(() => {
++		state.directFallbackTimer = null;
++		const current = ctx.peerStates[peerId];
++		if (!current || current.connectedPeer || ctx.isLeaving()) return;
++		if (role === "offer" ? current.offerPeer !== peer : current.answeringPeer !== peer) return;
++		const iceState = peer.connection?.iceConnectionState;
++		if (iceState === "connected" || iceState === "completed") return;
++		if (!escalateToFallbackRtc(ctx, current, peerId, "direct_ice_timeout")) return;
++		if (role === "offer") resetOfferState(current, ctx.offerPool);
++		else {
++			peer.destroy();
++			clearAnswering(current, peer);
++		}
++		ctx.checkDeactivate();
++	}, directFallbackTimeoutMs);
++};
+ const getSdpExchangeConnectionError = (peerId, config) => `could not connect to peer ${peerId} after exchanging SDP; ${hasTurnServer(config) ? "check that your TURN server URLs and credentials are reachable by both peers" : "configure TURN servers with turnConfig or rtcConfig.iceServers"}`;
+ const reportSdpExchangeConnectionFailure = (ctx, state, peerId) => {
+ 	if (ctx.isLeaving() || state.connectedPeer || state.connectionErrorReported) return;
+@@ -76,6 +112,7 @@ const updateStatus = (state) => {
+ };
+ const clearAnswering = (state, peer) => {
+ 	if (state.answeringPeer === peer) {
++		clearDirectFallbackTimer(state);
+ 		state.answeringExpiryTimer = resetTimer(state.answeringExpiryTimer);
+ 		state.answeringPeer = null;
+ 		state.answerSent = false;
+@@ -109,6 +146,7 @@ const hasRemoteDescription = (peer) => {
+ };
+ const resetOfferState = (state, offerPool) => {
+ 	const previousOfferAnswered = state.offerAnswered;
++	clearDirectFallbackTimer(state);
+ 	state.offerExpiryTimer = resetTimer(state.offerExpiryTimer);
+ 	state.offerInitPromise = null;
+ 	state.offerRelays.forEach((_, relayId) => clearOfferRelay(state, relayId));
+@@ -116,7 +154,7 @@ const resetOfferState = (state, offerPool) => {
+ 	state.offerSignalRelays = [];
+ 	state.offerRelayTimers = [];
+ 	state.offerSignalBacklog = [];
+-	if (state.offerPeer && state.offerPeer !== state.connectedPeer) if (previousOfferAnswered || hasRemoteDescription(state.offerPeer)) {
++	if (state.offerPeer && state.offerPeer !== state.connectedPeer) if (previousOfferAnswered || state.offerPeer.__usesFallbackRtc || hasRemoteDescription(state.offerPeer)) {
+ 		if (!state.offerPeer.isDead) state.offerPeer.destroy();
+ 	} else offerPool.recycle(state.offerPeer);
+ 	state.offerPeer = null;
+@@ -165,9 +203,23 @@ const ensureOffer = (ctx, state, peerId, relayId) => {
+ 	});
+ 	if (state.offerInitPromise) return state.offerInitPromise;
+ 	state.offerInitPromise = (async () => {
+-		const firstOffer = (await ctx.offerPool.checkout(1, false, ctx.encryptOffer))[0];
+-		if (!firstOffer) throw mkErr("failed to allocate offer peer");
+-		const { peer, offer } = firstOffer;
++		let peer;
++		let offer;
++		if (state.useFallbackRtc && ctx.config.fallbackRtcConfig) {
++			peer = ctx.initPeer(true, getPeerConfig(ctx, state));
++			peer.__usesFallbackRtc = true;
++			try {
++				offer = await ctx.encryptOffer(peer);
++			} catch (err) {
++				peer.destroy();
++				throw err;
++			}
++		} else {
++			const firstOffer = (await ctx.offerPool.checkout(1, false, ctx.encryptOffer))[0];
++			if (!firstOffer) throw mkErr("failed to allocate offer peer");
++			peer = firstOffer.peer;
++			offer = firstOffer.offer;
++		}
+ 		state.offerPeer = peer;
+ 		state.offerId = genId(offerIdSize);
+ 		state.offerSdp = offer;
+@@ -177,7 +229,7 @@ const ensureOffer = (ctx, state, peerId, relayId) => {
+ 		updateStatus(state);
+ 		const onOfferPeerClosedOrError = () => {
+ 			if (state.offerPeer === peer && !state.connectedPeer) {
+-				if (state.offerAnswered) reportSdpExchangeConnectionFailure(ctx, state, peerId);
++				if (state.offerAnswered && !escalateToFallbackRtc(ctx, state, peerId, "direct_ice_error")) reportSdpExchangeConnectionFailure(ctx, state, peerId);
+ 				resetOfferState(state, ctx.offerPool);
+ 			}
+ 			ctx.disconnectPeer(peer, peerId);
+@@ -249,14 +301,14 @@ const handleOffer = async (ctx, relayId, peerId, offer, offerId, hasOutgoingOffe
+ 	const hasTrackedOutgoingOffer = Boolean(state.offerPeer || state.offerRelays.some(Boolean));
+ 	if ((hasTrackedOutgoingOffer || hasOutgoingOfferHint) && selfId < peerId) return;
+ 	if (hasTrackedOutgoingOffer) resetOfferState(state, ctx.offerPool);
+-	const answerPeer = ctx.initPeer(false, ctx.config);
++	const answerPeer = ctx.initPeer(false, getPeerConfig(ctx, state));
+ 	state.answeringPeer = answerPeer;
+ 	state.answerSent = false;
+ 	state.connectionErrorReported = false;
+ 	scheduleAnsweringExpiry(ctx, state, peerId, answerPeer);
+ 	updateStatus(state);
+ 	const onAnswerPeerClosedOrError = () => {
+-		if (state.answeringPeer === answerPeer && !state.connectedPeer && state.answerSent) reportSdpExchangeConnectionFailure(ctx, state, peerId);
++		if (state.answeringPeer === answerPeer && !state.connectedPeer && state.answerSent && !escalateToFallbackRtc(ctx, state, peerId, "direct_ice_error")) reportSdpExchangeConnectionFailure(ctx, state, peerId);
+ 		clearAnswering(state, answerPeer);
+ 		ctx.disconnectPeer(answerPeer, peerId);
+ 		ctx.checkDeactivate();
+@@ -295,6 +347,7 @@ const handleOffer = async (ctx, relayId, peerId, offer, offerId, hasOutgoingOffe
+ 			const payloadToSend = { peerId: selfId };
+ 			if (signal.type === "answer") {
+ 				state.answerSent = true;
++				scheduleDirectFallback(ctx, state, peerId, answerPeer, "answer");
+ 				payloadToSend["answer"] = sdp;
+ 			} else payloadToSend["candidate"] = sdp;
+ 			if (offerId) payloadToSend["offerId"] = offerId;
+@@ -355,6 +408,7 @@ const handleAnswer = async (ctx, relayId, peerId, answer, offerId, peer) => {
+ 		if (!state || !state.offerPeer || state.offerAnswered || offerId && state.offerId && offerId !== state.offerId || state.offerPeer.isDead) return;
+ 		state.offerAnswered = true;
+ 		scheduleOfferExpiry(ctx, state, peerId, offerPostAnswerTtlMs);
++		scheduleDirectFallback(ctx, state, peerId, state.offerPeer, "offer");
+ 		state.offerPeer.signal(plainAnswer);
+ 	}
+ };
 diff --git a/dist/strategy.mjs b/dist/strategy.mjs
 index a75dfcfddd14b2174d9acee37ecb84cd3c16c0eb..bf30ed35aceac83166196a6348214220299c003e 100644
 --- a/dist/strategy.mjs
