@@ -49,9 +49,11 @@ class VoiceNoiseGateProcessor extends AudioWorkletProcessor {
     this.targetInputGain = 1;
     this.smoothedInputGain = 1;
 
-    // Adaptive speech auto-leveler (lifts quiet raw mics toward -13 dBFS RMS without pumping silence).
-    this.speechRms = 0.06;
-    this.normalizerGain = 3.5;
+    // Adaptive speech auto-leveler calibrated for natural speech headroom (~ -20 dBFS RMS)
+    // plus linear peak-envelope limiting so plosives never clip or distort.
+    this.speechRms = 0.05;
+    this.normalizerGain = 2.2;
+    this.limiterGain = 1.0;
 
     // 2nd-order Butterworth high-pass @ ~85 Hz (recalculated when sampleRate differs).
     this.hpB0 = 1;
@@ -393,31 +395,47 @@ class VoiceNoiseGateProcessor extends AudioWorkletProcessor {
       }
     }
 
-    if (!this.muted && this.gateOpen && rms >= 0.004 && levelDb >= thresholdDb) {
-      this.speechRms = this.speechRms * 0.96 + rms * 0.04;
-      const targetSpeechRms = 0.22; // ~ -13.1 dBFS conversational target
-      const desiredGain = Math.max(0.8, Math.min(10.0, targetSpeechRms / Math.max(this.speechRms, 0.005)));
-      const adaptCoeff = desiredGain < this.normalizerGain ? 0.08 : 0.015;
+    let blockPeak = 0;
+    for (let i = 0; i < len; i += 1) {
+      const a = outChannel0[i] < 0 ? -outChannel0[i] : outChannel0[i];
+      if (a > blockPeak) blockPeak = a;
+    }
+
+    if (!this.muted && this.gateOpen && rms >= 0.012 && levelDb >= thresholdDb + 3) {
+      this.speechRms = this.speechRms * 0.97 + rms * 0.03;
+      const targetSpeechRms = 0.10; // ~ -20 dBFS conversational RMS (leaves ~12 dB headroom for speech peaks)
+      let desiredGain = Math.max(0.5, Math.min(4.2, targetSpeechRms / Math.max(this.speechRms, 0.012)));
+      if (blockPeak * desiredGain > 0.72 && blockPeak > 1e-4) {
+        desiredGain = Math.max(0.5, 0.72 / blockPeak);
+      }
+      const adaptCoeff = desiredGain < this.normalizerGain ? 0.12 : 0.012;
       this.normalizerGain += (desiredGain - this.normalizerGain) * adaptCoeff;
+    } else if (!this.muted && this.gateOpen && blockPeak * this.normalizerGain > 0.78 && blockPeak > 1e-4) {
+      const capGain = Math.max(0.5, 0.78 / blockPeak);
+      this.normalizerGain += (capGain - this.normalizerGain) * 0.35;
     }
 
     this.smoothedInputGain += (this.targetInputGain - this.smoothedInputGain) * 0.15;
-    const outputGain = this.normalizerGain * this.smoothedInputGain;
+    const preLimiterGain = this.normalizerGain * this.smoothedInputGain;
+    const projectedPeak = blockPeak * preLimiterGain;
+    const peakCeiling = 0.85;
+    const desiredLimiter = projectedPeak > peakCeiling && projectedPeak > 1e-5
+      ? peakCeiling / projectedPeak
+      : 1.0;
+
     const targetGate = !this.muted && this.gateOpen ? 1 : 0;
     let env = this.gateEnvelope;
+    let lim = this.limiterGain;
     const coeff = targetGate > env ? this.attackCoeff : this.releaseCoeff;
+    const limCoeff = desiredLimiter < lim ? 0.45 : 0.008;
     for (let i = 0; i < len; i += 1) {
       env += (targetGate - env) * coeff;
-      let sample = outChannel0[i] * env * outputGain;
-      const absSample = sample < 0 ? -sample : sample;
-      if (absSample > 0.78) {
-        const excess = absSample - 0.78;
-        const limited = 0.78 + (0.20 * excess) / (0.20 + excess);
-        sample = sample < 0 ? -limited : limited;
-      }
+      lim += (desiredLimiter - lim) * limCoeff;
+      const sample = Math.max(-0.96, Math.min(0.96, outChannel0[i] * env * preLimiterGain * lim));
       outChannel0[i] = sample;
     }
     this.gateEnvelope = env;
+    this.limiterGain = lim;
 
     // Duplicate mono processed voice to remaining output channels if any.
     for (let c = 1; c < outputChannels.length; c += 1) {

@@ -473,7 +473,7 @@ export class VoiceManager {
       );
     }
     if (this.inputGainNode && this.inputCtx) {
-      const targetPreGain = this.workletNode ? 1 : (clampVoiceVolume(prefs.inputVolume) / 100) * 3.5;
+      const targetPreGain = this.workletNode ? 1 : (clampVoiceVolume(prefs.inputVolume) / 100) * 2.2;
       this.inputGainNode.gain.setTargetAtTime(
         targetPreGain,
         this.inputCtx.currentTime,

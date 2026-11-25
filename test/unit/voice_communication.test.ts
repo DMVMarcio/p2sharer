@@ -782,13 +782,16 @@ test('VoiceNoiseGateProcessor normalizes quiet microphones cleanly without clipp
     return { inRms, outRms, peak, outDb: 20 * Math.log10(outRms) };
   };
 
-  // Quiet -33.5 dBFS mic at 100% input gain is boosted into audible ~ -15 dBFS range.
+  // Quiet -33.5 dBFS mic at 100% input gain is boosted smoothly into conversational ~ -20 dBFS range.
   const quiet = runSignal(0.03, 1.0);
-  assert.ok(quiet.outRms / quiet.inRms >= 5.0, `expected strong speech boost, got ${(quiet.outRms / quiet.inRms).toFixed(2)}x`);
-  assert.ok(quiet.outDb >= -18 && quiet.outDb <= -10, `expected normalized speech dBFS, got ${quiet.outDb.toFixed(1)}`);
+  assert.ok(quiet.outRms / quiet.inRms >= 2.5, `expected clear speech boost, got ${(quiet.outRms / quiet.inRms).toFixed(2)}x`);
+  assert.ok(quiet.outDb >= -24 && quiet.outDb <= -16, `expected normalized speech dBFS, got ${quiet.outDb.toFixed(1)}`);
 
-  // 200% input gain boosts louder without hard-clipping (soft limiter keeps peak < 0.98).
+  // Loud hot mic stays controlled and 200% gain triggers clean linear limiting without clipping.
+  const hot = runSignal(0.35, 1.0);
+  assert.ok(hot.peak <= 0.88, `hot mic should settle cleanly below ceiling, got peak ${hot.peak.toFixed(3)}`);
+
   const boosted = runSignal(0.08, 2.0);
   assert.ok(boosted.outRms > quiet.outRms, '200% input gain should increase output loudness');
-  assert.ok(boosted.peak < 0.98, `soft limiter must prevent hard clipping, got peak ${boosted.peak.toFixed(3)}`);
+  assert.ok(boosted.peak <= 0.90, `peak limiter must prevent clipping, got peak ${boosted.peak.toFixed(3)}`);
 });
