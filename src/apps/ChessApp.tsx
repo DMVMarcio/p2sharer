@@ -598,16 +598,16 @@ export const ChessApp: React.FC<RoomAppViewProps> = ({ instanceId, compact = fal
                 </div>
               </div>
               <div className="chess-review-controls" role="group" aria-label={t('chess.reviewControls')}>
-                <TooltipButton className="btn btn-secondary btn-sm chess-review-button" tooltip={t('chess.reviewFirst')}
+                <TooltipButton className="cozy-wood-btn is-secondary chess-review-button" tooltip={t('chess.reviewFirst')}
                   aria-label={t('chess.reviewFirst')} disabled={game.moveHistory.length === 0 || currentReviewPly === 0}
                   onClick={() => setReviewPly(0)}><SkipBack size={18} aria-hidden="true" /></TooltipButton>
-                <TooltipButton className="btn btn-secondary btn-sm chess-review-button" tooltip={t('chess.reviewPrevious')}
+                <TooltipButton className="cozy-wood-btn is-secondary chess-review-button" tooltip={t('chess.reviewPrevious')}
                   aria-label={t('chess.reviewPrevious')} disabled={game.moveHistory.length === 0 || currentReviewPly === 0}
                   onClick={() => setReviewPly(Math.max(0, currentReviewPly - 1))}><ChevronLeft size={20} aria-hidden="true" /></TooltipButton>
-                <TooltipButton className="btn btn-secondary btn-sm chess-review-button" tooltip={t('chess.reviewNext')}
+                <TooltipButton className="cozy-wood-btn is-secondary chess-review-button" tooltip={t('chess.reviewNext')}
                   aria-label={t('chess.reviewNext')} disabled={!isReviewing || currentReviewPly >= game.moveHistory.length}
                   onClick={() => setReviewPly(currentReviewPly + 1 >= game.moveHistory.length ? null : currentReviewPly + 1)}><ChevronRight size={20} aria-hidden="true" /></TooltipButton>
-                <TooltipButton className="btn btn-secondary btn-sm chess-review-button" tooltip={t('chess.reviewLatest')}
+                <TooltipButton className="cozy-wood-btn is-secondary chess-review-button" tooltip={t('chess.reviewLatest')}
                   aria-label={t('chess.reviewLatest')} disabled={!isReviewing}
                   onClick={() => setReviewPly(null)}><SkipForward size={18} aria-hidden="true" /></TooltipButton>
               </div>

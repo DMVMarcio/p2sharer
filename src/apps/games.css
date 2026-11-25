@@ -882,9 +882,11 @@
   justify-content: center;
   width: 48px;
   height: 40px;
-  padding: 0;
-  border-radius: var(--radius-md);
-  box-shadow: var(--shadow-sm);
+}
+
+.chess-review-button:focus-visible {
+  outline: 2px solid #fae9ce;
+  outline-offset: 3px;
 }
 
 .ttt-wood-frame {
