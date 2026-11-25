@@ -1163,6 +1163,14 @@
 .cozy-piece-slot.is-returning.is-from-outside {
   animation-name: cozyPieceReturnFromOutside;
 }
+.cozy-piece-slot.is-review-moving {
+  z-index: 7;
+  animation: chessReviewMove 280ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+@keyframes chessReviewMove {
+  from { transform: translate(var(--piece-from-x), var(--piece-from-y)); }
+  to { transform: translate(0, 0); }
+}
 @keyframes cozyPieceReturn {
   0% {
     opacity: 1;
@@ -1945,6 +1953,7 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
+  .cozy-piece-slot.is-review-moving { animation: none; }
   .cozy-piece-slot.is-returning,
   .cozy-piece-slot.is-returning.is-from-outside,
   .ttt-wood-cell.is-resetting,

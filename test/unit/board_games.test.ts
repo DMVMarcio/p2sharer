@@ -136,6 +136,18 @@ test('a chess room locks for its lone first mover and lets them play both sides'
     assert.equal(soloModel.makeMove(sharedRoomId, indexOf(6, 4), indexOf(4, 4)), true);
     assert.equal(soloModel.getRoom(sharedRoomId)?.lockedBy, undefined);
     assert.equal(guestModel.joinRole(sharedRoomId, 'seat2'), true);
+
+    const abandonedRoomId = soloModel.createRoom('Abandoned solo chess', 'seat1')!;
+    assert.equal(soloModel.makeMove(abandonedRoomId, indexOf(6, 4), indexOf(4, 4)), true);
+    assert.equal(soloModel.getRoom(abandonedRoomId)?.lockedBy, 'solo');
+    assert.equal(soloModel.deleteRoom(abandonedRoomId), true);
+    assert.equal(guestModel.getRoom(abandonedRoomId), undefined);
+
+    const reopenedRoomId = soloModel.createRoom('Reset solo chess', 'seat1')!;
+    assert.equal(soloModel.makeMove(reopenedRoomId, indexOf(6, 4), indexOf(4, 4)), true);
+    assert.equal(soloModel.newGame(reopenedRoomId, true), true);
+    assert.equal(soloModel.getRoom(reopenedRoomId)?.lockedBy, undefined);
+    assert.equal(guestModel.joinRole(reopenedRoomId, 'seat2'), true);
   } finally {
     solo.reset();
     guest.reset();

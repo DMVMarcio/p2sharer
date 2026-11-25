@@ -61,6 +61,16 @@ function getChessPositionAtPly(game: ChessRoomState['game'], ply: number): Chess
   };
 }
 
+function getReviewMoveOffset(from: number, to: number, flipped: boolean): { x: number; y: number } {
+  const fromRow = Math.floor(from / 8);
+  const fromCol = from % 8;
+  const toRow = Math.floor(to / 8);
+  const toCol = to % 8;
+  return flipped
+    ? { x: (7 - fromCol - (7 - toCol)) * 100, y: (7 - fromRow - (7 - toRow)) * 100 }
+    : { x: (fromCol - toCol) * 100, y: (fromRow - toRow) * 100 };
+}
+
 interface DraggingPieceState {
   from: number;
   piece: { color: ChessColor; type: ChessPieceType };
@@ -92,6 +102,8 @@ export const ChessApp: React.FC<RoomAppViewProps> = ({ instanceId, compact = fal
   const [pgnDialogOpen, setPgnDialogOpen] = useState(false);
   const [pgnCopied, setPgnCopied] = useState(false);
   const [reviewPly, setReviewPly] = useState<number | null>(null);
+  const [reviewAnimation, setReviewAnimation] = useState<{ from: number; to: number; key: number } | null>(null);
+  const reviewAnimationTimerRef = useRef<number | null>(null);
   const suppressClickRef = useRef(false);
   const lastSoundSnapshotRef = useRef<{
     roomId: string;
@@ -119,6 +131,7 @@ export const ChessApp: React.FC<RoomAppViewProps> = ({ instanceId, compact = fal
       setPendingPromotion(null);
       setDragging(null);
       setReviewPly(null);
+      setReviewAnimation(null);
       clearPlanning();
     }
   }, [activeRoomId, model, clearPlanning]);
@@ -203,13 +216,19 @@ export const ChessApp: React.FC<RoomAppViewProps> = ({ instanceId, compact = fal
 
   const handleSelectRoom = (nextId: string | null) => {
     if (activeRoomId && nextId === null) {
-      model.leaveRoom(activeRoomId);
+      const room = model.getRoom(activeRoomId);
+      if (room?.lockedBy === model.localActor) {
+        model.deleteRoom(activeRoomId);
+      } else {
+        model.leaveRoom(activeRoomId);
+      }
     }
     setActiveRoomId(nextId);
     setSelectedSquare(null);
     setPendingPromotion(null);
     setDragging(null);
     setReviewPly(null);
+    setReviewAnimation(null);
     clearPlanning();
   };
 
@@ -336,6 +355,20 @@ export const ChessApp: React.FC<RoomAppViewProps> = ({ instanceId, compact = fal
         const isMyTurn = !isReviewing && game.status === 'playing' && myColor !== null && (isSoloMode || game.turn === myColor);
         const moveColor = isSoloMode ? game.turn : myColor;
         const flipped = !isSoloMode && myColor === 'b';
+        const moveReviewTo = (nextPly: number, animate: boolean) => {
+          if (reviewAnimationTimerRef.current !== null) window.clearTimeout(reviewAnimationTimerRef.current);
+          if (animate && nextPly !== currentReviewPly) {
+            const forward = nextPly > currentReviewPly;
+            const move = game.moveHistory[forward ? currentReviewPly : currentReviewPly - 1];
+            if (move) {
+              setReviewAnimation({ from: forward ? move.from : move.to, to: forward ? move.to : move.from, key: Date.now() });
+              reviewAnimationTimerRef.current = window.setTimeout(() => setReviewAnimation(null), 320);
+            }
+          } else {
+            setReviewAnimation(null);
+          }
+          setReviewPly(nextPly >= game.moveHistory.length ? null : nextPly);
+        };
 
         const activeOrigin = dragging ? dragging.from : selectedSquare;
         const legalMoves: ChessCandidateMove[] =
@@ -558,16 +591,22 @@ export const ChessApp: React.FC<RoomAppViewProps> = ({ instanceId, compact = fal
                         {showFile && <span className="wood-coord-file">{String.fromCharCode(97 + c)}</span>}
                         {piece && (() => {
                           const returnTransform = activeTransforms?.get(sqIndex);
+                          const reviewMove = reviewAnimation?.to === sqIndex ? reviewAnimation : null;
+                          const reviewOffset = reviewMove ? getReviewMoveOffset(reviewMove.from, reviewMove.to, flipped) : null;
                           return (
                             <span
-                              key={returnTransform ? `return-${boardAnimKey}-${sqIndex}` : `piece-${sqIndex}`}
+                              key={reviewMove ? `review-${reviewMove.key}-${sqIndex}` : returnTransform ? `return-${boardAnimKey}-${sqIndex}` : `piece-${sqIndex}`}
                               className={
-                                returnTransform
+                                reviewMove
+                                  ? 'cozy-piece-slot is-review-moving'
+                                  : returnTransform
                                   ? `cozy-piece-slot is-returning ${returnTransform.fromOutside ? 'is-from-outside' : ''}`
                                   : 'cozy-piece-slot'
                               }
                               style={
-                                returnTransform
+                                reviewMove && reviewOffset
+                                  ? ({ '--piece-from-x': `${reviewOffset.x}%`, '--piece-from-y': `${reviewOffset.y}%` } as React.CSSProperties)
+                                  : returnTransform
                                   ? ({
                                       '--piece-from-x': `${returnTransform.dxPercent}%`,
                                       '--piece-from-y': `${returnTransform.dyPercent}%`,
@@ -579,7 +618,7 @@ export const ChessApp: React.FC<RoomAppViewProps> = ({ instanceId, compact = fal
                             >
                               <ChessPieceSvg type={piece.type} color={piece.color} size={48} />
                             </span>
-                          );
+                            );
                         })()}
                         {isLegalDest && (
                           <span className={`wood-move-dot ${piece ? 'is-capture' : ''}`} aria-hidden="true" />
@@ -600,16 +639,16 @@ export const ChessApp: React.FC<RoomAppViewProps> = ({ instanceId, compact = fal
               <div className="chess-review-controls" role="group" aria-label={t('chess.reviewControls')}>
                 <TooltipButton className="cozy-wood-btn is-secondary chess-review-button" tooltip={t('chess.reviewFirst')}
                   aria-label={t('chess.reviewFirst')} disabled={game.moveHistory.length === 0 || currentReviewPly === 0}
-                  onClick={() => setReviewPly(0)}><SkipBack size={18} aria-hidden="true" /></TooltipButton>
+                  onClick={() => moveReviewTo(0, false)}><SkipBack size={18} aria-hidden="true" /></TooltipButton>
                 <TooltipButton className="cozy-wood-btn is-secondary chess-review-button" tooltip={t('chess.reviewPrevious')}
                   aria-label={t('chess.reviewPrevious')} disabled={game.moveHistory.length === 0 || currentReviewPly === 0}
-                  onClick={() => setReviewPly(Math.max(0, currentReviewPly - 1))}><ChevronLeft size={20} aria-hidden="true" /></TooltipButton>
+                  onClick={() => moveReviewTo(Math.max(0, currentReviewPly - 1), true)}><ChevronLeft size={20} aria-hidden="true" /></TooltipButton>
                 <TooltipButton className="cozy-wood-btn is-secondary chess-review-button" tooltip={t('chess.reviewNext')}
                   aria-label={t('chess.reviewNext')} disabled={!isReviewing || currentReviewPly >= game.moveHistory.length}
-                  onClick={() => setReviewPly(currentReviewPly + 1 >= game.moveHistory.length ? null : currentReviewPly + 1)}><ChevronRight size={20} aria-hidden="true" /></TooltipButton>
+                  onClick={() => moveReviewTo(currentReviewPly + 1, true)}><ChevronRight size={20} aria-hidden="true" /></TooltipButton>
                 <TooltipButton className="cozy-wood-btn is-secondary chess-review-button" tooltip={t('chess.reviewLatest')}
                   aria-label={t('chess.reviewLatest')} disabled={!isReviewing}
-                  onClick={() => setReviewPly(null)}><SkipForward size={18} aria-hidden="true" /></TooltipButton>
+                  onClick={() => moveReviewTo(game.moveHistory.length, false)}><SkipForward size={18} aria-hidden="true" /></TooltipButton>
               </div>
             </div>
 
