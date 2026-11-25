@@ -259,9 +259,17 @@ test('relayed admission admits indirect newcomers through an admitted peer while
     // Host verifies and admits member directly
     hostNet.room.onPeerJoin('member');
     await verifyDirectPeer(hostNet.actions, hostNet.sent, 'member', memberAuth);
+    hostNet.sent.length = 0;
     await hostNet.actions.get('room_admission')!.onMessage!({ kind: 'request', password: '' }, { peerId: 'member' });
-    const hostAdmittedMember = hostNet.sent.findLast((item) =>
-      item.action === 'room_admission' && item.data.kind === 'command' && item.data.command.kind === 'admit')!.data.command;
+    const hostAdmitIndex = hostNet.sent.findIndex((item) =>
+      item.action === 'room_admission' && item.data.kind === 'command' && item.data.command.kind === 'admit');
+    const hostSyncIndex = hostNet.sent.findIndex((item) =>
+      item.action === 'room_admission' && item.data.kind === 'sync' && item.target === 'member');
+    const hostPresenceIndex = hostNet.sent.findIndex((item) =>
+      item.action === 'presence' && item.target === 'member');
+    assert.ok(hostAdmitIndex >= 0 && hostSyncIndex > hostAdmitIndex && hostPresenceIndex > hostSyncIndex,
+      'host must send admission command and sync before announcing presence to the newcomer');
+    const hostAdmittedMember = hostNet.sent[hostAdmitIndex]!.data.command;
 
     // Relay member authenticates host and applies its own admission
     const relaySelfId = relayManager.getLocalPeerId();
@@ -323,9 +331,15 @@ test('relayed admission admits indirect newcomers through an admitted peer while
       item.action === 'room_admission' && item.target === 'member' && item.data.kind === 'command')?.data.command;
     assert.ok(issuedCommand && issuedCommand.kind === 'admit' && issuedCommand.targetPeerId === 'newcomer');
 
-    // Relay receives host command and forwards [selfAdmit, newcomerAdmit, sync] to newcomer
+    // Relay receives host command and forwards [selfAdmit, newcomerAdmit, sync] to newcomer before presence
     relayNet.sent.length = 0;
     await relayNet.actions.get('room_admission')!.onMessage!({ kind: 'command', command: issuedCommand }, { peerId: 'host' });
+    const relaySyncToNewcomerIndex = relayNet.sent.findIndex((item) =>
+      item.action === 'room_admission' && item.target === 'newcomer' && item.data.kind === 'sync');
+    const relayPresenceToNewcomerIndex = relayNet.sent.findIndex((item) =>
+      item.action === 'presence' && item.target === 'newcomer');
+    assert.ok(relaySyncToNewcomerIndex >= 0 && relayPresenceToNewcomerIndex > relaySyncToNewcomerIndex,
+      'relay must deliver admission sync before announcing presence to the newcomer');
     const packetsToNewcomer = relayNet.sent
       .filter((item) => item.action === 'room_admission' && item.target === 'newcomer')
       .map((item) => item.data);
@@ -335,9 +349,21 @@ test('relayed admission admits indirect newcomers through an admitted peer while
     assert.equal(packetsToNewcomer[1]?.command?.targetPeerId, 'newcomer');
     assert.equal(packetsToNewcomer[2]?.kind, 'sync');
 
+    relayNet.sent.length = 0;
     await relayNet.actions.get('presence')!.onMessage!({ username: 'Newcomer' }, { peerId: 'newcomer' });
     assert.equal(relayManager.getConnectedPeers().some((peer) => peer.id === 'newcomer'), true,
       'admitted relay must display the newly admitted newcomer after presence');
+    assert.equal(
+      relayNet.sent.filter((item) => item.action === 'presence' && item.target === 'newcomer').length,
+      1,
+      'first presence from a newly admitted peer must trigger one reciprocal presence reply',
+    );
+    await relayNet.actions.get('presence')!.onMessage!({ username: 'Newcomer' }, { peerId: 'newcomer' });
+    assert.equal(
+      relayNet.sent.filter((item) => item.action === 'presence' && item.target === 'newcomer').length,
+      1,
+      'subsequent presence heartbeats must not trigger reciprocal presence loops',
+    );
 
     // Verify newcomer side admits both member (first command) and itself (second command), then accepts sync
     const memberAdmitCmd = await hostAuthority.makeCommand('admit', { targetPeerId: 'member', targetKey: memberAuth.publicKey });

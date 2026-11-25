@@ -2,43 +2,56 @@
   "version": "1.8.3",
   "translations": {
     "en": [
-      "**More reliable voice in rooms.** Fixed an issue where participants could stop hearing each other when joining or switching rooms, with automatic voice recovery."
+      "**More reliable voice in rooms.** Fixed an issue where participants could stop hearing each other when joining or switching rooms, with automatic voice recovery.",
+      "**Participants appear immediately on entry.** Fixed a delay where the host or existing members could take a few seconds to show up after joining a room."
     ],
     "pt-BR": [
-      "**Voz mais confiável nas salas.** Corrigido um problema em que participantes deixavam de se ouvir ao entrar ou trocar de sala, com recuperação automática."
+      "**Voz mais confiável nas salas.** Corrigido um problema em que participantes deixavam de se ouvir ao entrar ou trocar de sala, com recuperação automática.",
+      "**Participantes aparecem na hora ao entrar.** Corrigido um atraso em que o anfitrião ou membros já na sala podiam demorar alguns segundos para aparecer."
     ],
     "es": [
-      "**Voz más confiable en las salas.** Se corrigió un problema por el cual los participantes dejaban de escucharse al entrar o cambiar de sala, con recuperación automática."
+      "**Voz más confiable en las salas.** Se corrigió un problema por el cual los participantes dejaban de escucharse al entrar o cambiar de sala, con recuperación automática.",
+      "**Los participantes aparecen al instante.** Se corrigió un retraso por el cual el anfitrión o miembros ya presentes tardaban unos segundos en mostrarse al entrar."
     ],
     "fr": [
-      "**Voix plus fiable dans les salons.** Correction d'un problème où les participants ne s'entendaient plus en rejoignant ou changeant de salon, avec reprise automatique."
+      "**Voix plus fiable dans les salons.** Correction d'un problème où les participants ne s'entendaient plus en rejoignant ou changeant de salon, avec reprise automatique.",
+      "**Participants visibles dès l'entrée.** Correction d'un délai où l'hôte ou des membres déjà présents pouvaient mettre quelques secondes à apparaître."
     ],
     "de": [
-      "**Zuverlässigere Sprache in Räumen.** Behoben, dass Teilnehmer sich beim Betreten oder Wechseln von Räumen nicht mehr hörten, nun mit automatischer Wiederherstellung."
+      "**Zuverlässigere Sprache in Räumen.** Behoben, dass Teilnehmer sich beim Betreten oder Wechseln von Räumen nicht mehr hörten, nun mit automatischer Wiederherstellung.",
+      "**Teilnehmer sofort beim Beitritt sichtbar.** Behoben, dass Host oder anwesende Mitglieder nach dem Betreten eines Raums erst verzögert erschienen."
     ],
     "it": [
-      "**Voce più affidabile nelle stanze.** Risolto un problema per cui i partecipanti non si sentivano entrando o cambiando stanza, con ripristino automatico."
+      "**Voce più affidabile nelle stanze.** Risolto un problema per cui i partecipanti non si sentivano entrando o cambiando stanza, con ripristino automatico.",
+      "**Partecipanti visibili subito all'ingresso.** Risolto un ritardo per cui l'host o i membri già presenti potevano impiegare alcuni secondi ad apparire."
     ],
     "zh-CN": [
-      "**房间语音更加稳定可靠。** 修复了加入或切换房间时成员可能听不到彼此声音的问题，并支持语音自动恢复。"
+      "**房间语音更加稳定可靠。** 修复了加入或切换房间时成员可能听不到彼此声音的问题，并支持语音自动恢复。",
+      "**进入房间立即显示成员。** 修复了加入房间后房主或已在线成员可能需要等待几秒才显示的问题。"
     ],
     "zh-TW": [
-      "**房間語音更加穩定可靠。** 修復了加入或切換房間時成員可能聽不到彼此聲音的問題，並支援語音自動恢復。"
+      "**房間語音更加穩定可靠。** 修復了加入或切換房間時成員可能聽不到彼此聲音的問題，並支援語音自動恢復。",
+      "**進入房間立即顯示成員。** 修復了加入房間後房主或已在線成員可能需要等待幾秒才顯示的問題。"
     ],
     "ja": [
-      "**ルーム内の通話がより安定。** 入室時やルーム切り替え時に相手の声が聞こえなくなる問題を修正し、音声を自動復旧できるようになりました。"
+      "**ルーム内の通話がより安定。** 入室時やルーム切り替え時に相手の声が聞こえなくなる問題を修正し、音声を自動復旧できるようになりました。",
+      "**入室直後から参加者を即表示。** ルームに入った際、ホストや入室済みメンバーの表示が数秒遅れる問題を修正しました。"
     ],
     "ko": [
-      "**방 음성 통화 안정성 향상.** 방에 들어가거나 이동할 때 서로의 목소리가 들리지 않던 문제를 수정하고 음성을 자동으로 복구합니다."
+      "**방 음성 통화 안정성 향상.** 방에 들어가거나 이동할 때 서로의 목소리가 들리지 않던 문제를 수정하고 음성을 자동으로 복구합니다.",
+      "**입장 즉시 참여자 표시.** 방에 들어갔을 때 호스트나 기존 참여자가 몇 초 뒤에 나타나던 지연 문제를 수정했습니다."
     ],
     "hi": [
-      "**रूम में अधिक भरोसेमंद वॉइस।** रूम में जुड़ने या बदलने पर एक-दूसरे की आवाज़ न सुनाई देने की समस्या ठीक की गई, अब वॉइस अपने-आप बहाल होती है।"
+      "**रूम में अधिक भरोसेमंद वॉइस।** रूम में जुड़ने या बदलने पर एक-दूसरे की आवाज़ न सुनाई देने की समस्या ठीक की गई, अब वॉइस अपने-आप बहाल होती है।",
+      "**प्रवेश करते ही सदस्य तुरंत दिखें।** रूम में जुड़ने के बाद होस्ट या मौजूदा सदस्यों के दिखने में कुछ सेकंड की देरी की समस्या ठीक की गई।"
     ],
     "fi": [
-      "**Luotettavampi puhe huoneissa.** Korjattu ongelma, jossa osallistujat eivät kuulleet toisiaan huoneeseen liittyessä tai vaihdettaessa, automaattisella palautuksella."
+      "**Luotettavampi puhe huoneissa.** Korjattu ongelma, jossa osallistujat eivät kuulleet toisiaan huoneeseen liittyessä tai vaihdettaessa, automaattisella palautuksella.",
+      "**Osallistujat näkyvät heti liittyessä.** Korjattiin viive, jossa isäntä tai huoneessa jo olleet jäsenet ilmestyivät näkyviin vasta muutaman sekunnin kuluttua."
     ],
     "ru": [
-      "**Более надёжная голосовая связь.** Исправлена проблема, из-за которой участники переставали слышать друг друга при входе или смене комнаты, с автовосстановлением."
+      "**Более надёжная голосовая связь.** Исправлена проблема, из-за которой участники переставали слышать друг друга при входе или смене комнаты, с автовосстановлением.",
+      "**Участники видны сразу при входе.** Исправлена задержка, из-за которой хост или уже находящиеся в комнате участники появлялись лишь через пару секунд."
     ]
   }
 }

@@ -1348,7 +1348,7 @@ export class GroupRoomManager {
     if (peerId === selfId) {
       this.flushPendingVoiceStreams();
       for (const target of this.admittedTargets()) {
-        this.syncVoiceWithPeer(target);
+        this.announceToPeer(target);
       }
     } else if (this.chatAuth?.getKnownKey(peerId) === key) {
       this.announceToPeer(peerId);
@@ -1383,9 +1383,11 @@ export class GroupRoomManager {
     this.admissionHistory.push(command);
     this.retainAdmissionHistory();
     await this.persistHostCommands();
-    this.applyAdmittedPeer(peerId, key);
+    // Send the admission command and history before announcing presence/media/voice so
+    // the newcomer sets localAdmitted before our initial room packets arrive.
     await this.admissionAction?.send({ kind: 'command', command });
     await this.admissionAction?.send({ kind: 'sync', commands: this.admissionHistory }, { target: peerId });
+    this.applyAdmittedPeer(peerId, key);
   }
 
   private async issueAdminAdmission(peerId: string): Promise<void> {
@@ -1396,9 +1398,9 @@ export class GroupRoomManager {
     if (!key || !grant || this.bannedKeys.has(key)) return;
     const admission = await this.authority.signAdminAdmission(peerId, key, grant);
     this.adminAdmissions.set(peerId, admission);
-    if (peerId !== selfId) this.applyAdmittedPeer(peerId, key);
     await this.admissionAction?.send({ kind: 'admin-admit', admission });
     await this.admissionAction?.send({ kind: 'sync', commands: this.admissionHistory }, { target: peerId });
+    if (peerId !== selfId) this.applyAdmittedPeer(peerId, key);
   }
 
   private async deliverRelayedAdmission(
@@ -1451,8 +1453,8 @@ export class GroupRoomManager {
     }
     if (targetKey !== admission.targetKey) return;
     this.adminAdmissions.set(admission.targetPeerId, admission);
-    this.applyAdmittedPeer(admission.targetPeerId, admission.targetKey);
     await this.deliverRelayedAdmission(admission.targetPeerId, { kind: 'admin-admit', admission }, 'admin');
+    this.applyAdmittedPeer(admission.targetPeerId, admission.targetKey);
   }
 
   private async persistHostCommands(): Promise<void> {
@@ -1611,19 +1613,15 @@ export class GroupRoomManager {
       if (!batch) void this.persistHostCommands();
     }
     if (command.kind === 'admit' && command.targetPeerId && command.targetKey) {
+      if (command.targetPeerId !== selfId) {
+        await this.deliverRelayedAdmission(command.targetPeerId, { kind: 'command', command }, 'host');
+      }
       this.applyAdmittedPeer(command.targetPeerId, command.targetKey, batch);
       peersUpdated = true;
       admittedPeerId = command.targetPeerId;
       admittedKey = command.targetKey;
       if (command.targetPeerId === selfId) {
         selfAdmitted = true;
-        if (!batch) {
-          for (const peerId of this.peerTracker.directConnectedPeers) {
-            if (this.admittedPeers.has(peerId)) this.announceToPeer(peerId);
-          }
-        }
-      } else {
-        await this.deliverRelayedAdmission(command.targetPeerId, { kind: 'command', command }, 'host');
       }
     } else if (command.kind === 'kick' && command.targetPeerId && command.targetKey) {
       this.removeKickedPeer(command.targetPeerId, command.targetKey);
@@ -2033,7 +2031,6 @@ export class GroupRoomManager {
             this.admissionHistory.push(command);
             this.retainAdmissionHistory();
             await this.persistHostCommands();
-            this.applyAdmittedPeer(targetPeerId, targetKey);
             if (this.isLivePeerTarget(meta.peerId)) {
               await this.admissionAction.send({ kind: 'command', command }, { target: meta.peerId });
             }
@@ -2042,6 +2039,7 @@ export class GroupRoomManager {
                 await this.admissionAction.send({ kind: 'command', command }, { target });
               }
             }
+            this.applyAdmittedPeer(targetPeerId, targetKey);
             logDiagnostic('INFO', 'p2p.admission', 'Host issued relayed admission', {
               targetPeer: targetPeerId.slice(0, 6), viaPeer: meta.peerId.slice(0, 6),
             });
@@ -2050,7 +2048,6 @@ export class GroupRoomManager {
             if (!grant) return;
             const admission = await this.authority.signAdminAdmission(targetPeerId, targetKey, grant);
             this.adminAdmissions.set(targetPeerId, admission);
-            this.applyAdmittedPeer(targetPeerId, targetKey);
             if (this.isLivePeerTarget(meta.peerId)) {
               await this.admissionAction.send({ kind: 'admin-admit', admission }, { target: meta.peerId });
             }
@@ -2059,6 +2056,7 @@ export class GroupRoomManager {
                 await this.admissionAction.send({ kind: 'admin-admit', admission }, { target });
               }
             }
+            this.applyAdmittedPeer(targetPeerId, targetKey);
             logDiagnostic('INFO', 'p2p.admission', 'Admin issued relayed admission', {
               targetPeer: targetPeerId.slice(0, 6), viaPeer: meta.peerId.slice(0, 6),
             });
@@ -2281,6 +2279,15 @@ export class GroupRoomManager {
           // A signed history may arrive before the sender's role/name presence.
           // Retry after identity metadata is pinned so claims can be validated.
           try { this.historyAction?.send({ request: true }, { target: peerId }); } catch {}
+          // Reply once with our own presence/media/voice so a newcomer whose admission
+          // finished milliseconds after our initial announce sees us immediately without
+          // waiting for the 2-second heartbeat.
+          if (!this.previewOnly && this.isLivePeerTarget(peerId) &&
+              (!this.authority || (this.localAdmitted && this.isAdmittedPeer(peerId)))) {
+            try { this.presenceAction?.send(this.buildPresencePayload(), { target: peerId }); } catch {}
+            this.publishMediaManifest(peerId);
+            this.syncVoiceWithPeer(peerId);
+          }
         }
       }
 
