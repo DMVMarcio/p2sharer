@@ -807,7 +807,7 @@ export function CozyRoomSidePanel<TGame>({
             </div>
           ) : (
             <div className="cozy-seat-open-row">
-              {room.lockedBy && room.lockedBy !== model.localActor ? (
+              {room.lockedBy ? (
                 <span className="cozy-seat-open-label is-locked">
                   <LockKeyhole size={11} aria-hidden="true" />
                   {t('games.roomLocked')}

@@ -646,18 +646,23 @@ export class TimedBoardGameModel<TGame extends TimedBoardGameState> extends Boar
 
   newGame(roomId: string, resetScores = false): boolean {
     const actor = this.localActor;
-    return this.updateGame(roomId, (room) => {
-      if (!actor) return null;
-      const isPlayer = room.players.seat1 === actor || room.players.seat2 === actor || room.createdBy === actor;
-      if (!isPlayer && room.players.seat1 && room.players.seat2) return null;
-      const limitMs = room.game.clock?.limitMs ?? null;
-      const nextSeq = (room.game.clock?.syncSeq ?? 0) + 1;
-      return this.hooks.createInitial(
+    const room = this.getRoom(roomId);
+    if (!room || !actor) return false;
+    const isPlayer = room.players.seat1 === actor || room.players.seat2 === actor || room.createdBy === actor;
+    if (!isPlayer && room.players.seat1 && room.players.seat2) return false;
+    const limitMs = room.game.clock?.limitMs ?? null;
+    const nextSeq = (room.game.clock?.syncSeq ?? 0) + 1;
+    this.writeRoom({
+      ...room,
+      ...(resetScores && this.kind === 'chess' ? { lockedBy: undefined } : {}),
+      game: this.hooks.createInitial(
         resetScores ? { w: 0, b: 0, draws: 0 } : room.game.scores,
         limitMs,
         nextSeq,
-      );
+      ),
+      updatedAt: Date.now(),
     });
+    return true;
   }
 
   swapSides(roomId: string): boolean {
