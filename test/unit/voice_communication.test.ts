@@ -871,3 +871,79 @@ test('VoiceNoiseGateProcessor normalizes quiet microphones cleanly without clipp
   const speechOutRms = Math.sqrt(speechOutSq / speechSamples);
   assert.ok(speechOutRms > 0.05, `voice formants over fan noise must pass clearly, got RMS ${speechOutRms.toFixed(4)}`);
 });
+
+test('GroupRoomManager recovers missed remote voice track directly from RTCPeerConnection receivers by announced trackId', async () => {
+  const { GroupRoomManager } = await import('../../src/p2p/group_room.ts');
+  const prevMediaStream = (globalThis as Record<string, unknown>).MediaStream;
+  class FakeMediaStream {
+    private tracks: Array<{ id: string; kind: string; readyState: string; muted?: boolean; addEventListener?: () => void }>;
+    constructor(tracks: Array<{ id: string; kind: string; readyState: string; muted?: boolean; addEventListener?: () => void }> = []) {
+      this.tracks = [...tracks];
+    }
+    getAudioTracks() {
+      return this.tracks.filter((t) => t.kind === 'audio');
+    }
+    getTracks() {
+      return [...this.tracks];
+    }
+    addEventListener() {}
+  }
+  (globalThis as Record<string, unknown>).MediaStream = FakeMediaStream;
+
+  try {
+    const manager = new GroupRoomManager('Tester', 'room-voice-recovery', '', true);
+    const attached: Array<{ peerId: string; trackIds: string[] }> = [];
+    const voiceTrack = { id: 'voice-track-1', kind: 'audio', readyState: 'live', muted: false, addEventListener() {} };
+    const screenAudioTrack = { id: 'screen-audio-9', kind: 'audio', readyState: 'live', muted: false, addEventListener() {} };
+    const fakePc = {
+      signalingState: 'stable',
+      getReceivers: () => [{ track: screenAudioTrack }, { track: voiceTrack }],
+      getSenders: () => [],
+    };
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const m = manager as any;
+    m.callbacks = {
+      onRemoteVoiceStream: (peerId: string, stream: { getAudioTracks: () => Array<{ id: string }> } | null) => {
+        if (stream) {
+          attached.push({ peerId, trackIds: stream.getAudioTracks().map((t) => t.id) });
+        }
+      },
+    };
+    m.room = {
+      getPeers: () => ({ 'peer-remote-1': { connection: fakePc } }),
+    };
+    m.peerTracker.receivePeerExchange('peer-remote-1', true, 'RemoteUser');
+    m.localAdmitted = true;
+
+    // Unrelated trackId must never attach screen-share audio.
+    m.remoteVoiceTrackIds.set('peer-remote-1', 'unknown-track');
+    assert.equal(m.recoverVoiceFromReceivers('peer-remote-1'), false);
+    assert.equal(attached.length, 0);
+
+    // Exact announced voice trackId recovers immediately from pc.getReceivers().
+    m.remoteVoiceTrackIds.set('peer-remote-1', 'voice-track-1');
+    assert.equal(m.recoverVoiceFromReceivers('peer-remote-1'), true);
+    assert.equal(attached.length, 1);
+    assert.deepEqual(attached[0], { peerId: 'peer-remote-1', trackIds: ['voice-track-1'] });
+
+    // Local voice state payload advertises the active voice trackId.
+    m.localVoiceState = { inVoice: true, muted: false, deafened: false };
+    m.localVoiceStream = new FakeMediaStream([{ id: 'local-voice-42', kind: 'audio', readyState: 'live' }]);
+    assert.deepEqual(m.buildVoiceStatePayload(), {
+      inVoice: true,
+      muted: false,
+      deafened: false,
+      trackId: 'local-voice-42',
+    });
+    assert.deepEqual(m.buildVoiceStatePayload(true), {
+      inVoice: true,
+      muted: false,
+      deafened: false,
+      trackId: 'local-voice-42',
+      requestVoice: true,
+    });
+  } finally {
+    if (prevMediaStream === undefined) delete (globalThis as Record<string, unknown>).MediaStream;
+    else (globalThis as Record<string, unknown>).MediaStream = prevMediaStream;
+  }
+});

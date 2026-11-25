@@ -984,6 +984,16 @@ export class VoiceManager {
       holdUntil: 0,
     });
 
+    logDiagnostic('INFO', 'voice.playback', 'Remote voice audio attached', {
+      peer: peerId.slice(0, 6),
+      trackCount: tracks.length,
+      mutedTracks: tracks.map((t) => t.muted),
+      contextState: ctx.state,
+      volume: saved.volume,
+      userMuted: saved.muted,
+      deafened: this.deafened,
+    });
+
     this.ensureRemoteSpeakTimer();
     this.notify();
   }
