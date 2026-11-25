@@ -106,10 +106,10 @@ export function useBoardPlanning(gridSize = 8, options: BoardPlanningOptions = {
     const colDelta = endCol - startCol;
 
     if (Math.abs(rowDelta) === 2 && Math.abs(colDelta) === 1) {
-      return [startSq, startRow * gridSize + endCol, endSq];
+      return [startSq, endRow * gridSize + startCol, endSq];
     }
     if (Math.abs(rowDelta) === 1 && Math.abs(colDelta) === 2) {
-      return [startSq, endRow * gridSize + startCol, endSq];
+      return [startSq, startRow * gridSize + endCol, endSq];
     }
 
     const candidates: Array<{ square: number; distance: number; progress: number; diagonal: boolean }> = [];
