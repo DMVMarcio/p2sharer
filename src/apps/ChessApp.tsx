@@ -357,7 +357,7 @@ export const ChessApp: React.FC<RoomAppViewProps> = ({ instanceId, compact = fal
         const flipped = !isSoloMode && myColor === 'b';
         const moveReviewTo = (nextPly: number, animate: boolean) => {
           if (reviewAnimationTimerRef.current !== null) window.clearTimeout(reviewAnimationTimerRef.current);
-          if (animate && nextPly !== currentReviewPly) {
+          if (animate && Math.abs(nextPly - currentReviewPly) === 1) {
             const forward = nextPly > currentReviewPly;
             const move = game.moveHistory[forward ? currentReviewPly : currentReviewPly - 1];
             if (move) {
@@ -510,6 +510,21 @@ export const ChessApp: React.FC<RoomAppViewProps> = ({ instanceId, compact = fal
             : describeRoomStatus(room);
 
         const lastMoveRecord = game.moveHistory[game.moveHistory.length - 1];
+        const activeMoveRecord = currentReviewPly > 0 ? game.moveHistory[currentReviewPly - 1] : undefined;
+        const sortedCapturedByWhite = [...displayGame.capturedByWhite].sort(
+          (a, b) => CHESS_CAPTURE_ORDER[a] - CHESS_CAPTURE_ORDER[b],
+        );
+        const sortedCapturedByBlack = [...displayGame.capturedByBlack].sort(
+          (a, b) => CHESS_CAPTURE_ORDER[a] - CHESS_CAPTURE_ORDER[b],
+        );
+        const highlightedWhiteCaptureIndex =
+          activeMoveRecord?.color === 'w' && activeMoveRecord.captured
+            ? sortedCapturedByWhite.lastIndexOf(activeMoveRecord.captured)
+            : -1;
+        const highlightedBlackCaptureIndex =
+          activeMoveRecord?.color === 'b' && activeMoveRecord.captured
+            ? sortedCapturedByBlack.lastIndexOf(activeMoveRecord.captured)
+            : -1;
         const canRequestUndo = Boolean(
           game.status === 'playing' &&
             myColor !== null &&
@@ -524,7 +539,7 @@ export const ChessApp: React.FC<RoomAppViewProps> = ({ instanceId, compact = fal
 
         return (
           <div className="cozy-match-layout">
-            <div className="cozy-board-stage has-chess-review-controls">
+            <div className="cozy-board-stage">
               <div className="wood-board-frame chess-wood-frame">
                 <span className="wood-frame-stud stud-tl" aria-hidden="true" />
                 <span className="wood-frame-stud stud-tr" aria-hidden="true" />
@@ -636,20 +651,6 @@ export const ChessApp: React.FC<RoomAppViewProps> = ({ instanceId, compact = fal
                   />
                 </div>
               </div>
-              <div className="chess-review-controls" role="group" aria-label={t('chess.reviewControls')}>
-                <TooltipButton className="cozy-wood-btn is-secondary chess-review-button" tooltip={t('chess.reviewFirst')}
-                  aria-label={t('chess.reviewFirst')} disabled={game.moveHistory.length === 0 || currentReviewPly === 0}
-                  onClick={() => moveReviewTo(0, false)}><SkipBack size={18} aria-hidden="true" /></TooltipButton>
-                <TooltipButton className="cozy-wood-btn is-secondary chess-review-button" tooltip={t('chess.reviewPrevious')}
-                  aria-label={t('chess.reviewPrevious')} disabled={game.moveHistory.length === 0 || currentReviewPly === 0}
-                  onClick={() => moveReviewTo(Math.max(0, currentReviewPly - 1), true)}><ChevronLeft size={20} aria-hidden="true" /></TooltipButton>
-                <TooltipButton className="cozy-wood-btn is-secondary chess-review-button" tooltip={t('chess.reviewNext')}
-                  aria-label={t('chess.reviewNext')} disabled={!isReviewing || currentReviewPly >= game.moveHistory.length}
-                  onClick={() => moveReviewTo(currentReviewPly + 1, true)}><ChevronRight size={20} aria-hidden="true" /></TooltipButton>
-                <TooltipButton className="cozy-wood-btn is-secondary chess-review-button" tooltip={t('chess.reviewLatest')}
-                  aria-label={t('chess.reviewLatest')} disabled={!isReviewing}
-                  onClick={() => moveReviewTo(game.moveHistory.length, false)}><SkipForward size={18} aria-hidden="true" /></TooltipButton>
-              </div>
             </div>
 
             {dragging &&
@@ -726,16 +727,17 @@ export const ChessApp: React.FC<RoomAppViewProps> = ({ instanceId, compact = fal
                         <span>{t('games.white')}</span>
                       </span>
                       <div className="cozy-captured-tray">
-                        {displayGame.capturedByWhite.length === 0 ? (
+                        {sortedCapturedByWhite.length === 0 ? (
                           <span className="cozy-captured-empty">—</span>
                         ) : (
-                          [...displayGame.capturedByWhite]
-                            .sort((a, b) => CHESS_CAPTURE_ORDER[a] - CHESS_CAPTURE_ORDER[b])
-                            .map((type, idx) => (
-                              <span key={idx} className="cozy-captured-piece">
-                                <ChessPieceSvg type={type} color="b" size={26} />
-                              </span>
-                            ))
+                          sortedCapturedByWhite.map((type, idx) => (
+                            <span
+                              key={idx}
+                              className={`cozy-captured-piece ${idx === highlightedWhiteCaptureIndex ? 'is-latest-capture' : ''}`}
+                            >
+                              <ChessPieceSvg type={type} color="b" size={26} />
+                            </span>
+                          ))
                         )}
                       </div>
                     </div>
@@ -745,32 +747,66 @@ export const ChessApp: React.FC<RoomAppViewProps> = ({ instanceId, compact = fal
                         <span>{t('games.black')}</span>
                       </span>
                       <div className="cozy-captured-tray">
-                        {displayGame.capturedByBlack.length === 0 ? (
+                        {sortedCapturedByBlack.length === 0 ? (
                           <span className="cozy-captured-empty">—</span>
                         ) : (
-                          [...displayGame.capturedByBlack]
-                            .sort((a, b) => CHESS_CAPTURE_ORDER[a] - CHESS_CAPTURE_ORDER[b])
-                            .map((type, idx) => (
-                              <span key={idx} className="cozy-captured-piece">
-                                <ChessPieceSvg type={type} color="w" size={26} />
-                              </span>
-                            ))
+                          sortedCapturedByBlack.map((type, idx) => (
+                            <span
+                              key={idx}
+                              className={`cozy-captured-piece ${idx === highlightedBlackCaptureIndex ? 'is-latest-capture' : ''}`}
+                            >
+                              <ChessPieceSvg type={type} color="w" size={26} />
+                            </span>
+                          ))
                         )}
                       </div>
                     </div>
                   </div>
 
                   <div className="cozy-moves-log">
-                    <span className="cozy-card-subtitle">{t('games.moveHistory')}</span>
+                    <div className="cozy-moves-header">
+                      <span className="cozy-card-subtitle">{t('games.moveHistory')}</span>
+                      <div className="chess-review-controls" role="group" aria-label={t('chess.reviewControls')}>
+                        <TooltipButton className="cozy-wood-btn is-secondary chess-review-button" tooltip={t('chess.reviewFirst')}
+                          aria-label={t('chess.reviewFirst')} disabled={game.moveHistory.length === 0 || currentReviewPly === 0}
+                          onClick={() => moveReviewTo(0, false)}><SkipBack size={14} aria-hidden="true" /></TooltipButton>
+                        <TooltipButton className="cozy-wood-btn is-secondary chess-review-button" tooltip={t('chess.reviewPrevious')}
+                          aria-label={t('chess.reviewPrevious')} disabled={game.moveHistory.length === 0 || currentReviewPly === 0}
+                          onClick={() => moveReviewTo(Math.max(0, currentReviewPly - 1), true)}><ChevronLeft size={16} aria-hidden="true" /></TooltipButton>
+                        <TooltipButton className="cozy-wood-btn is-secondary chess-review-button" tooltip={t('chess.reviewNext')}
+                          aria-label={t('chess.reviewNext')} disabled={!isReviewing || currentReviewPly >= game.moveHistory.length}
+                          onClick={() => moveReviewTo(currentReviewPly + 1, true)}><ChevronRight size={16} aria-hidden="true" /></TooltipButton>
+                        <TooltipButton className="cozy-wood-btn is-secondary chess-review-button" tooltip={t('chess.reviewLatest')}
+                          aria-label={t('chess.reviewLatest')} disabled={!isReviewing}
+                          onClick={() => moveReviewTo(game.moveHistory.length, false)}><SkipForward size={14} aria-hidden="true" /></TooltipButton>
+                      </div>
+                    </div>
                     {game.moveHistory.length === 0 ? (
                       <p className="cozy-muted-note">{t('games.noMovesYet')}</p>
                     ) : (
                       <div className="cozy-moves-list">
-                        {game.moveHistory.slice(-28).map((m, idx) => (
-                          <span key={idx} className={`cozy-move-pill is-${m.color}`}>
-                            {m.san}
-                          </span>
-                        ))}
+                        {game.moveHistory.map((m, idx) => {
+                          const ply = idx + 1;
+                          const isActive = currentReviewPly === ply;
+                          return (
+                            <button
+                              key={idx}
+                              type="button"
+                              aria-current={isActive ? 'step' : undefined}
+                              className={`cozy-move-pill is-${m.color} is-interactive ${isActive ? 'is-active' : ''}`}
+                              onClick={() => moveReviewTo(ply, true)}
+                            >
+                              <span>{m.san}</span>
+                              {m.captured && (
+                                <ChessPieceSvg
+                                  type={m.captured}
+                                  color={m.color === 'w' ? 'b' : 'w'}
+                                  size={13}
+                                />
+                              )}
+                            </button>
+                          );
+                        })}
                       </div>
                     )}
                     {game.status !== 'playing' && (
