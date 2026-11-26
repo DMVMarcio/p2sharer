@@ -215,6 +215,11 @@ export class GroupRoomManager {
   public hasAdmission(): boolean { return this.localAdmitted && !this.previewOnly; }
   public isAdmissionDenied(): boolean { return this.admissionDenied; }
   public hasDirectPeers(): boolean { return this.peerTracker.directConnectedPeers.size > 0; }
+  public getActivePeerConnections(): RTCPeerConnection[] {
+    const peers = this.room?.getPeers?.();
+    if (!peers) return [];
+    return Object.values(peers).filter((pc): pc is RTCPeerConnection => Boolean(pc && typeof (pc as RTCPeerConnection).getStats === 'function'));
+  }
   public hasVerifiedPreviewMembers(): boolean { return this.verifiedPreviewByResponder.size > 0; }
   public hasVerifiedIdentityPeers(): boolean {
     for (const peerId of this.peerTracker.directConnectedPeers) {

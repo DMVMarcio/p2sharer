@@ -28,6 +28,7 @@ import { getTransferSpeedUnit, saveTransferSpeedUnit, type TransferSpeedUnit } f
 import { EmojiGlyph } from '../common/EmojiGlyph';
 import { RendezvousServerEditor } from '../common/RendezvousServerEditor';
 import { NetworkDiagnosticsPanel } from '../common/NetworkDiagnosticsPanel';
+import { PerformanceDiagnosticsPanel } from '../common/PerformanceDiagnosticsPanel';
 import { loadRendezvousPreferences, saveRendezvousPreferences, validateRendezvousPreferences } from '../../p2p/relay_preferences.ts';
 import { clearTurnFallbackCache, isValidTurnUrl, parseTurnUrls } from '../../p2p/ice_config.ts';
 import { appUpdates } from '../../services/app_updates';
@@ -315,6 +316,13 @@ export const SettingsModal: React.FC = () => {
     } catch (err) {
       showToast(t("message.1d56d35310c9", { v0: err }), 3500, 'error');
     }
+  };
+
+  const handleOpenDiagnosticsShortcut = (tab: 'network' | 'stream', targetId: string) => {
+    setActiveTab(tab);
+    window.setTimeout(() => {
+      document.getElementById(targetId)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }, 220);
   };
 
   const panePresence = useContentPresence(activeTab);
@@ -974,6 +982,7 @@ export const SettingsModal: React.FC = () => {
                   </label>
                   </div>}
                 </div>}
+                <PerformanceDiagnosticsPanel />
               </div>
             )}
 
@@ -1220,6 +1229,35 @@ export const SettingsModal: React.FC = () => {
                       <line x1="14" y1="11" x2="14" y2="17"/>
                     </svg>
                     <span>{t("message.64ac69ca075b")}</span>
+                  </button>
+                </div>
+
+                <div className="settings-pane-header rendezvous-header">
+                  <h3 className="settings-pane-title">{t('diagnostics.shortcuts.title')}</h3>
+                  <p className="settings-pane-desc">{t('diagnostics.shortcuts.desc')}</p>
+                </div>
+                <div className="network-diagnostics-actions" style={{ flexWrap: 'wrap' }}>
+                  <button
+                    type="button"
+                    className="btn btn-sm btn-outline network-diagnostics-btn"
+                    onClick={() => handleOpenDiagnosticsShortcut('network', 'network-diagnostics-section')}
+                  >
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                      <circle cx="12" cy="12" r="10" />
+                      <path d="M2 12h20" />
+                      <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z" />
+                    </svg>
+                    <span>{t('diagnostics.shortcuts.network')}</span>
+                  </button>
+                  <button
+                    type="button"
+                    className="btn btn-sm btn-outline network-diagnostics-btn"
+                    onClick={() => handleOpenDiagnosticsShortcut('stream', 'performance-diagnostics-section')}
+                  >
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                      <polyline points="22 12 18 12 15 21 9 3 6 12 2 12" />
+                    </svg>
+                    <span>{t('diagnostics.shortcuts.performance')}</span>
                   </button>
                 </div>
               </div>

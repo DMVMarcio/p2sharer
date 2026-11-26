@@ -183,6 +183,83 @@ pub struct CaptureMetricsSnapshot {
     queue_drops: u64, missed_deadlines: u64, queue_age_us: u64, max_queue_age_us: u64,
 }
 
+#[derive(Clone, Debug, Serialize)]
+pub(crate) struct ActiveCaptureDiagnosticSnapshot {
+    pub session_index: usize,
+    pub backend: &'static str,
+    pub encoder: &'static str,
+    pub callbacks: u64,
+    pub gated: u64,
+    pub images: u64,
+    pub nvenc_images: u64,
+    pub nvenc_us: u64,
+    pub nvenc_fallbacks: u64,
+    pub readback_us: u64,
+    pub jpeg_us: u64,
+    pub resize_us: u64,
+    pub processing_us: u64,
+    pub gpu_scaled_images: u64,
+    pub staging_allocations: u64,
+    pub readback_errors: u64,
+    pub jpeg_errors: u64,
+    pub paced_images: u64,
+    pub repeat_ticks: u64,
+    pub refresh_images: u64,
+    pub queue_drops: u64,
+    pub missed_deadlines: u64,
+    pub max_queue_age_us: u64,
+}
+
+pub(crate) fn active_capture_diagnostics() -> Vec<ActiveCaptureDiagnosticSnapshot> {
+    let Ok(sessions) = SESSIONS.try_lock() else {
+        return Vec::new();
+    };
+    sessions
+        .values()
+        .enumerate()
+        .map(|(session_index, session)| {
+            let m = &session.metrics;
+            let backend = match m.capture_backend.load(Ordering::Relaxed) {
+                1 => "WGC",
+                2 => "DXGI",
+                3 => "xcap",
+                _ => "unknown",
+            };
+            let encoder = match m.encoder_kind.load(Ordering::Relaxed) {
+                1 => "NVENC/H264",
+                2 => "libjpeg-turbo/JPEG",
+                3 => "MediaFoundation/H264",
+                _ => "pending",
+            };
+            ActiveCaptureDiagnosticSnapshot {
+                session_index,
+                backend,
+                encoder,
+                callbacks: m.callbacks.load(Ordering::Relaxed),
+                gated: m.gated.load(Ordering::Relaxed),
+                images: m.images.load(Ordering::Relaxed),
+                nvenc_images: m.nvenc_images.load(Ordering::Relaxed),
+                nvenc_us: m.nvenc_us.load(Ordering::Relaxed),
+                nvenc_fallbacks: m.nvenc_fallbacks.load(Ordering::Relaxed),
+                readback_us: m.readback_us.load(Ordering::Relaxed),
+                jpeg_us: m.jpeg_us.load(Ordering::Relaxed),
+                resize_us: m.resize_us.load(Ordering::Relaxed),
+                processing_us: m.processing_us.load(Ordering::Relaxed),
+                gpu_scaled_images: m.gpu_scaled_images.load(Ordering::Relaxed),
+                staging_allocations: m.staging_allocations.load(Ordering::Relaxed),
+                readback_errors: m.readback_errors.load(Ordering::Relaxed),
+                jpeg_errors: m.jpeg_errors.load(Ordering::Relaxed),
+                paced_images: m.paced_images.load(Ordering::Relaxed),
+                repeat_ticks: m.repeat_ticks.load(Ordering::Relaxed),
+                refresh_images: m.refresh_images.load(Ordering::Relaxed),
+                queue_drops: m.queue_drops.load(Ordering::Relaxed),
+                missed_deadlines: m.missed_deadlines.load(Ordering::Relaxed),
+                max_queue_age_us: m.max_queue_age_us.load(Ordering::Relaxed),
+            }
+        })
+        .collect()
+}
+
 #[tauri::command]
 pub fn get_capture_metrics(session_id: String) -> Result<CaptureMetricsSnapshot, String> {
     let sessions = SESSIONS.lock().map_err(|_| "Capture session lock poisoned")?;

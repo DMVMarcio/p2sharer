@@ -54,6 +54,7 @@ mod traffic_counters;
 pub mod virtual_network;
 pub mod upnp;
 pub mod network_diagnostic;
+pub mod performance_diagnostic;
 pub mod twitch_auth;
 mod virtual_network_policy;
 #[cfg(all(windows, target_arch = "x86_64"))]
@@ -167,6 +168,7 @@ pub fn run() {
         .manage(peer_payload::PayloadState::default())
         .manage(virtual_network::VirtualNetworkState::default())
         .manage(upnp::UpnpState::default())
+        .manage(performance_diagnostic::PerformanceDiagState::default())
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_updater::Builder::new().build())
         .plugin(tauri_plugin_process::init())
@@ -271,6 +273,12 @@ pub fn run() {
             upnp::get_upnp_status,
             upnp::request_upnp_port,
             network_diagnostic::run_network_diagnostics,
+            performance_diagnostic::perf_diag_start,
+            performance_diagnostic::perf_diag_sample,
+            performance_diagnostic::perf_diag_finish,
+            performance_diagnostic::perf_diag_cancel,
+            performance_diagnostic::export_performance_report,
+            performance_diagnostic::save_performance_report_to_logs,
             prepare_app_update,
             cancel_app_update,
             arm_exit_watchdog,

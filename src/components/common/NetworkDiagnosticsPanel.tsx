@@ -37,7 +37,7 @@ export const NetworkDiagnosticsPanel: React.FC = () => {
   };
 
   return (
-    <div className="network-diagnostics-container">
+    <div className="network-diagnostics-container" id="network-diagnostics-section">
       <div className="settings-pane-header rendezvous-header">
         <h3 className="settings-pane-title">{t('network.diagnostics.title')}</h3>
         <p className="settings-pane-desc">{t('network.diagnostics.desc')}</p>
