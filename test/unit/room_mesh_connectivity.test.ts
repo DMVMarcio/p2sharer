@@ -311,3 +311,124 @@ test('PEX reveals a missing third peer and direct handshake promotes it', async 
     (signalingManager as any).reannounce = originalReannounce;
   }
 });
+
+test('audio-only recovery never restarts a healthy native video route and keeps the recovery cooldown intact', () => {
+  const mock = mockRoom();
+  const manager = new GroupRoomManager('Host', 'audio-recovery-fixture', '', true);
+  const internal = manager as any;
+  internal.room = mock.room;
+  mock.room.getPeers = () => ({ peer: {} });
+  const sent: Array<{ name: string; data: any; options: any }> = [];
+  mock.room.makeAction = (name: string) => {
+    const action: MockAction = {
+      send: async (data, options) => { sent.push({ name, data, options }); },
+    };
+    mock.actions.set(name, action);
+    return action;
+  };
+  internal.bindRoomActions();
+  internal.peerTracker.receivePeerExchange('peer', true);
+
+  try {
+    // 1. Sender side: audio-only stream_req must not pass forceRestart=true to native video.
+    const dispatchCalls: Array<{ forceRestart: boolean }> = [];
+    internal.nativeVideo = {
+      isBlocked: () => false,
+      sending: () => true,
+      recentlyConfirmed: () => false,
+      dispatch: (_peer: string, _stream: MediaStream, _desc: unknown, forceRestart: boolean) => {
+        dispatchCalls.push({ forceRestart });
+        return true;
+      },
+      close: () => {},
+      stop: () => {},
+    };
+    const audioTrack = { id: 'audio-1', kind: 'audio', readyState: 'live' } as MediaStreamTrack;
+    const videoTrack = { id: 'video-1', kind: 'video', readyState: 'live' } as MediaStreamTrack;
+    const localStream = {
+      id: 'local-screen',
+      getTracks: () => [videoTrack, audioTrack],
+      getVideoTracks: () => [videoTrack],
+      getAudioTracks: () => [audioTrack],
+    } as unknown as MediaStream;
+    const descriptor = { id: 'screen-1', kind: 'screen' as const, label: 'Screen', videoTrackId: 'video-1', fps: 60, bitrate: 15000, hasAudio: true };
+    internal.localMedia.set('screen-1', { descriptor, stream: localStream });
+    internal.localStream = localStream;
+
+    mock.actions.get('stream_req')!.onMessage!(
+      { request: true, missingVideo: false, missingAudio: true },
+      { peerId: 'peer' },
+    );
+    assert.equal(dispatchCalls.length, 1);
+    assert.equal(dispatchCalls[0].forceRestart, false, 'audio-only recovery must not tear down native video');
+
+    // 2. Viewer side: video-only attach while screen expects audio must keep the 8s recovery cooldown.
+    const remoteDesc = { id: 'remote-screen', kind: 'screen' as const, label: 'Remote', videoTrackId: 'rv-1', fps: 60, bitrate: 15000, hasAudio: true };
+    internal.remoteDescriptors.set('peer', [remoteDesc]);
+    internal.remoteMediaRevisions.set('peer', 1);
+    internal.remoteDescriptorFirstSeen.set('peer/remote-screen', Date.now() - 5000);
+    internal.lastStreamRecoveryRequests.set('peer', Date.now() - 1000);
+
+    const videoOnlyStream = {
+      id: 'native-video-only',
+      getTracks: () => [{ id: 'rv-1', kind: 'video', readyState: 'live' }],
+      getVideoTracks: () => [{ id: 'rv-1', kind: 'video', readyState: 'live' }],
+      getAudioTracks: () => [],
+    } as unknown as MediaStream;
+    internal.receivePeerStream(videoOnlyStream, 'peer', remoteDesc, false);
+    assert.ok(internal.lastStreamRecoveryRequests.has('peer'), 'cooldown must remain active while required audio is still missing');
+
+    const beforeReqCount = sent.filter((item) => item.name === 'stream_req').length;
+    mock.actions.get('stream_status')!.onMessage!(
+      { isStreaming: true, revision: 1, streams: [remoteDesc], timestamp: Date.now() },
+      { peerId: 'peer' },
+    );
+    assert.equal(sent.filter((item) => item.name === 'stream_req').length, beforeReqCount, 'manifest heartbeat inside cooldown must not spam stream_req');
+  } finally {
+    internal.profileTransfer?.close();
+    internal.bannerTransfer?.close();
+    internal.nativeVideo?.close();
+    internal.room = null;
+  }
+});
+
+test('half-open silent peer transport is closed and pruned after extended silence', async (context) => {
+  context.mock.timers.enable({ apis: ['setInterval', 'Date'], now: 10_000 });
+  const original = { join: signalingManager.joinRoom, leave: signalingManager.leaveRoom, announce: signalingManager.reannounce };
+  const mock = mockRoom();
+  let closed = false;
+  const connections: Record<string, any> = {
+    zombie: {
+      connectionState: 'connected',
+      iceConnectionState: 'connected',
+      createDataChannel: () => ({ readyState: 'open', close() {} }),
+      close() { closed = true; this.connectionState = 'closed'; },
+    },
+  };
+  mock.room.getPeers = () => connections;
+  signalingManager.joinRoom = () => mock.room;
+  signalingManager.leaveRoom = async () => {};
+  signalingManager.reannounce = async () => {};
+  const left: string[] = [];
+  const manager = new GroupRoomManager('Viewer', 'zombie-prune-fixture', '', true);
+  try {
+    await manager.join({ ...callbacks(), onPeerLeft: (id) => left.push(id) });
+    mock.room.onPeerJoin('zombie');
+    mock.actions.get('presence')!.onMessage!({ username: 'Zombie' }, { peerId: 'zombie' });
+
+    // Still alive at 26s (brief spike tolerance).
+    for (let tick = 0; tick < 13; tick++) context.mock.timers.tick(2000);
+    assert.deepEqual(left, []);
+    assert.equal(closed, false);
+
+    // After 46s of total silence, half-open transport is closed and pruned so reconnect can proceed.
+    for (let tick = 0; tick < 10; tick++) context.mock.timers.tick(2000);
+    assert.equal(closed, true);
+    assert.deepEqual(left, ['zombie']);
+  } finally {
+    await manager.leave();
+    signalingManager.joinRoom = original.join;
+    signalingManager.leaveRoom = original.leave;
+    signalingManager.reannounce = original.announce;
+  }
+});

@@ -13,7 +13,7 @@ type Signal = { id: string; kind: 'offer' | 'answer' | 'ice' | 'reject' | 'stop'
   sdp?: string; candidate?: RTCIceCandidateInit; descriptor?: StreamDescriptor; reason?: string };
 interface Outgoing { id: string; peer: string; descriptor: StreamDescriptor; source: NativeSenderSource; track: MediaStreamTrack;
   started: number;
-  offer?: Signal; retryTimer?: ReturnType<typeof setTimeout>; answering?: boolean; ready?: boolean;
+  offer?: Signal; retryTimer?: ReturnType<typeof setTimeout>; answering?: boolean; ready?: boolean; readyAt?: number;
   timer: ReturnType<typeof setTimeout>; offered: boolean; answered: boolean; candidates: RTCIceCandidateInit[]; localCandidates: RTCIceCandidateInit[] }
 interface Incoming { id: string; peer: string; descriptor: StreamDescriptor; pc?: RTCPeerConnection;
   timer: ReturnType<typeof setInterval>; remoteReady: boolean; candidates: RTCIceCandidateInit[]; started: number; connectedAt?: number;
@@ -113,6 +113,7 @@ export class NativeVideoTransport {
       try {
         if (signal.kind === 'ready' && outgoing.answered && !outgoing.ready) {
           outgoing.ready = true;
+          outgoing.readyAt = performance.now();
           clearTimeout(outgoing.timer);
           logDiagnostic('INFO', 'transmission.native', 'Receiver confirmed decoded native video; retiring browser video', {
             routeId: outgoing.id, mediaId: outgoing.descriptor.id, elapsedMs: Math.round(performance.now() - outgoing.started) });
@@ -314,6 +315,10 @@ export class NativeVideoTransport {
   }
   public hasOutgoing(peer: string, mediaId: string): boolean { return this.outgoing.has(this.key(peer, mediaId)); }
   public sending(peer: string, mediaId: string): boolean { return this.outgoing.get(this.key(peer, mediaId))?.ready === true; }
+  public recentlyConfirmed(peer: string, mediaId: string, graceMs = 4000): boolean {
+    const route = this.outgoing.get(this.key(peer, mediaId));
+    return Boolean(route?.ready && route.readyAt !== undefined && performance.now() - route.readyAt < graceMs);
+  }
   public receiving(peer: string, mediaId: string): boolean { return this.incoming.get(this.key(peer, mediaId))?.verifiedFrames === true; }
   /** Sends binary remote-control frames directly over the native Rust WebRTC connection when open. */
   public sendRemoteControlFrame(peer: string, mediaId: string, lane: 'datagram' | 'input', frame: Uint8Array): boolean {

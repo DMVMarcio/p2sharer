@@ -203,6 +203,8 @@ export interface StreamRequestPayload {
   broadcasterId: string;
   requesterId: string;
   reason?: 'initial_join' | 'stream_resumed' | 'track_ended_recovery';
+  missingVideo?: boolean;
+  missingAudio?: boolean;
 }
 
 export interface VideoSourceOptions {

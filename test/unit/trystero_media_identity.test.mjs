@@ -134,3 +134,37 @@ test('inactive transceiver receivers never shadow replacement tracks on metadata
   assert.equal(events.length, 2);
   assert.equal(events.at(-1).stream, replacementStream);
 });
+
+test('reused transceivers whose receiver track.id differs from sender track.id still pair via streamId and kind', () => {
+  const { manager } = fixture();
+  const events = [];
+  manager.onPeerTrack = (track, stream, owner, meta) => events.push({ track, stream, owner, meta });
+
+  // Meta arrives before track (normal order): receiver transceiver assigns a local UUID instead of sender's trackId.
+  const screenMeta = { id: 'screen-1', kind: 'screen' };
+  manager.receiveTrackMeta({ k: 'video-key', s: 'sender-stream-1', t: 'sender-video-id', d: 'video', m: screenMeta }, 'owner');
+  manager.receiveTrackMeta({ k: 'audio-key', s: 'sender-stream-1', t: 'sender-audio-id', d: 'audio', m: screenMeta }, 'owner');
+
+  const reusedVideo = { id: 'receiver-local-video-uuid', kind: 'video', readyState: 'live' };
+  const reusedAudio = { id: 'receiver-local-audio-uuid', kind: 'audio', readyState: 'live' };
+  const remoteStream = streamFixture('sender-stream-1', [reusedAudio, reusedVideo]);
+  manager.receiveRemoteTrack('owner', reusedVideo, remoteStream);
+  manager.receiveRemoteTrack('owner', reusedAudio, remoteStream);
+
+  assert.equal(events.length, 2);
+  assert.equal(events[0].track, reusedVideo);
+  assert.equal(events[0].meta, screenMeta);
+  assert.equal(events[1].track, reusedAudio);
+  assert.equal(events[1].meta, screenMeta);
+
+  // Track arrives before meta (reversed order) with mismatched receiver track.id.
+  const lateVideo = { id: 'receiver-local-cam-uuid', kind: 'video', readyState: 'live' };
+  const camStream = streamFixture('sender-cam-stream', [lateVideo]);
+  const camMeta = { id: 'cam-1', kind: 'camera' };
+  manager.receiveRemoteTrack('owner', lateVideo, camStream);
+  assert.equal(events.length, 2);
+  manager.receiveTrackMeta({ k: 'cam-key', s: 'sender-cam-stream', t: 'sender-cam-id', d: 'video', m: camMeta }, 'owner');
+  assert.equal(events.length, 3);
+  assert.equal(events[2].track, lateVideo);
+  assert.equal(events[2].meta, camMeta);
+});

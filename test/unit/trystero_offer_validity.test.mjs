@@ -2,6 +2,8 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import createPeer from '../../node_modules/@trystero-p2p/core/dist/peer.mjs';
 import { OfferPool } from '../../node_modules/@trystero-p2p/core/dist/offer-pool.mjs';
+import { createSignalHandler } from '../../node_modules/@trystero-p2p/core/dist/signal-handler.mjs';
+import { SharedPeerManager } from '../../node_modules/@trystero-p2p/core/dist/shared-peer.mjs';
 
 const emptySdp = 'v=0\r\ns=fixture\r\nt=0 0\r\n';
 const validSdp = `${emptySdp}m=application 9 UDP/DTLS/SCTP webrtc-datachannel\r\n`;
@@ -272,4 +274,87 @@ test('stale answer m-line mismatch on open peer is ignored instead of tearing do
     assert.equal(peer.isDead, false);
     assert.equal(conn.signalingState, 'have-local-offer');
   } finally { peer.destroy(); }
+});
+
+test('duplicate initial negotiationneeded before remote answer never emits a second empty offer', async () => {
+  const conn = createRenegotiationConnection('stable');
+  conn.remoteDescription = null;
+  conn.connectionState = 'new';
+  conn.channel.readyState = 'connecting';
+  conn.createOffer = async () => ({ type: 'offer', sdp: `${validSdp}a=ice-ufrag:init0\r\n` });
+  const peer = createPeer(true, { rtcPolyfill: class { constructor() { return conn; } }, trickleIce: true });
+  const signals = [];
+  peer.setHandlers({ signal: (s) => signals.push(s) });
+  try {
+    await new Promise((resolve) => setImmediate(resolve));
+    assert.equal(conn.signalingState, 'have-local-offer');
+    // Simulate Chromium firing its queued negotiationneeded for createDataChannel("data")
+    // while the initial offer is still awaiting the remote answer.
+    await conn.onnegotiationneeded?.(new Event('negotiationneeded'));
+    const offersBeforeAnswer = signals.filter((s) => s.type === 'offer').length;
+    await peer.signal({ type: 'answer', sdp: `${validSdp}a=ice-ufrag:ans0\r\n` });
+    await new Promise((resolve) => setImmediate(resolve));
+    assert.equal(conn.signalingState, 'stable', 'initiator must stay stable after initial answer');
+    assert.equal(signals.filter((s) => s.type === 'offer').length, offersBeforeAnswer);
+  } finally { peer.destroy(); }
+});
+
+test('signal handler replaces a stalled answering peer when a newer offerId arrives after abort/rejoin', async (context) => {
+  context.mock.timers.enable({ apis: ['Date'], now: 10_000 });
+  const createdPeers = [];
+  const sent = [];
+  const ctx = {
+    appId: 'app',
+    roomId: 'room',
+    config: {},
+    peerStates: {},
+    rootTopicPlaintext: 'root',
+    rootTopicP: Promise.resolve('root-topic'),
+    selfTopicP: Promise.resolve('self-topic'),
+    toPlain: async (s) => s,
+    toCipher: async (s) => s,
+    isLeaving: () => false,
+    isPassive: false,
+    isActive: true,
+    sharedPeers: new SharedPeerManager(),
+    offerPool: { recycle() {} },
+    initPeer: () => {
+      let signalHandler = null;
+      const peer = {
+        isDead: false,
+        destroyed: false,
+        connection: { connectionState: 'connecting', iceConnectionState: 'checking' },
+        setHandlers(h) { if (h.signal) signalHandler = h.signal; },
+        async signal() { signalHandler?.({ type: 'answer', sdp: `${validSdp}a=ice-ufrag:ans\r\n` }); },
+        destroy() { this.isDead = true; this.destroyed = true; },
+      };
+      createdPeers.push(peer);
+      return peer;
+    },
+    connectPeer() {},
+    disconnectPeer() {},
+    attachSharedPeerToRoom() {},
+    checkDeactivate() {},
+    announceIntervals: [],
+    announceIntervalMs: 5000,
+  };
+  const handler = createSignalHandler(ctx)(0);
+  const remotePeerId = 'remote-offerer-peer';
+  const sendSignal = (topic, msg) => sent.push({ topic, msg });
+
+  await handler('self-topic', JSON.stringify({ peerId: remotePeerId, offerId: 'offer-probe-1', offer: validSdp }), sendSignal);
+  assert.equal(createdPeers.length, 1);
+
+  // Duplicate delivery of the same offerId is ignored even after time passes.
+  context.mock.timers.tick(1500);
+  await handler('self-topic', JSON.stringify({ peerId: remotePeerId, offerId: 'offer-probe-1', offer: validSdp }), sendSignal);
+  assert.equal(createdPeers.length, 1);
+  assert.equal(createdPeers[0].destroyed, false);
+
+  // A fresh offerId from the same peer replaces the stalled answering peer.
+  await handler('self-topic', JSON.stringify({ peerId: remotePeerId, offerId: 'offer-room-2', offer: validSdp }), sendSignal);
+  assert.equal(createdPeers.length, 2);
+  assert.equal(createdPeers[0].destroyed, true);
+  assert.equal(ctx.peerStates[remotePeerId].answeringOfferId, 'offer-room-2');
+  clearTimeout(ctx.peerStates[remotePeerId].answeringExpiryTimer);
 });

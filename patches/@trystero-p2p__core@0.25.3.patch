@@ -26,10 +26,18 @@ index 992caaaef5e9f1e0bcfb5e348bc9138667f8242b..944fcd910e44956be3e4b0e95471bd5b
  						const currentPeer = getPeer(id, normalizedOptions.sendToPending);
  						if (!currentPeer || currentPeer !== peer) break;
 diff --git a/dist/media.mjs b/dist/media.mjs
-index 2fd4906e80aefbef3f6b9f523a77ebf58562c3af..d9e650d02b8f469315d563a27ca2f216f2d05f0b 100644
+index 2fd4906e80aefbef3f6b9f523a77ebf58562c3af..794baa9ad557bcecc5700e5377b08450d862c326 100644
 --- a/dist/media.mjs
 +++ b/dist/media.mjs
-@@ -53,6 +53,10 @@ const createMediaIdentityCache = () => {
+@@ -5,6 +5,7 @@ const toPendingMediaMeta = (value) => {
+ 		key: value.k,
+ 		...typeof value.s === "string" ? { streamId: value.s } : {},
+ 		...typeof value.t === "string" ? { trackId: value.t } : {},
++		...typeof value.d === "string" ? { kind: value.d } : {},
+ 		...Object.hasOwn(value, "m") ? { metadata: value.m } : {}
+ 	};
+ 	return null;
+@@ -53,6 +54,10 @@ const createMediaIdentityCache = () => {
  const createMediaManager = ({ iterate, isActive, getSharedMediaPeer }) => {
  	const pendingStreamMetas = {};
  	const pendingTrackMetas = {};
@@ -40,7 +48,7 @@ index 2fd4906e80aefbef3f6b9f523a77ebf58562c3af..d9e650d02b8f469315d563a27ca2f216
  	const localMedia = createMediaIdentityCache();
  	const listeners = {
  		onPeerStream: null,
-@@ -60,11 +64,13 @@ const createMediaManager = ({ iterate, isActive, getSharedMediaPeer }) => {
+@@ -60,11 +65,13 @@ const createMediaManager = ({ iterate, isActive, getSharedMediaPeer }) => {
  	};
  	const emitStream = (id, key, stream, metadata) => {
  		if (!isActive(id)) return;
@@ -54,7 +62,7 @@ index 2fd4906e80aefbef3f6b9f523a77ebf58562c3af..d9e650d02b8f469315d563a27ca2f216
  		getSharedMediaPeer(id)?.__trysteroMedia?.rememberRemoteTrack(key, track, stream, typeof track.id === "string" ? track.id : void 0, typeof stream.id === "string" ? stream.id : void 0);
  		listeners.onPeerTrack?.(track, stream, id, metadata);
  	};
-@@ -76,9 +82,21 @@ const createMediaManager = ({ iterate, isActive, getSharedMediaPeer }) => {
+@@ -76,9 +83,21 @@ const createMediaManager = ({ iterate, isActive, getSharedMediaPeer }) => {
  		};
  		return iterate(targets, async (id, peer) => {
  			await sendMeta(payload, id);
@@ -77,7 +85,17 @@ index 2fd4906e80aefbef3f6b9f523a77ebf58562c3af..d9e650d02b8f469315d563a27ca2f216
  	return {
  		addStream: (stream, options, sendMeta) => applyMediaOp(options.target, localMedia.getStreamKey(stream), options.metadata, sendMeta, (peer) => peer.addStream(stream), { s: stream.id }),
  		removeStream: (stream, target) => {
-@@ -96,39 +114,69 @@ const createMediaManager = ({ iterate, isActive, getSharedMediaPeer }) => {
+@@ -86,7 +105,8 @@ const createMediaManager = ({ iterate, isActive, getSharedMediaPeer }) => {
+ 		},
+ 		addTrack: (track, stream, options, sendMeta) => applyMediaOp(options.target, localMedia.getTrackKey(track), options.metadata, sendMeta, (peer) => peer.addTrack(track, stream), {
+ 			s: stream.id,
+-			t: track.id
++			t: track.id,
++			...typeof track.kind === "string" ? { d: track.kind } : {}
+ 		}),
+ 		removeTrack: (track, target) => {
+ 			iterate(target, (_, peer) => peer.removeTrack(track));
+@@ -96,39 +116,84 @@ const createMediaManager = ({ iterate, isActive, getSharedMediaPeer }) => {
  			if (!isActive(id)) return;
  			const parsed = toPendingMediaMeta(meta);
  			if (!parsed) return;
@@ -114,9 +132,19 @@ index 2fd4906e80aefbef3f6b9f523a77ebf58562c3af..d9e650d02b8f469315d563a27ca2f216
  				return;
  			}
 -			(pendingTrackMetas[id] ??= []).push(parsed);
-+			const received = receivedTracks[id]?.get(parsed.trackId);
++			let received = receivedTracks[id]?.get(parsed.trackId);
++			let matchedTrackId = parsed.trackId;
++			if (!received && parsed.streamId && receivedTracks[id]) {
++				for (const [candidateId, candidate] of receivedTracks[id].entries()) {
++					if (candidate.stream?.id === parsed.streamId && (!parsed.kind || !candidate.track?.kind || candidate.track.kind === parsed.kind)) {
++						received = candidate;
++						matchedTrackId = candidateId;
++						break;
++					}
++				}
++			}
 +			if (received) {
-+				receivedTracks[id].delete(parsed.trackId);
++				receivedTracks[id].delete(matchedTrackId);
 +				emitTrack(id, parsed.key, received.track, received.stream, parsed.metadata);
 +			}
  		},
@@ -138,8 +166,13 @@ index 2fd4906e80aefbef3f6b9f523a77ebf58562c3af..d9e650d02b8f469315d563a27ca2f216
 -			const next = pendingTrackMetas[id]?.shift();
 +			if (emittedTracks[id]?.get(track) === stream) return;
 +			(receivedTracks[id] ??= new Map()).set(track.id, { track, stream });
-+			const index = pendingTrackMetas[id]?.findIndex(meta => meta.trackId === track.id) ?? -1;
-+			const next = index >= 0 ? pendingTrackMetas[id][index] : null;
++			const pending = pendingTrackMetas[id] ?? [];
++			let index = pending.findIndex(meta => meta.trackId === track.id);
++			if (index < 0 && typeof stream?.id === "string" && stream.id) {
++				index = pending.findIndex(meta => meta.streamId === stream.id && (!meta.kind || !track.kind || meta.kind === track.kind));
++				if (index < 0) index = pending.findIndex(meta => meta.streamId === stream.id);
++			}
++			const next = index >= 0 ? pending[index] : null;
  			if (!next) return;
 +			receivedTracks[id].delete(track.id);
  			emitTrack(id, next.key, track, stream, next.metadata);
@@ -169,7 +202,7 @@ index 7340a4f4bd7192c2c9f064d40311433436effc0f..76076fb6d1649100358ca3c7d12b51bb
  	makeOffer;
  	pool = [];
 diff --git a/dist/peer.mjs b/dist/peer.mjs
-index 8003df9196a808650bc233f9243be5eae14b4a1d..cd0f0d721f4902b8979daf412ba01a2a4f00888c 100644
+index 8003df9196a808650bc233f9243be5eae14b4a1d..d02151dc474fe9c044251c886e3e46a5d09e9cfd 100644
 --- a/dist/peer.mjs
 +++ b/dist/peer.mjs
 @@ -1,13 +1,21 @@
@@ -227,7 +260,7 @@ index 8003df9196a808650bc233f9243be5eae14b4a1d..cd0f0d721f4902b8979daf412ba01a2a
 +					await pc.setLocalDescription({ type: "rollback" });
 +					localOfferCreatedAt = null;
 +				} else {
-+					needsRenegotiation = true;
++					if (pc.remoteDescription || (pc.getSenders?.().length ?? 0) > 0) needsRenegotiation = true;
 +					return;
 +				}
 +			}
@@ -490,9 +523,20 @@ index a09d8b9c6425b41e08fe4cf421a974d94d627a6c..9ce9935607b45b3435898f82dd303fef
  			return listeners.onPeerJoin;
  		},
 diff --git a/dist/shared-peer.mjs b/dist/shared-peer.mjs
-index 5fca48a89e823ad3a5665d121f390b505ecf9345..f692fd4dc6ac4ec1092b82d4a87380dbe4e66701 100644
+index 5fca48a89e823ad3a5665d121f390b505ecf9345..099693eeacf338a90c9db442f797f80b07fb3c17 100644
 --- a/dist/shared-peer.mjs
 +++ b/dist/shared-peer.mjs
+@@ -52,8 +52,8 @@ const isPeerUnderlyingStale = (peer) => {
+ };
+ const getConnectedPeerHealth = (peer) => {
+ 	if (isPeerUnderlyingStale(peer)) return "stale";
+-	const { channel } = peer;
+-	if (!channel || channel.readyState !== "open") return "transient";
++	const { connection, channel } = peer;
++	if (!channel || channel.readyState !== "open" || connection.connectionState === "disconnected" || connection.iceConnectionState === "disconnected") return "transient";
+ 	return "live";
+ };
+ var SharedPeerManager = class {
 @@ -134,7 +134,7 @@ var SharedPeerManager = class {
  			close: () => this.clear(appId, peerId, { destroyPeer: false }),
  			error: (err) => {
@@ -570,7 +614,7 @@ index 5fca48a89e823ad3a5665d121f390b505ecf9345..f692fd4dc6ac4ec1092b82d4a87380db
  	getSignalBinding(shared) {
  		if (shared.controlRoomId) {
 diff --git a/dist/signal-handler.mjs b/dist/signal-handler.mjs
-index cf12b0b808d11b85878e2a038138e8a64b5c40ba..bb4f98473c2b0ad347f4719a3270f44d94564e18 100644
+index cf12b0b808d11b85878e2a038138e8a64b5c40ba..f480cb70008ed1f253a9cb3b8a3198641bb63d55 100644
 --- a/dist/signal-handler.mjs
 +++ b/dist/signal-handler.mjs
 @@ -5,7 +5,8 @@ import { getConnectedPeerHealth } from "./shared-peer.mjs";
@@ -578,13 +622,17 @@ index cf12b0b808d11b85878e2a038138e8a64b5c40ba..bb4f98473c2b0ad347f4719a3270f44d
  const offerPostAnswerTtlMs = 23333;
  const offerIdSize = 12;
 -const disconnectedPeerGraceMs = 7533;
-+const disconnectedPeerGraceMs = 25e3;
++const disconnectedPeerGraceMs = 6e3;
 +const directFallbackTimeoutMs = 6e3;
  const answeringTtlMs = 23333;
  const legacyCandidateKey = "__legacy__";
  const offerRelayPlaceholder = "offer-placeholder";
-@@ -49,13 +50,48 @@ const makeState = () => ({
+@@ -47,15 +48,52 @@ const makeState = () => ({
+ 	connectedPeerUnhealthySinceMs: null,
+ 	answeringExpiryTimer: null,
  	answeringPeer: null,
++	answeringOfferId: null,
++	answeringStartedAt: 0,
  	answerSent: false,
  	connectionErrorReported: false,
 +	useFallbackRtc: false,
@@ -633,15 +681,19 @@ index cf12b0b808d11b85878e2a038138e8a64b5c40ba..bb4f98473c2b0ad347f4719a3270f44d
  const getSdpExchangeConnectionError = (peerId, config) => `could not connect to peer ${peerId} after exchanging SDP; ${hasTurnServer(config) ? "check that your TURN server URLs and credentials are reachable by both peers" : "configure TURN servers with turnConfig or rtcConfig.iceServers"}`;
  const reportSdpExchangeConnectionFailure = (ctx, state, peerId) => {
  	if (ctx.isLeaving() || state.connectedPeer || state.connectionErrorReported) return;
-@@ -76,6 +112,7 @@ const updateStatus = (state) => {
+@@ -76,8 +114,11 @@ const updateStatus = (state) => {
  };
  const clearAnswering = (state, peer) => {
  	if (state.answeringPeer === peer) {
 +		clearDirectFallbackTimer(state);
  		state.answeringExpiryTimer = resetTimer(state.answeringExpiryTimer);
  		state.answeringPeer = null;
++		state.answeringOfferId = null;
++		state.answeringStartedAt = 0;
  		state.answerSent = false;
-@@ -109,6 +146,7 @@ const hasRemoteDescription = (peer) => {
+ 		updateStatus(state);
+ 	}
+@@ -109,6 +150,7 @@ const hasRemoteDescription = (peer) => {
  };
  const resetOfferState = (state, offerPool) => {
  	const previousOfferAnswered = state.offerAnswered;
@@ -649,7 +701,7 @@ index cf12b0b808d11b85878e2a038138e8a64b5c40ba..bb4f98473c2b0ad347f4719a3270f44d
  	state.offerExpiryTimer = resetTimer(state.offerExpiryTimer);
  	state.offerInitPromise = null;
  	state.offerRelays.forEach((_, relayId) => clearOfferRelay(state, relayId));
-@@ -116,7 +154,7 @@ const resetOfferState = (state, offerPool) => {
+@@ -116,7 +158,7 @@ const resetOfferState = (state, offerPool) => {
  	state.offerSignalRelays = [];
  	state.offerRelayTimers = [];
  	state.offerSignalBacklog = [];
@@ -658,7 +710,7 @@ index cf12b0b808d11b85878e2a038138e8a64b5c40ba..bb4f98473c2b0ad347f4719a3270f44d
  		if (!state.offerPeer.isDead) state.offerPeer.destroy();
  	} else offerPool.recycle(state.offerPeer);
  	state.offerPeer = null;
-@@ -165,9 +203,23 @@ const ensureOffer = (ctx, state, peerId, relayId) => {
+@@ -165,9 +207,23 @@ const ensureOffer = (ctx, state, peerId, relayId) => {
  	});
  	if (state.offerInitPromise) return state.offerInitPromise;
  	state.offerInitPromise = (async () => {
@@ -685,7 +737,7 @@ index cf12b0b808d11b85878e2a038138e8a64b5c40ba..bb4f98473c2b0ad347f4719a3270f44d
  		state.offerPeer = peer;
  		state.offerId = genId(offerIdSize);
  		state.offerSdp = offer;
-@@ -177,7 +229,7 @@ const ensureOffer = (ctx, state, peerId, relayId) => {
+@@ -177,7 +233,7 @@ const ensureOffer = (ctx, state, peerId, relayId) => {
  		updateStatus(state);
  		const onOfferPeerClosedOrError = () => {
  			if (state.offerPeer === peer && !state.connectedPeer) {
@@ -694,13 +746,36 @@ index cf12b0b808d11b85878e2a038138e8a64b5c40ba..bb4f98473c2b0ad347f4719a3270f44d
  				resetOfferState(state, ctx.offerPool);
  			}
  			ctx.disconnectPeer(peer, peerId);
-@@ -249,14 +301,14 @@ const handleOffer = async (ctx, relayId, peerId, offer, offerId, hasOutgoingOffe
+@@ -245,18 +301,36 @@ const handleAnnouncement = async (ctx, relayId, peerId, shared, signalPeer) => {
+ };
+ const handleOffer = async (ctx, relayId, peerId, offer, offerId, hasOutgoingOfferHint, signalPeer) => {
+ 	const state = getState(ctx.peerStates, peerId);
+-	if (state.answeringPeer || state.offerAnswered) return;
++	if (state.offerAnswered) return;
++	if (state.answeringPeer) {
++		const iceState = state.answeringPeer.connection?.iceConnectionState;
++		const canReplaceStaleAnswer = Boolean(
++			!state.connectedPeer &&
++			offerId &&
++			state.answeringOfferId &&
++			offerId !== state.answeringOfferId &&
++			iceState !== "connected" &&
++			iceState !== "completed" &&
++			Date.now() - (state.answeringStartedAt ?? 0) >= 1e3
++		);
++		if (!canReplaceStaleAnswer) return;
++		const stalePeer = state.answeringPeer;
++		clearAnswering(state, stalePeer);
++		if (!stalePeer.isDead) stalePeer.destroy();
++	}
  	const hasTrackedOutgoingOffer = Boolean(state.offerPeer || state.offerRelays.some(Boolean));
  	if ((hasTrackedOutgoingOffer || hasOutgoingOfferHint) && selfId < peerId) return;
  	if (hasTrackedOutgoingOffer) resetOfferState(state, ctx.offerPool);
 -	const answerPeer = ctx.initPeer(false, ctx.config);
 +	const answerPeer = ctx.initPeer(false, getPeerConfig(ctx, state));
  	state.answeringPeer = answerPeer;
++	state.answeringOfferId = offerId ?? null;
++	state.answeringStartedAt = Date.now();
  	state.answerSent = false;
  	state.connectionErrorReported = false;
  	scheduleAnsweringExpiry(ctx, state, peerId, answerPeer);
@@ -711,7 +786,7 @@ index cf12b0b808d11b85878e2a038138e8a64b5c40ba..bb4f98473c2b0ad347f4719a3270f44d
  		clearAnswering(state, answerPeer);
  		ctx.disconnectPeer(answerPeer, peerId);
  		ctx.checkDeactivate();
-@@ -295,6 +347,7 @@ const handleOffer = async (ctx, relayId, peerId, offer, offerId, hasOutgoingOffe
+@@ -295,6 +369,7 @@ const handleOffer = async (ctx, relayId, peerId, offer, offerId, hasOutgoingOffe
  			const payloadToSend = { peerId: selfId };
  			if (signal.type === "answer") {
  				state.answerSent = true;
@@ -719,7 +794,7 @@ index cf12b0b808d11b85878e2a038138e8a64b5c40ba..bb4f98473c2b0ad347f4719a3270f44d
  				payloadToSend["answer"] = sdp;
  			} else payloadToSend["candidate"] = sdp;
  			if (offerId) payloadToSend["offerId"] = offerId;
-@@ -355,6 +408,7 @@ const handleAnswer = async (ctx, relayId, peerId, answer, offerId, peer) => {
+@@ -355,6 +430,7 @@ const handleAnswer = async (ctx, relayId, peerId, answer, offerId, peer) => {
  		if (!state || !state.offerPeer || state.offerAnswered || offerId && state.offerId && offerId !== state.offerId || state.offerPeer.isDead) return;
  		state.offerAnswered = true;
  		scheduleOfferExpiry(ctx, state, peerId, offerPostAnswerTtlMs);

@@ -133,6 +133,7 @@ export class RoomService {
 
   private listeners: Set<Listener> = new Set();
   private beforeRoomJoinHooks = new Set<() => Promise<void>>();
+  private reconnectWatchMemory = new Map<string, { ownerPeerId: string; mediaKind?: string; expiresAt: number }>();
   private roomConnectingTimeout: ReturnType<typeof setTimeout> | null = null;
   private roomTransition: Promise<void> = Promise.resolve();
   private remoteControlMoveQueues = new Map<
@@ -485,6 +486,7 @@ export class RoomService {
     if (signal?.aborted) return;
     this.joinOutcome = 'connecting';
     this.joinError = '';
+    this.reconnectWatchMemory.clear();
     this.remoteControlHost.clear();
     this.remoteControlViewerStates = {};
     this.remoteCursorStates = {};
@@ -669,8 +671,31 @@ export class RoomService {
       },
       onSlotsUpdate: (slots: RoomSlotInfo[]) => {
         if (this.roomManager !== manager) return;
+        const now = Date.now();
         const currentKeys = new Set(slots.map((slot) => slot.peerId));
-        for (const key of stateStore.subscribedStreams) if (!currentKeys.has(key)) audioContextManager.detachPeerAudio(key);
+        const previousSlots = stateStore.roomSlots;
+        for (const key of stateStore.subscribedStreams) {
+          if (!currentKeys.has(key)) {
+            audioContextManager.detachPeerAudio(key);
+            const prevSlot = previousSlots.find((slot) => slot.peerId === key);
+            if (prevSlot && !prevSlot.isLocal) {
+              const ownerPeerId = prevSlot.ownerPeerId ?? streamOwner(prevSlot.peerId);
+              // Remember active watch selection briefly so a transient WebRTC hiccup
+              // auto-resumes watching when the peer reconnects seconds later.
+              if (!slots.some((slot) => !slot.isLocal && (slot.ownerPeerId ?? streamOwner(slot.peerId)) === ownerPeerId)) {
+                this.reconnectWatchMemory.set(key, {
+                  ownerPeerId,
+                  mediaKind: prevSlot.mediaKind,
+                  expiresAt: now + 15_000,
+                });
+              }
+            }
+          }
+        }
+        for (const [memKey, mem] of this.reconnectWatchMemory) {
+          if (mem.expiresAt <= now) this.reconnectWatchMemory.delete(memKey);
+        }
+        const restoredWatchKeys: string[] = [];
         for (const key of stateStore.activePipPeers) if (!currentKeys.has(key)) void pipService.restoreFromPip(key);
         let viewerStatePruned = false;
         const nextViewerStates = { ...this.remoteControlViewerStates };
@@ -687,10 +712,36 @@ export class RoomService {
           s.roomSlots = slots;
           s.localPreviewStreams = Object.fromEntries(Object.entries(s.localPreviewStreams)
             .filter(([key]) => slots.some((slot) => slot.isLocal && slot.isStreaming && slot.peerId === key)));
-          s.subscribedStreams = new Set([...s.subscribedStreams].filter((key) => currentKeys.has(key)));
+          const nextSubscribed = new Set([...s.subscribedStreams].filter((key) => currentKeys.has(key)));
+          if (this.reconnectWatchMemory.size > 0) {
+            for (const slot of slots) {
+              if (slot.isLocal || !slot.isStreaming || nextSubscribed.has(slot.peerId)) continue;
+              const ownerPeerId = slot.ownerPeerId ?? streamOwner(slot.peerId);
+              let matchedKey: string | null = null;
+              if (this.reconnectWatchMemory.has(slot.peerId)) {
+                matchedKey = slot.peerId;
+              } else {
+                for (const [memKey, mem] of this.reconnectWatchMemory) {
+                  if (mem.ownerPeerId === ownerPeerId && (!mem.mediaKind || mem.mediaKind === slot.mediaKind)) {
+                    matchedKey = memKey;
+                    break;
+                  }
+                }
+              }
+              if (matchedKey) {
+                this.reconnectWatchMemory.delete(matchedKey);
+                nextSubscribed.add(slot.peerId);
+                restoredWatchKeys.push(slot.peerId);
+              }
+            }
+          }
+          s.subscribedStreams = nextSubscribed;
           s.streamOverlays = Object.fromEntries(Object.entries(s.streamOverlays).filter(([target]) => currentKeys.has(target))
             .map(([target, keys]) => [target, keys.filter((key) => currentKeys.has(key))]));
         });
+        for (const key of restoredWatchKeys) {
+          manager.watchStream(key);
+        }
         if (manager.hasAdmission() && (isCreator || slots.some((slot) => !slot.isLocal))) this.hideConnecting();
       },
       onChat: (msg: ChatMessage) => {
@@ -783,6 +834,10 @@ export class RoomService {
       onStreamStopped: (peerId, _uname, isLocal) => {
         soundEffects.playScreenShareStop();
         if (!isLocal) {
+          const owner = streamOwner(peerId);
+          for (const [memKey, mem] of this.reconnectWatchMemory) {
+            if (memKey === peerId || mem.ownerPeerId === owner) this.reconnectWatchMemory.delete(memKey);
+          }
           this.stopRemoteControlViewer(peerId);
           if (stateStore.subscribedStreams.has(peerId)) {
             stateStore.set((s) => {
@@ -1873,6 +1928,7 @@ export class RoomService {
     }
     this.joinOutcome = 'idle';
     this.joinError = '';
+    this.reconnectWatchMemory.clear();
     for (const viewerSlotPeerId of Object.keys(this.remoteControlViewerStates)) {
       this.stopRemoteControlViewer(viewerSlotPeerId);
     }
@@ -2221,6 +2277,7 @@ export class RoomService {
   }
 
   public stopWatchingStream(peerId: string): void {
+    this.reconnectWatchMemory.delete(peerId);
     this.stopRemoteControlViewer(peerId);
     if (this.remoteCursorStates[peerId]) {
       const nextCursors = { ...this.remoteCursorStates };

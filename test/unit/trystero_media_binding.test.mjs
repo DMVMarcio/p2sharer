@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { SharedPeerManager } from '../../node_modules/@trystero-p2p/core/dist/shared-peer.mjs';
+import { getConnectedPeerHealth, SharedPeerManager } from '../../node_modules/@trystero-p2p/core/dist/shared-peer.mjs';
 
 function fixture(context) {
   const manager = new SharedPeerManager();
@@ -48,4 +48,16 @@ test('recovery rechecks real senders even when stream ownership is already regis
   assert.deepEqual(f.senders.map(sender => sender.track), [f.track]);
   current.addStream(f.stream);
   assert.equal(f.senders.length, 1);
+});
+
+test('connected peer health marks ICE-disconnected peers as transient so remote reconnects are not ignored', () => {
+  const base = {
+    isDead: false,
+    channel: { readyState: 'open' },
+    connection: { connectionState: 'connected', iceConnectionState: 'connected' },
+  };
+  assert.equal(getConnectedPeerHealth(base), 'live');
+  assert.equal(getConnectedPeerHealth({ ...base, connection: { connectionState: 'disconnected', iceConnectionState: 'connected' } }), 'transient');
+  assert.equal(getConnectedPeerHealth({ ...base, connection: { connectionState: 'connected', iceConnectionState: 'disconnected' } }), 'transient');
+  assert.equal(getConnectedPeerHealth({ ...base, connection: { connectionState: 'failed', iceConnectionState: 'failed' } }), 'stale');
 });
