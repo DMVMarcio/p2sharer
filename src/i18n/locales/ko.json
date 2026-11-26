@@ -1806,6 +1806,12 @@
   "inputBindings.confirmResetAllDesc": "모든 단축키, 개별 키 재매핑, 컨트롤러 프로필이 기본값으로 초기화됩니다.",
   "tictactoe.title": "틱택토",
   "tictactoe.description": "포근한 나무 보드에서 즐기는 틱택토. 여러 방에서 동시에 플레이하고 관전할 수 있습니다.",
+  "chess.exportPgn": "PGN 내보내기",
+  "chess.exportPgnTitle": "대국을 PGN으로 내보내기",
+  "chess.exportPgnSubtitle": "이 대국의 PGN 기보를 복사하거나 다운로드하세요.",
+  "chess.pgnCopied": "PGN 복사됨",
+  "chess.copyPgn": "PGN 복사",
+  "chess.downloadPgn": "PGN 다운로드",
   "chess.title": "체스",
   "chess.description": "정원 속 따뜻한 나무 체스판에서 여러 방의 대국과 실시간 관전을 즐겨보세요.",
   "chess.check": "체크!",
@@ -2117,5 +2123,13 @@
   "voice.micPermissionError": "마이크 접근이 거부되었습니다. 시스템 권한을 확인하고 다시 시도하세요.",
   "voice.micUnavailableError": "마이크를 열 수 없습니다.",
   "voice.mobileMic": "마이크 켜짐",
-  "voice.mobileMuted": "음소거됨"
+  "voice.mobileMuted": "음소거됨",
+  "chess.soloModeStatus": "혼자 하기 · 매 수마다 보드 방향 전환",
+  "games.roomLocked": "방 잠김",
+  "chess.reviewControls": "기보 검토 컨트롤",
+  "chess.reviewFirst": "첫 수",
+  "chess.reviewPrevious": "이전 수",
+  "chess.reviewNext": "다음 수",
+  "chess.reviewLatest": "현재 위치로 돌아가기",
+  "chess.reviewPosition": "전체 {{total}}수 중 {{move}}수 검토 중"
 }

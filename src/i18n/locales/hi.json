@@ -1806,6 +1806,12 @@
   "inputBindings.confirmResetAllDesc": "यह सभी शॉर्टकट, कुंजी रीमैपिंग और कंट्रोलर प्रोफ़ाइल को फ़ैक्टरी डिफ़ॉल्ट पर रीसेट कर देगा।",
   "tictactoe.title": "टिक-टैक-टो",
   "tictactoe.description": "कई कमरों और दर्शकों के साथ आरामदायक लकड़ी के बोर्ड पर टिक-टैक-टो खेलें।",
+  "chess.exportPgn": "PGN निर्यात करें",
+  "chess.exportPgnTitle": "खेल को PGN के रूप में निर्यात करें",
+  "chess.exportPgnSubtitle": "इस खेल की PGN चालों को कॉपी या डाउनलोड करें।",
+  "chess.pgnCopied": "PGN कॉपी किया गया",
+  "chess.copyPgn": "PGN कॉपी करें",
+  "chess.downloadPgn": "PGN डाउनलोड करें",
   "chess.title": "शतरंज",
   "chess.description": "बगीचे के शांत माहौल में लकड़ी के शतरंज बोर्ड पर कई टेबल और दर्शकों के साथ खेलें।",
   "chess.check": "शह (चेक)!",
@@ -2117,5 +2123,13 @@
   "voice.micPermissionError": "माइक्रोफ़ोन एक्सेस अस्वीकार किया गया। सिस्टम अनुमतियां जांचें और पुनः प्रयास करें।",
   "voice.micUnavailableError": "माइक्रोफ़ोन नहीं खोला जा सका।",
   "voice.mobileMic": "माइक चालू",
-  "voice.mobileMuted": "म्यूट"
+  "voice.mobileMuted": "म्यूट",
+  "chess.soloModeStatus": "एकल मोड · हर चाल के बाद बोर्ड पलटें",
+  "games.roomLocked": "कमरा लॉक है",
+  "chess.reviewControls": "चालों की समीक्षा के नियंत्रण",
+  "chess.reviewFirst": "पहली चाल",
+  "chess.reviewPrevious": "पिछली चाल",
+  "chess.reviewNext": "अगली चाल",
+  "chess.reviewLatest": "वर्तमान स्थिति पर लौटें",
+  "chess.reviewPosition": "{{total}} में से {{move}}वीं स्थिति की समीक्षा"
 }

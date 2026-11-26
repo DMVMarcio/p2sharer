@@ -1806,6 +1806,12 @@
   "inputBindings.confirmResetAllDesc": "这会将所有快捷键、按键重映射及手柄配置全部恢复为出厂默认值。",
   "tictactoe.title": "井字棋",
   "tictactoe.description": "在温馨的木制棋盘上进行井字棋对局，支持多房间同时进行与旁观。",
+  "chess.exportPgn": "导出 PGN",
+  "chess.exportPgnTitle": "将棋局导出为 PGN",
+  "chess.exportPgnSubtitle": "复制或下载此棋局的 PGN 记谱。",
+  "chess.pgnCopied": "已复制 PGN",
+  "chess.copyPgn": "复制 PGN",
+  "chess.downloadPgn": "下载 PGN",
   "chess.title": "国际象棋",
   "chess.description": "在花园木制棋盘旁对弈国际象棋，支持多房间并行对局与实时旁观。",
   "chess.check": "将军！",
@@ -2117,5 +2123,13 @@
   "voice.micPermissionError": "麦克风访问被拒绝，请检查系统权限后重试。",
   "voice.micUnavailableError": "无法打开麦克风。",
   "voice.mobileMic": "麦克风开",
-  "voice.mobileMuted": "已静音"
+  "voice.mobileMuted": "已静音",
+  "chess.soloModeStatus": "单人模式 · 每步棋后切换棋盘方向",
+  "games.roomLocked": "房间已锁定",
+  "chess.reviewControls": "复盘棋步控制",
+  "chess.reviewFirst": "第一步",
+  "chess.reviewPrevious": "上一步",
+  "chess.reviewNext": "下一步",
+  "chess.reviewLatest": "返回当前局面",
+  "chess.reviewPosition": "正在复盘第 {{move}} 步，共 {{total}} 步"
 }

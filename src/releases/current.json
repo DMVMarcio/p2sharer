@@ -4,67 +4,106 @@
     "en": [
       "**Automatic recovery for streams and connections.** Fixed rooms and screen shares getting stuck on connecting or falling out of sync after brief PC or network hiccups.",
       "**Lower-latency group calls and faster member appearance.** Direct connections are prioritized before relay fallback, and participants appear right away when joining.",
-      "**Clearer room entry when hosts are away.** Rooms now indicate when hosts or admins are offline and automatically restore owner access when rejoining your own invite."
+      "**Clearer room entry when hosts are away.** Rooms now indicate when hosts or admins are offline and automatically restore owner access when rejoining your own invite.",
+      "**Play chess solo.** Play both colors with individual clocks; the room reopens when you reset the score and closes when you leave.",
+      "**Export and review games.** Download completed games as PGN and review moves during play with four navigation buttons.",
+      "**Draw clearer chess arrows.** They follow straight or knight paths and appear when drawing is complete."
     ],
     "pt-BR": [
       "**Recuperação automática de transmissões e conexões.** Corrigido travamento em \"conectando transmissão\" e dessincronização na sala após picos rápidos de PC ou rede.",
       "**Menor latência em grupo e exibição imediata de membros.** Conexões diretas são priorizadas antes do servidor de apoio, e participantes aparecem na hora ao entrar.",
-      "**Entrada mais clara quando responsáveis estão ausentes.** A sala avisa se anfitrião e admins estão offline e restaura seu acesso ao entrar pelo próprio convite."
+      "**Entrada mais clara quando responsáveis estão ausentes.** A sala avisa se anfitrião e admins estão offline e restaura seu acesso ao entrar pelo próprio convite.",
+      "**Jogue xadrez solo.** Jogue com as duas cores e relógios por jogador; zerar o placar reabre a sala e sair a fecha.",
+      "**Exporte e revise partidas.** Baixe partidas concluídas em PGN e revise os lances durante o jogo com quatro botões.",
+      "**Setas de xadrez mais claras.** Elas seguem linhas retas ou trajetos de cavalo e aparecem ao concluir o desenho."
     ],
     "es": [
       "**Recuperación automática de transmisiones y conexiones.** Se corrigieron bloqueos al conectar transmisiones y desincronizaciones tras breves picos de PC o red.",
       "**Menor latencia en grupo y aparición inmediata de miembros.** Se priorizan conexiones directas antes del relevo y los participantes aparecen al instante al entrar.",
-      "**Entrada más clara cuando los responsables no están.** La sala avisa si anfitrión y admins están desconectados y restaura tu acceso al usar tu propia invitación."
+      "**Entrada más clara cuando los responsables no están.** La sala avisa si anfitrión y admins están desconectados y restaura tu acceso al usar tu propia invitación.",
+      "**Juega al ajedrez en solitario.** Juega con ambos colores y reloj por jugador; reiniciar el marcador reabre la mesa y salir la cierra.",
+      "**Exporta y repasa partidas.** Descarga partidas terminadas en PGN y repasa jugadas durante la partida con cuatro botones.",
+      "**Flechas de ajedrez más claras.** Siguen líneas rectas o recorridos de caballo y aparecen al terminar de dibujarlas."
     ],
     "fr": [
       "**Reprise automatique des flux et connexions.** Correction des flux bloqués en connexion et des désynchronisations du salon après un bref pic du PC ou du réseau.",
       "**Latence réduite en groupe et apparition immédiate des membres.** Les connexions directes sont privilégiées avant le relais et chacun s'affiche dès l'entrée.",
-      "**Entrée plus claire en l'absence des responsables.** Le salon indique si l'hôte et les admins sont hors ligne et restaure votre accès via votre propre invitation."
+      "**Entrée plus claire en l'absence des responsables.** Le salon indique si l'hôte et les admins sont hors ligne et restaure votre accès via votre propre invitation.",
+      "**Jouez seul aux échecs.** Jouez les deux couleurs avec un chronomètre par joueur ; réinitialiser le score rouvre la table, quitter la ferme.",
+      "**Exportez et révisez vos parties.** Téléchargez les parties terminées en PGN et révisez les coups en cours avec quatre boutons.",
+      "**Des flèches plus claires.** Elles suivent une ligne droite ou un trajet de cavalier et apparaissent une fois le tracé terminé."
     ],
     "de": [
       "**Automatische Erholung von Streams und Verbindungen.** Behoben, dass Streams beim Verbinden hängen blieben oder Räume nach kurzen PC- oder Netzlastspitzen asynchron wurden.",
       "**Geringere Gruppenlatenz und sofort sichtbare Mitglieder.** Direkte Verbindungen haben Vorrang vor Relays, und Teilnehmende erscheinen beim Beitritt sofort.",
-      "**Klarerer Beitritt bei abwesenden Verantwortlichen.** Räume zeigen an, wenn Host und Admins offline sind, und stellen den Zugriff für eigene Räume automatisch her."
+      "**Klarerer Beitritt bei abwesenden Verantwortlichen.** Räume zeigen an, wenn Host und Admins offline sind, und stellen den Zugriff für eigene Räume automatisch her.",
+      "**Spiele allein Schach.** Spiele beide Farben mit eigener Bedenkzeit. Beim Zurücksetzen öffnet sich der Tisch wieder, beim Verlassen wird er geschlossen.",
+      "**Exportiere und überprüfe Partien.** Lade beendete Partien als PGN herunter und gehe laufende Züge mit vier Schaltflächen durch.",
+      "**Klarere Schachpfeile.** Sie folgen geraden oder Springerzügen und erscheinen nach dem Zeichnen."
     ],
     "it": [
       "**Ripristino automatico di flussi e connessioni.** Risolti i blocchi in connessione degli schermi e la perdita di sincronia nella stanza dopo brevi picchi di PC o rete.",
       "**Minore latenza nei gruppi e membri subito visibili.** Le connessioni dirette hanno priorità sul relay e i partecipanti compaiono subito all'ingresso.",
-      "**Ingresso più chiaro quando i responsabili sono assenti.** La stanza segnala se host e admin sono offline e ripristina l'accesso entrando dal proprio invito."
+      "**Ingresso più chiaro quando i responsabili sono assenti.** La stanza segnala se host e admin sono offline e ripristina l'accesso entrando dal proprio invito.",
+      "**Gioca a scacchi da solo.** Gioca con entrambi i colori e il tempo per giocatore; azzerare il punteggio riapre il tavolo, uscire lo chiude.",
+      "**Esporta e rivedi le partite.** Scarica le partite concluse in PGN e rivedi le mosse durante la partita con quattro pulsanti.",
+      "**Frecce più chiare.** Seguono linee dritte o percorsi del cavallo e appaiono al termine del disegno."
     ],
     "zh-CN": [
       "**画面与连接自动恢复。** 修复了短暂电脑卡顿或网络波动后，共享画面一直停留在连接中或房间成员状态不同步的问题。",
       "**更低的多人通话延迟与即时成员显示。** 优先保持低延迟直连而非过早切换中继，加入房间时其他成员会立即显示。",
-      "**房主离线提示更清晰。** 当房主和管理员不在线时会明确提示，且通过自己的邀请链接进入时会自动恢复房主身份。"
+      "**房主离线提示更清晰。** 当房主和管理员不在线时会明确提示，且通过自己的邀请链接进入时会自动恢复房主身份。",
+      "**独自下棋。** 可操作双方棋子并使用各自计时；重置比分会重新开放棋桌，离开时关闭棋桌。",
+      "**导出并复盘棋局。** 下载已结束对局的 PGN，并在对局进行时用四个按钮回顾棋步。",
+      "**更清晰的棋盘箭头。** 箭头沿直线或马步路径绘制，并在完成后显示。"
     ],
     "zh-TW": [
       "**畫面與連線自動恢復。** 修復了短暫電腦卡頓或網路波動後，共享畫面一直停留在連線中或房間成員狀態不同步的問題。",
       "**更低的多人通話延遲與即時成員顯示。** 優先保持低延遲直連而非過早切換中繼，加入房間時其他成員會立即顯示。",
-      "**房主離線提示更清晰。** 當房主和管理員不在線時會明確提示，且透過自己的邀請連結進入時會自動恢復房主身分。"
+      "**房主離線提示更清晰。** 當房主和管理員不在線時會明確提示，且透過自己的邀請連結進入時會自動恢復房主身分。",
+      "**獨自下棋。** 可操作雙方棋子並使用各自計時；重設比分會重新開放棋桌，離開時關閉棋桌。",
+      "**匯出並回顧棋局。** 下載已結束對局的 PGN，並在對局進行時用四個按鈕回顧棋步。",
+      "**更清楚的棋盤箭頭。** 箭頭沿直線或騎士步法路徑繪製，並在完成後顯示。"
     ],
     "ja": [
       "**配信と接続の自動復旧を改善。** 一時的なPC負荷や通信の揺らぎ後に、画面共有が接続中のまま止まったり参加者状態がずれたりする問題を修正しました。",
       "**グループ通話の低遅延化と即時メンバー表示。** 中継への切り替え前に直接接続を優先し、入室時に他の参加者がすぐ表示されます。",
-      "**主催者不在時の案内を改善。** ホストや管理者がオフラインの際に分かりやすく通知し、自分の招待から入る際は主催者権限を自動復元します。"
+      "**主催者不在時の案内を改善。** ホストや管理者がオフラインの際に分かりやすく通知し、自分の招待から入る際は主催者権限を自動復元します。",
+      "**一人で対局できます。** 両方の色を操作でき、持ち時間にも対応。スコアをリセットすると再開放され、退出すると終了します。",
+      "**棋譜を出力して振り返れます。** 終了した対局をPGNでダウンロードし、対局中も4つのボタンで手を確認できます。",
+      "**チェスの矢印がより明確に。** 直線またはナイトの経路に沿って描かれ、描画完了後に表示されます。"
     ],
     "ko": [
       "**방송 및 연결 자동 복구 개선.** 일시적인 PC 부하나 네트워크 흔들림 이후 화면 공유가 연결 중 상태에서 멈추거나 참여자 상태가 어긋나던 문제를 수정했습니다。",
       "**그룹 통화 지연 감소 및 즉시 참가자 표시.** 릴레이 전환 전 직접 연결을 우선 유지하며 입장 즉시 다른 멤버가 바로 표시됩니다.",
-      "**방장 부재 시 안내 개선.** 호스트와 관리자가 오프라인일 때 명확히 알려 주며, 내 초대로 다시 입장할 때 방장 권한을 자동으로 복원합니다."
+      "**방장 부재 시 안내 개선.** 호스트와 관리자가 오프라인일 때 명확히 알려 주며, 내 초대로 다시 입장할 때 방장 권한을 자동으로 복원합니다.",
+      "**혼자 체스를 두세요.** 양쪽 말을 움직이고 각 색의 시간을 사용하세요. 점수 초기화 시 방이 다시 열리고 나가면 닫힙니다.",
+      "**기보를 내보내고 복기하세요.** 완료된 대국을 PGN으로 다운로드하고, 대국 중 네 버튼으로 수를 살펴보세요.",
+      "**더 명확한 체스 화살표.** 직선이나 나이트 경로를 따르며 그리기를 마치면 표시됩니다."
     ],
     "hi": [
       "**स्ट्रीम और कनेक्शन की स्वतः बहाली।** पीसी या नेटवर्क के हल्के झटके के बाद स्क्रीन शेयर के कनेक्टिंग पर अटकने और रूम स्थिति बिगड़ने की समस्या ठीक की गई।",
       "**ग्रुप कॉल में कम विलंबता और तुरंत सदस्य दिखना।** रिले से पहले सीधे कनेक्शन को प्राथमिकता मिलती है और जुड़ते ही सभी सदस्य तुरंत दिखाई देते हैं।",
-      "**होस्ट ऑफ़लाइन होने पर स्पष्ट जानकारी।** होस्ट और एडमिन ऑफ़लाइन होने पर रूम साफ़ सूचना देता है और अपने आमंत्रण से जुड़ने पर स्वामित्व स्वतः बहाल करता है।"
+      "**होस्ट ऑफ़लाइन होने पर स्पष्ट जानकारी।** होस्ट और एडमिन ऑफ़लाइन होने पर रूम साफ़ सूचना देता है और अपने आमंत्रण से जुड़ने पर स्वामित्व स्वतः बहाल करता है।",
+      "**अकेले शतरंज खेलें।** दोनों रंगों से खेलें और हर खिलाड़ी का समय इस्तेमाल करें। स्कोर रीसेट करने पर टेबल फिर खुलेगी; बाहर निकलने पर बंद होगी।",
+      "**बाज़ियाँ निर्यात करें और दोहराएँ।** पूरी बाज़ियाँ PGN में डाउनलोड करें और खेल के दौरान चार बटनों से चालें देखें।",
+      "**शतरंज के तीर स्पष्ट हैं।** वे सीधी रेखा या घोड़े के रास्ते चलते हैं और ड्रॉ पूरा होने पर दिखते हैं।"
     ],
     "fi": [
       "**Lähetysten ja yhteyksien automaattinen palautus.** Korjattiin tilanne, jossa näytönjako jäi yhdistämään tai huoneen tila meni epäsynkkaan lyhyen piikin jälkeen.",
       "**Pienempi viive ryhmissä ja välitön osallistujien näkyvyys.** Suoria yhteyksiä suositaan ennen välityspalvelinta ja jäsenet näkyvät heti liityttäessä.",
-      "**Selkeämpi liittyminen vastuuhenkilöiden ollessa poissa.** Huone kertoo, jos isäntä ja ylläpitäjät ovat poissa, ja palauttaa omistajan oikeudet omalla kutsulla."
+      "**Selkeämpi liittyminen vastuuhenkilöiden ollessa poissa.** Huone kertoo, jos isäntä ja ylläpitäjät ovat poissa, ja palauttaa omistajan oikeudet omalla kutsulla.",
+      "**Pelaa shakkia yksin.** Pelaa molemmilla väreillä ja käytä pelaajakohtaista aikaa. Pisteiden nollaus avaa pöydän, poistuminen sulkee sen.",
+      "**Vie ja tarkastele pelejä.** Lataa päättyneet pelit PGN-muodossa ja tarkastele siirtoja pelin aikana neljällä painikkeella.",
+      "**Selkeämmät shakkinuolet.** Ne seuraavat suoraa tai ratsun reittiä ja näkyvät piirtämisen valmistuttua."
     ],
     "ru": [
       "**Автовосстановление трансляций и связи.** Исправлено зависание показа экрана на подключении и рассинхронизация участников после кратковременных скачков ПК или сети.",
       "**Меньше задержка в группах и мгновенное появление участников.** Прямое соединение в приоритете перед ретрансляцией, а участники видны сразу при входе.",
-      "**Понятный вход, когда организаторы не в сети.** Комната сообщает, если хост и админы офлайн, а по своему приглашению автоматически возвращает права владельца."
+      "**Понятный вход, когда организаторы не в сети.** Комната сообщает, если хост и админы офлайн, а по своему приглашению автоматически возвращает права владельца.",
+      "**Играйте в шахматы в одиночку.** Играйте за оба цвета с отдельным временем. Сброс счёта открывает стол, выход закрывает его.",
+      "**Экспортируйте и просматривайте партии.** Скачивайте завершённые партии в PGN и просматривайте ходы во время игры четырьмя кнопками.",
+      "**Более понятные стрелки.** Они идут по прямой или по ходу коня и появляются после завершения рисования."
     ]
   }
 }

@@ -1806,6 +1806,12 @@
   "inputBindings.confirmResetAllDesc": "Dadurch werden alle Kürzel, Tasten-Neubelegungen und Controller-Profile auf Standardwerte zurückgesetzt.",
   "tictactoe.title": "Tic-Tac-Toe",
   "tictactoe.description": "Spiele gemütliches Tic-Tac-Toe auf Holzbrettern mit mehreren Räumen und Zuschauern.",
+  "chess.exportPgn": "PGN exportieren",
+  "chess.exportPgnTitle": "Partie als PGN exportieren",
+  "chess.exportPgnSubtitle": "Kopiere oder lade die PGN-Notation dieser Partie herunter.",
+  "chess.pgnCopied": "PGN kopiert",
+  "chess.copyPgn": "PGN kopieren",
+  "chess.downloadPgn": "PGN herunterladen",
   "chess.title": "Schach",
   "chess.description": "Spielt Schach am warmen Holzbrett im Garten mit mehreren Tischen und Live-Zuschauern.",
   "chess.check": "Schach!",
@@ -2117,5 +2123,13 @@
   "voice.micPermissionError": "Mikrofonzugriff verweigert. Prüfe die Systemberechtigungen und versuche es erneut.",
   "voice.micUnavailableError": "Mikrofon konnte nicht geöffnet werden.",
   "voice.mobileMic": "Mikro an",
-  "voice.mobileMuted": "Stumm"
+  "voice.mobileMuted": "Stumm",
+  "chess.soloModeStatus": "Einzelspiel · nach jedem Zug die Seite wechseln",
+  "games.roomLocked": "Gesperrt",
+  "chess.reviewControls": "Steuerung zum Überprüfen der Züge",
+  "chess.reviewFirst": "Erster Zug",
+  "chess.reviewPrevious": "Vorheriger Zug",
+  "chess.reviewNext": "Nächster Zug",
+  "chess.reviewLatest": "Zur aktuellen Stellung zurückkehren",
+  "chess.reviewPosition": "Stellung {{move}} von {{total}} wird überprüft"
 }

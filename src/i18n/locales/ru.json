@@ -1806,6 +1806,12 @@
   "inputBindings.confirmResetAllDesc": "Все сочетания, переназначения клавиш и профили геймпадов будут сброшены к заводским настройкам.",
   "tictactoe.title": "Крестики-нолики",
   "tictactoe.description": "Уютные крестики-нолики на деревянной доске с несколькими комнатами и зрителями.",
+  "chess.exportPgn": "Экспорт PGN",
+  "chess.exportPgnTitle": "Экспортировать партию в PGN",
+  "chess.exportPgnSubtitle": "Скопируйте или скачайте запись этой партии в формате PGN.",
+  "chess.pgnCopied": "PGN скопирован",
+  "chess.copyPgn": "Копировать PGN",
+  "chess.downloadPgn": "Скачать PGN",
   "chess.title": "Шахматы",
   "chess.description": "Собирайтесь за тёплой деревянной шахматной доской с несколькими столами и зрителями.",
   "chess.check": "Шах!",
@@ -2117,5 +2123,13 @@
   "voice.micPermissionError": "Доступ к микрофону отклонён. Проверьте системные разрешения и повторите попытку.",
   "voice.micUnavailableError": "Не удалось открыть микрофон.",
   "voice.mobileMic": "Микр. вкл.",
-  "voice.mobileMuted": "Без звука"
+  "voice.mobileMuted": "Без звука",
+  "chess.soloModeStatus": "Одиночный режим · меняйте сторону после каждого хода",
+  "games.roomLocked": "Комната закрыта",
+  "chess.reviewControls": "Управление просмотром ходов",
+  "chess.reviewFirst": "Первый ход",
+  "chess.reviewPrevious": "Предыдущий ход",
+  "chess.reviewNext": "Следующий ход",
+  "chess.reviewLatest": "Вернуться к текущей позиции",
+  "chess.reviewPosition": "Просмотр позиции {{move}} из {{total}}"
 }

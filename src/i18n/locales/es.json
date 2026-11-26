@@ -1806,6 +1806,12 @@
   "inputBindings.confirmResetAllDesc": "Esto restablecerá todos los atajos, reasignaciones de teclas y perfiles de mando a los valores de fábrica.",
   "tictactoe.title": "Tres en Raya",
   "tictactoe.description": "Juega partidas acogedoras en tableros de madera con múltiples salas y espectadores.",
+  "chess.exportPgn": "Exportar PGN",
+  "chess.exportPgnTitle": "Exportar partida como PGN",
+  "chess.exportPgnSubtitle": "Copia o descarga la notación PGN de esta partida.",
+  "chess.pgnCopied": "PGN copiado",
+  "chess.copyPgn": "Copiar PGN",
+  "chess.downloadPgn": "Descargar PGN",
   "chess.title": "Ajedrez",
   "chess.description": "Reúnete frente a un cálido tablero de madera con varias mesas y espectadores en vivo.",
   "chess.check": "¡Jaque!",
@@ -2117,5 +2123,13 @@
   "voice.micPermissionError": "Se denegó el acceso al micrófono. Revisa los permisos del sistema e inténtalo de nuevo.",
   "voice.micUnavailableError": "No se pudo abrir el micrófono.",
   "voice.mobileMic": "Mic activo",
-  "voice.mobileMuted": "Silenciado"
+  "voice.mobileMuted": "Silenciado",
+  "chess.soloModeStatus": "Modo individual · cambia de lado tras cada movimiento",
+  "games.roomLocked": "Sala bloqueada",
+  "chess.reviewControls": "Controles para revisar las jugadas",
+  "chess.reviewFirst": "Primera jugada",
+  "chess.reviewPrevious": "Jugada anterior",
+  "chess.reviewNext": "Jugada siguiente",
+  "chess.reviewLatest": "Volver a la posición actual",
+  "chess.reviewPosition": "Revisando la posición {{move}} de {{total}}"
 }

@@ -41,6 +41,7 @@ export interface BoardGameRoomState<TGame> {
   id: string;
   name: string;
   createdBy: string;
+  lockedBy?: string;
   createdAt: number;
   updatedAt: number;
   players: {
@@ -77,6 +78,7 @@ function validBoardGameRoom<TGame>(
   if (!validRoomId(r.id)) return false;
   if (typeof r.name !== 'string' || !r.name.trim() || r.name.length > MAX_ROOM_NAME) return false;
   if (!validActorId(r.createdBy)) return false;
+  if (r.lockedBy !== undefined && !validActorId(r.lockedBy)) return false;
   if (!Number.isFinite(r.createdAt) || !Number.isFinite(r.updatedAt)) return false;
   if (!r.players || typeof r.players !== 'object') return false;
   if (r.players.seat1 !== null && !validActorId(r.players.seat1)) return false;
@@ -197,7 +199,7 @@ export class BoardGameLobbyModel<TGame> implements RoomAppModel {
   joinRole(roomId: string, role: 'seat1' | 'seat2' | 'spectator'): boolean {
     const room = this.getRoom(roomId);
     const actor = this.localActor;
-    if (!room || !actor) return false;
+    if (!room || !actor || (room.lockedBy && room.lockedBy !== actor)) return false;
 
     const nextPlayers = { ...room.players };
     const nextSpectators = room.spectators.filter((id) => id !== actor);
@@ -545,7 +547,7 @@ export class TimedBoardGameModel<TGame extends TimedBoardGameState> extends Boar
     const actor = this.localActor;
     return this.updateGame(roomId, (room) => {
       const expectedActor = room.game.turn === 'w' ? room.players.seat1 : room.players.seat2;
-      if (!actor || expectedActor !== actor) return null;
+      if (!actor || (expectedActor !== actor && room.lockedBy !== actor)) return null;
       const { clock } = room.game;
       if (!clock || room.game.status !== 'playing' || room.game.moveHistory.length === 0) return null;
 
@@ -579,6 +581,7 @@ export class TimedBoardGameModel<TGame extends TimedBoardGameState> extends Boar
       const isPlayer =
         room.players.seat1 === actor ||
         room.players.seat2 === actor ||
+        room.lockedBy === actor ||
         (room.createdBy === actor && (!room.players.seat1 || !room.players.seat2));
       if (!isPlayer) return null;
 
@@ -644,18 +647,23 @@ export class TimedBoardGameModel<TGame extends TimedBoardGameState> extends Boar
 
   newGame(roomId: string, resetScores = false): boolean {
     const actor = this.localActor;
-    return this.updateGame(roomId, (room) => {
-      if (!actor) return null;
-      const isPlayer = room.players.seat1 === actor || room.players.seat2 === actor || room.createdBy === actor;
-      if (!isPlayer && room.players.seat1 && room.players.seat2) return null;
-      const limitMs = room.game.clock?.limitMs ?? null;
-      const nextSeq = (room.game.clock?.syncSeq ?? 0) + 1;
-      return this.hooks.createInitial(
+    const room = this.getRoom(roomId);
+    if (!room || !actor) return false;
+    const isPlayer = room.players.seat1 === actor || room.players.seat2 === actor || room.createdBy === actor;
+    if (!isPlayer && room.players.seat1 && room.players.seat2) return false;
+    const limitMs = room.game.clock?.limitMs ?? null;
+    const nextSeq = (room.game.clock?.syncSeq ?? 0) + 1;
+    this.writeRoom({
+      ...room,
+      ...(resetScores && this.kind === 'chess' ? { lockedBy: undefined } : {}),
+      game: this.hooks.createInitial(
         resetScores ? { w: 0, b: 0, draws: 0 } : room.game.scores,
         limitMs,
         nextSeq,
-      );
+      ),
+      updatedAt: Date.now(),
     });
+    return true;
   }
 
   swapSides(roomId: string): boolean {
@@ -695,12 +703,28 @@ export class ChessModel extends TimedBoardGameModel<ChessGameState> {
     now = Date.now(),
   ): boolean {
     const actor = this.localActor;
-    return this.updateGame(roomId, (room) => {
-      const expectedActor = room.game.turn === 'w' ? room.players.seat1 : room.players.seat2;
-      if (!actor || expectedActor !== actor) return null;
-      const elapsedMs = this.getElapsedMsForTurn(room, now);
-      return applyChessMove(room.game, from, to, promotion, { now, elapsedMs });
+    const room = this.getRoom(roomId);
+    if (!room || !actor || room.game.status !== 'playing') return false;
+    const isSoloOwner = room.lockedBy === actor;
+    const shouldLockForSolo = !room.lockedBy && room.game.moveHistory.length === 0 &&
+      room.players.seat1 === actor && room.players.seat2 === null && room.spectators.length === 0;
+    const expectedActor = room.game.turn === 'w' ? room.players.seat1 : room.players.seat2;
+    if (expectedActor !== actor && !isSoloOwner) return false;
+    const elapsedMs = this.getElapsedMsForTurn(room, now);
+    const nextGame = applyChessMove(room.game, from, to, promotion, { now, elapsedMs });
+    if (!nextGame || !validChessState(nextGame)) return false;
+    this.writeRoom({
+      ...room,
+      lockedBy: shouldLockForSolo ? actor : room.lockedBy,
+      game: shouldLockForSolo ? {
+        ...nextGame,
+        clock: nextGame.clock
+          ? { ...nextGame.clock, syncSeq: nextGame.clock.syncSeq + 1 }
+          : null,
+      } : nextGame,
+      updatedAt: now,
     });
+    return true;
   }
 }
 

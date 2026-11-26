@@ -1806,6 +1806,12 @@
   "inputBindings.confirmResetAllDesc": "すべてのショートカット、個別キー、およびコントローラー設定を初期状態に戻します。",
   "tictactoe.title": "三目並べ",
   "tictactoe.description": "温かみのある木製ボードで三目並べ。複数のルーム作成や観戦に対応しています。",
+  "chess.exportPgn": "PGNをエクスポート",
+  "chess.exportPgnTitle": "棋譜をPGNでエクスポート",
+  "chess.exportPgnSubtitle": "この対局のPGN記法をコピーまたはダウンロードします。",
+  "chess.pgnCopied": "PGNをコピーしました",
+  "chess.copyPgn": "PGNをコピー",
+  "chess.downloadPgn": "PGNをダウンロード",
   "chess.title": "チェス",
   "chess.description": "ガーデンの木製チェス盤で対局。複数のテーブルとリアルタイム観戦を楽しめます。",
   "chess.check": "チェック！",
@@ -2117,5 +2123,13 @@
   "voice.micPermissionError": "マイクへのアクセスが拒否されました。システムの権限を確認して再試行してください。",
   "voice.micUnavailableError": "マイクを開けませんでした。",
   "voice.mobileMic": "マイクオン",
-  "voice.mobileMuted": "ミュート"
+  "voice.mobileMuted": "ミュート",
+  "chess.soloModeStatus": "ソロモード · 毎手ごとに盤面を反転",
+  "games.roomLocked": "ルームはロックされています",
+  "chess.reviewControls": "棋譜確認コントロール",
+  "chess.reviewFirst": "最初の手",
+  "chess.reviewPrevious": "前の手",
+  "chess.reviewNext": "次の手",
+  "chess.reviewLatest": "現在の局面に戻る",
+  "chess.reviewPosition": "{{total}} 手中 {{move}} 手目を確認中"
 }

@@ -1806,6 +1806,12 @@
   "inputBindings.confirmResetAllDesc": "Tutte le scorciatoie, le rimappature dei tasti e i profili controller verranno reimpostati.",
   "tictactoe.title": "Tris",
   "tictactoe.description": "Gioca a Tris su un accogliente tavolo in legno con più stanze e spettatori.",
+  "chess.exportPgn": "Esporta PGN",
+  "chess.exportPgnTitle": "Esporta la partita come PGN",
+  "chess.exportPgnSubtitle": "Copia o scarica la notazione PGN di questa partita.",
+  "chess.pgnCopied": "PGN copiato",
+  "chess.copyPgn": "Copia PGN",
+  "chess.downloadPgn": "Scarica PGN",
   "chess.title": "Scacchi",
   "chess.description": "Ritrovati attorno a una scacchiera in legno nel giardino con più tavoli e spettatori.",
   "chess.check": "Scacco!",
@@ -2117,5 +2123,13 @@
   "voice.micPermissionError": "Accesso al microfono negato. Controlla i permessi di sistema e riprova.",
   "voice.micUnavailableError": "Impossibile aprire il microfono.",
   "voice.mobileMic": "Mic attivo",
-  "voice.mobileMuted": "Muto"
+  "voice.mobileMuted": "Muto",
+  "chess.soloModeStatus": "Modalità in solitaria · cambia lato dopo ogni mossa",
+  "games.roomLocked": "Stanza bloccata",
+  "chess.reviewControls": "Comandi per rivedere le mosse",
+  "chess.reviewFirst": "Prima mossa",
+  "chess.reviewPrevious": "Mossa precedente",
+  "chess.reviewNext": "Mossa successiva",
+  "chess.reviewLatest": "Torna alla posizione attuale",
+  "chess.reviewPosition": "Revisione della posizione {{move}} di {{total}}"
 }

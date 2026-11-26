@@ -1806,6 +1806,12 @@
   "inputBindings.confirmResetAllDesc": "Tämä nollaa kaikki pikanäppäimet, näppäinmääritykset ja ohjainprofiilit tehdasasetuksiin.",
   "tictactoe.title": "Ristinolla",
   "tictactoe.description": "Pelaa kodikasta ristinollaa puulaudalla useissa huoneissa katsojien kanssa.",
+  "chess.exportPgn": "Vie PGN",
+  "chess.exportPgnTitle": "Vie peli PGN-muodossa",
+  "chess.exportPgnSubtitle": "Kopioi tai lataa tämän pelin PGN-merkintä.",
+  "chess.pgnCopied": "PGN kopioitu",
+  "chess.copyPgn": "Kopioi PGN",
+  "chess.downloadPgn": "Lataa PGN",
   "chess.title": "Shakki",
   "chess.description": "Kokoontukaa lämpimän puisen shakkilaudan äärelle useissa pöydissä.",
   "chess.check": "Shakki!",
@@ -2117,5 +2123,13 @@
   "voice.micPermissionError": "Mikrofonin käyttö estettiin. Tarkista järjestelmän käyttöoikeudet ja yritä uudelleen.",
   "voice.micUnavailableError": "Mikrofonin avaaminen epäonnistui.",
   "voice.mobileMic": "Mikro päällä",
-  "voice.mobileMuted": "Mykistetty"
+  "voice.mobileMuted": "Mykistetty",
+  "chess.soloModeStatus": "Yksinpeli · vaihda puolta jokaisen siirron jälkeen",
+  "games.roomLocked": "Huone lukittu",
+  "chess.reviewControls": "Siirtojen tarkastelun ohjaimet",
+  "chess.reviewFirst": "Ensimmäinen siirto",
+  "chess.reviewPrevious": "Edellinen siirto",
+  "chess.reviewNext": "Seuraava siirto",
+  "chess.reviewLatest": "Palaa nykyiseen asemaan",
+  "chess.reviewPosition": "Tarkastellaan asemaa {{move}} / {{total}}"
 }

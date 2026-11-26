@@ -1806,6 +1806,12 @@
   "inputBindings.confirmResetAllDesc": "Cette action réinitialisera tous les raccourcis, touches remappées et profils de manette.",
   "tictactoe.title": "Morpion",
   "tictactoe.description": "Jouez au morpion sur un plateau en bois chaleureux avec plusieurs salons et spectateurs.",
+  "chess.exportPgn": "Exporter le PGN",
+  "chess.exportPgnTitle": "Exporter la partie en PGN",
+  "chess.exportPgnSubtitle": "Copiez ou téléchargez la notation PGN de cette partie.",
+  "chess.pgnCopied": "PGN copié",
+  "chess.copyPgn": "Copier le PGN",
+  "chess.downloadPgn": "Télécharger le PGN",
   "chess.title": "Échecs",
   "chess.description": "Retrouvez-vous autour d’un échiquier en bois avec plusieurs tables et spectateurs en direct.",
   "chess.check": "Échec !",
@@ -2117,5 +2123,13 @@
   "voice.micPermissionError": "L'accès au microphone a été refusé. Vérifiez les autorisations système et réessayez.",
   "voice.micUnavailableError": "Impossible d'ouvrir le microphone.",
   "voice.mobileMic": "Micro actif",
-  "voice.mobileMuted": "Coupé"
+  "voice.mobileMuted": "Coupé",
+  "chess.soloModeStatus": "Mode solo · changez de côté après chaque coup",
+  "games.roomLocked": "Salle verrouillée",
+  "chess.reviewControls": "Commandes de révision des coups",
+  "chess.reviewFirst": "Premier coup",
+  "chess.reviewPrevious": "Coup précédent",
+  "chess.reviewNext": "Coup suivant",
+  "chess.reviewLatest": "Revenir à la position actuelle",
+  "chess.reviewPosition": "Révision de la position {{move}} sur {{total}}"
 }

@@ -864,6 +864,31 @@
   aspect-ratio: 1;
 }
 
+.cozy-board-stage.has-chess-review-controls .chess-wood-frame {
+  width: min(100%, calc(100cqh - 68px), calc(100cqw - 292px));
+}
+
+.chess-review-controls {
+  display: flex;
+  flex: 0 0 auto;
+  justify-content: center;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.chess-review-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 48px;
+  height: 40px;
+}
+
+.chess-review-button:focus-visible {
+  outline: 2px solid #fae9ce;
+  outline-offset: 3px;
+}
+
 .ttt-wood-frame {
   width: min(100%, calc(100cqh - 18px), calc(100cqw - 292px));
   max-width: 640px;
@@ -1137,6 +1162,14 @@
 }
 .cozy-piece-slot.is-returning.is-from-outside {
   animation-name: cozyPieceReturnFromOutside;
+}
+.cozy-piece-slot.is-review-moving {
+  z-index: 7;
+  animation: chessReviewMove 280ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+@keyframes chessReviewMove {
+  from { transform: translate(var(--piece-from-x), var(--piece-from-y)); }
+  to { transform: translate(0, 0); }
 }
 @keyframes cozyPieceReturn {
   0% {
@@ -1455,6 +1488,11 @@
   color: rgba(248, 233, 206, 0.72);
   font-style: italic;
 }
+.cozy-seat-open-label.is-locked {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
 
 .cozy-wood-seat-btn {
   display: inline-flex;
@@ -1624,6 +1662,18 @@
   gap: 6px;
   border-top: 1px solid rgba(222, 184, 135, 0.18);
   padding-top: 6px;
+}
+
+.cozy-pgn-export {
+  align-self: flex-start;
+}
+
+.chess-pgn-preview {
+  min-height: 260px;
+  resize: vertical;
+  font-family: var(--font-mono);
+  line-height: 1.55;
+  white-space: pre;
 }
 
 .cozy-moves-list {
@@ -1801,6 +1851,9 @@
   .checkers-wood-frame {
     width: min(100%, 78cqh, 94cqw);
   }
+  .cozy-board-stage.has-chess-review-controls .chess-wood-frame {
+    width: min(100%, calc(78cqh - 50px), 94cqw);
+  }
   .ttt-wood-frame {
     width: min(100%, 70cqh, 88cqw);
   }
@@ -1900,6 +1953,7 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
+  .cozy-piece-slot.is-review-moving { animation: none; }
   .cozy-piece-slot.is-returning,
   .cozy-piece-slot.is-returning.is-from-outside,
   .ttt-wood-cell.is-resetting,
