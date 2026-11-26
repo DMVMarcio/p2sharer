@@ -135,6 +135,8 @@ export function useRoom() {
     isInRoom: roomSlots.length > 0 && Boolean(currentRoomCode),
     isRoomHost: roomService.isRoomHost(),
     isRoomAdmin: roomService.isRoomAdmin(),
+    isWaitingForAdmission: roomService.isWaitingForAdmission(),
+    isAdmitterOnline: roomService.isAdmitterOnline(),
     remoteControlRequests: roomService.remoteControlRequests,
     remoteControlElevationRequests: roomService.remoteControlElevationRequests,
     remoteControllers: roomService.remoteControllers,

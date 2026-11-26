@@ -25,7 +25,7 @@ import { useClipboardFeedback } from '../../hooks/useClipboardFeedback';
 export const AppHeader: React.FC<{ showUpdate?: boolean; homeScrolled?: boolean; onLeaveRoom: () => void }> = ({ showUpdate = true, homeScrolled = false, onLeaveRoom }) => {
   useLocale();
   const openContextMenu = useContextMenu();
-  const { currentRoomCode, currentRoomInvite, currentRoomName, currentRoomPassword, username, isInRoom } = useRoom();
+  const { currentRoomCode, currentRoomInvite, currentRoomName, currentRoomPassword, username, isInRoom, isWaitingForAdmission, isAdmitterOnline } = useRoom();
   const { openModal } = useModal();
   const [savedRecord, setSavedRecord] = useState<SavedRoom | null>(null);
   const [savingRoom, setSavingRoom] = useState(false);
@@ -34,6 +34,11 @@ export const AppHeader: React.FC<{ showUpdate?: boolean; homeScrolled?: boolean;
   const shortInvite = useClipboardFeedback(invitation?.roomId ?? '');
   const webInvite = useClipboardFeedback(websiteUrl(webRoomPath(invitation?.roomId)));
   const inviteCopied = copied || shortInvite.copied || webInvite.copied;
+  const notifyIfWaitingForHost = () => {
+    if (isWaitingForAdmission && !isAdmitterOnline) {
+      showToast(t('room.inviteHostOfflineWarning'), 5000, 'warning');
+    }
+  };
 
   useEffect(() => {
     const roomId = parseRoomInvite(currentRoomInvite)?.roomId;
@@ -104,12 +109,12 @@ export const AppHeader: React.FC<{ showUpdate?: boolean; homeScrolled?: boolean;
                 { id: 'short-invite', label: t('invite.short'), icon: <Copy size={15} />,
                   disabled: !invitation || (invitation.version !== 3 && Boolean(invitation.connection)),
                   tooltip: invitation && invitation.version !== 3 && invitation.connection ? t('invite.shortLan') : t('invite.shortHint'),
-                  onSelect: () => shortInvite.copy() },
+                  onSelect: () => { shortInvite.copy(); notifyIfWaitingForHost(); } },
                 { id: 'signed-invite', label: t('invite.signed'), icon: <LockKeyhole size={15} />,
-                  onSelect: () => copy() },
+                  onSelect: () => { copy(); notifyIfWaitingForHost(); } },
                 { id: 'web-invite', label: t('invite.webLink'), icon: <Link size={15} />,
                   disabled: !invitation || (invitation.version !== 3 && Boolean(invitation.connection)),
-                  tooltip: t('invite.shortHint'), onSelect: () => webInvite.copy() },
+                  tooltip: t('invite.shortHint'), onSelect: () => { webInvite.copy(); notifyIfWaitingForHost(); } },
               ], { toggle: true })}
               aria-label={inviteCopied ? t('header.copied') : t('header.invite')}>
               <span className="header-invite-icon" key={inviteCopied ? 'copied' : 'invite'}>

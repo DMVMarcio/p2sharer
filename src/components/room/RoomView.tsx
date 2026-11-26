@@ -10,12 +10,15 @@ import { RoomSidebar } from './RoomSidebar';
 import { MobileRoomDock } from './MobileRoomDock';
 import { ChatFileRequests } from './ChatFileRequests';
 import { useRoom } from '../../hooks/useRoom';
+import { useModal } from '../../hooks/useModal';
 import { useIsMobile } from '../../hooks/useIsMobile';
 import { stateStore } from '../../core/state_store';
+import { AlertTriangle, Plus } from 'lucide-react';
 
 export const RoomView: React.FC = () => {
   useLocale();
-  const { isSidebarCollapsed, toggleSidebar, unreadChatMessages } = useRoom();
+  const { isSidebarCollapsed, toggleSidebar, unreadChatMessages, isWaitingForAdmission, isAdmitterOnline, connectingOverlay } = useRoom();
+  const { openModal } = useModal();
   const layoutRef = useRef<HTMLDivElement>(null);
   const edgeRef = useRef<HTMLDivElement>(null);
   const isMobile = useIsMobile();
@@ -85,6 +88,22 @@ export const RoomView: React.FC = () => {
       >
         <div className="stream-area">
           <StreamHeaderBar />
+          {isWaitingForAdmission && !isAdmitterOnline && !connectingOverlay.visible && (
+            <div className="room-waiting-host-banner" role="status" aria-live="polite">
+              <div className="room-waiting-host-banner-copy">
+                <AlertTriangle size={16} aria-hidden="true" />
+                <span>{t('room.waitingHostBanner')}</span>
+              </div>
+              <button
+                type="button"
+                className="btn btn-primary btn-sm"
+                onClick={() => openModal('createRoom')}
+              >
+                <Plus size={14} aria-hidden="true" />
+                <span>{t('room.waitingHostCreateAction')}</span>
+              </button>
+            </div>
+          )}
           <RoomVideoContainer />
           <MobileRoomDock />
         </div>

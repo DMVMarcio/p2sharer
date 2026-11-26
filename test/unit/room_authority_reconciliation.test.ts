@@ -379,6 +379,69 @@ test('relayed admission admits indirect newcomers through an admitted peer while
     assert.equal(newcomerManager.getConnectedPeers().some((peer) => peer.id === 'member'), true,
       'relayed newcomer must accept trusted sync and display its relay peer');
 
+    // Admitted indirect peer reported via peer_exchange appears immediately as 'connecting'
+    // (and stays visible across onPeerJoin handoff until direct presence arrives), while strangers stay hidden.
+    const thirdPeerAuth = await PeerAuthenticator.create(invite.roomId, 'third-peer');
+    const strangerAuth = await PeerAuthenticator.create(invite.roomId, 'stranger-peer');
+    const thirdAdmitCmd = await hostAuthority.makeCommand('admit', {
+      targetPeerId: 'third-peer',
+      targetKey: thirdPeerAuth.publicKey,
+    });
+    let latestNewcomerVoice: Record<string, { inVoice: boolean; muted: boolean; deafened: boolean }> = {};
+    (newcomerManager as any).callbacks.onVoiceStateUpdate = (states: typeof latestNewcomerVoice) => {
+      latestNewcomerVoice = states;
+    };
+    await newcomerNet.actions.get('room_admission')!.onMessage!(
+      { kind: 'command', command: thirdAdmitCmd },
+      { peerId: 'member' },
+    );
+    await newcomerNet.actions.get('peer_exchange')!.onMessage!({
+      peers: [
+        {
+          peerId: 'third-peer',
+          username: 'Uai, Zé',
+          isStreaming: false,
+          isCreator: false,
+          joinedAt: Date.now(),
+          publicKey: thirdPeerAuth.publicKey,
+          inVoice: true,
+          voiceMuted: false,
+          voiceDeafened: false,
+        },
+        {
+          peerId: 'stranger-peer',
+          username: 'UnadmittedStranger',
+          isStreaming: false,
+          isCreator: false,
+          joinedAt: Date.now(),
+          publicKey: strangerAuth.publicKey,
+          inVoice: true,
+        },
+      ],
+    }, { peerId: 'member' });
+
+    const connectingThird = newcomerManager.getConnectedPeers().find((peer) => peer.id === 'third-peer');
+    assert.ok(connectingThird, 'admitted indirect peer must appear immediately before 1-to-1 WebRTC finishes');
+    assert.equal(connectingThird.connectionState, 'connecting');
+    assert.equal(connectingThird.username, 'Uai, Zé');
+    assert.equal(newcomerManager.getAllRoomSlots().some((slot) => slot.peerId === 'third-peer' && slot.connectionState === 'connecting'), true);
+    assert.equal(latestNewcomerVoice['third-peer']?.inVoice, true, 'indirect admitted peer voice presence surfaces immediately');
+    assert.equal(newcomerManager.getConnectedPeers().some((peer) => peer.id === 'stranger-peer'), false,
+      'unadmitted PEX rumors must never appear in the room roster');
+
+    // Direct WebRTC connects: peer must stay visible (not blink out) while identity/presence completes.
+    (newcomerNet.room.getPeers() as Record<string, object>)['third-peer'] = {};
+    newcomerNet.room.onPeerJoin('third-peer');
+    assert.equal(newcomerManager.getConnectedPeers().some((peer) => peer.id === 'third-peer'), true,
+      'indirect peer must not disappear during direct WebRTC identity handshake');
+    await verifyDirectPeer(newcomerNet.actions, newcomerNet.sent, 'third-peer', thirdPeerAuth);
+    await newcomerNet.actions.get('presence')!.onMessage!({ username: 'Uai, Zé' }, { peerId: 'third-peer' });
+    assert.equal(
+      newcomerManager.getConnectedPeers().find((peer) => peer.id === 'third-peer')?.connectionState,
+      'connected',
+      'peer upgrades cleanly from connecting to connected once direct presence arrives',
+    );
+
     // Banned keys must still be rejected on relay-request
     const bannedAuth = await PeerAuthenticator.create(invite.roomId, 'banned-peer');
     (hostManager as any).bannedKeys.add(bannedAuth.publicKey);

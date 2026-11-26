@@ -33,8 +33,10 @@ export function JoinRoomModal() {
   const [isSavedRoom, setIsSavedRoom] = useState(() => Boolean(roomService.pendingJoinAsOwner));
   const [saveRoomOnJoin, setSaveRoomOnJoin] = useState(false);
   const [trustSummary, setTrustSummary] = useState<{ roomName?: string; roomCode: string; isShort: boolean } | null>(null);
+  const [admitterOffline, setAdmitterOffline] = useState(false);
   const [error, setError] = useState(() => localizeText(retryError.current));
   const owner = useRef(roomService.pendingJoinAsOwner);
+  const ownedRoomRecord = useRef(Boolean(roomService.pendingJoinAsOwner));
   const session = useRef<{ manager: GroupRoomManager; ready: Promise<void>; release?: Promise<void> } | null>(null);
   const mounted = useRef(true);
   const joining = useRef(Boolean(retryError.current));
@@ -67,9 +69,23 @@ export function JoinRoomModal() {
   }, [phase, joinOutcome, joinError, closeModal]);
   useEffect(() => {
     if (phase !== 'searching' && phase !== 'preview') return;
-    const interval = setInterval(() => session.current?.manager.requestPreview(), 2500);
+    const syncAdmitterState = () => {
+      const mgr = session.current?.manager;
+      if (!mgr || !mounted.current) return;
+      if (!owner.current && !ownedRoomRecord.current && mgr.hasVerifiedIdentityPeers() && !mgr.hasAdmitterOnline()) {
+        setAdmitterOffline(true);
+        if (canEnter) setPhase(current => current === 'searching' ? 'preview' : current);
+      } else if (mgr.hasAdmitterOnline()) {
+        setAdmitterOffline(false);
+      }
+    };
+    const interval = setInterval(() => {
+      session.current?.manager.requestPreview();
+      syncAdmitterState();
+    }, 2500);
     const timeout = setTimeout(() => {
       if (!mounted.current) return;
+      syncAdmitterState();
       if (canEnter) setPhase(current => current === 'searching' ? 'preview' : current);
       else {
         void release().then(() => {
@@ -96,6 +112,8 @@ export function JoinRoomModal() {
       if (!invite && !short) throw new Error(t('message.5348364ca0b6'));
       if (!mounted.current) return;
       const alreadySaved = Boolean(known?.saved);
+      ownedRoomRecord.current = Boolean(known?.owned && known?.identity);
+      setAdmitterOffline(false);
       const resolvedName = known?.customName ?? known?.name ?? (invite ? invite.version === 3 ? invite.roomId.slice(0, 8) : invite.name : '');
       setIsSavedRoom(alreadySaved);
       if (alreadySaved) setSaveRoomOnJoin(false);
@@ -128,6 +146,7 @@ export function JoinRoomModal() {
             setCanEnter(true);
           }
           setPreview(previous => stabilizeRoomPreview(previous, summary));
+          setAdmitterOffline(!manager.hasAdmitterOnline() && !owner.current && !ownedRoomRecord.current);
           setRequiresPassword(summary.protected); setPhase('preview');
         },
         onStreamsUpdate: () => {}, onSlotsUpdate: () => {}, onChat: () => {},
@@ -150,7 +169,9 @@ export function JoinRoomModal() {
       const normalized = extractRoomInvite(code) ?? extractWebRoomCode(code) ?? code.trim();
       const parsedId = parseRoomInvite(normalized)?.roomId ?? normalized;
       void savedRooms.get(parsedId).then((known) => {
-        if (mounted.current && known?.saved) setIsSavedRoom(true);
+        if (!mounted.current) return;
+        if (known?.saved) setIsSavedRoom(true);
+        if (known?.owned && known?.identity) ownedRoomRecord.current = true;
       }).catch(() => {});
     }
   }, []);
@@ -166,10 +187,19 @@ export function JoinRoomModal() {
       const current = session.current;
       await current?.ready;
       if (!mounted.current) return;
+      const restoreOwner = owner.current || (ownedRoomRecord.current && !current?.manager.hasHostOnline());
+      let reusablePreview = current?.manager;
       session.current = null;
-      await roomService.joinRoom(code.trim(), password.trim(), owner.current, {
-        waitForAdmission,
-        preview: current?.manager,
+      if (restoreOwner && !owner.current && current) {
+        reusablePreview = undefined;
+        current.release ??= roomService.stopRoomPreview(current.manager);
+        await current.release;
+        if (!mounted.current) return;
+      }
+      owner.current = restoreOwner;
+      await roomService.joinRoom(code.trim(), password.trim(), restoreOwner, {
+        waitForAdmission: restoreOwner ? false : waitForAdmission,
+        preview: reusablePreview,
         signal: attempt.current.signal,
         ...(saveRoomOnJoin && !isSavedRoom ? { saveOnJoin: true } : {}),
       });
@@ -224,6 +254,7 @@ export function JoinRoomModal() {
           {phase === 'joining' ? localizeText(roomStatusText) : phase === 'searching' ? t('join.searching') :
             preview ? t('join.online', { count: preview.participants.length }) : t('join.noResponse')}
         </p>}
+        {admitterOffline && phase !== 'joining' && <StatusNotice>{t('join.hostOfflineNotice')}</StatusNotice>}
         {(phase === 'searching' || phase === 'joining') && <div className="join-room-loading"><div className="connecting-spinner" /></div>}
         {preview && <ul className="join-room-participants" aria-label={t('join.participants')}>
           {preview.participants.map(person => <li key={person.id}>

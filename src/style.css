@@ -7631,6 +7631,35 @@ body:has(.fullscreen-dialog, .chat-image-viewer) .window-titlebar { display: non
   font-size: 12px;
 }
 
+.room-waiting-host-banner {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin: 0 16px 8px;
+  padding: 10px 14px;
+  border: 1px solid rgba(245, 158, 11, 0.32);
+  border-radius: var(--radius-md);
+  background: rgba(245, 158, 11, 0.1);
+  color: var(--text-primary);
+  font-size: 13px;
+}
+
+.room-waiting-host-banner-copy {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex: 1 1 260px;
+  min-width: 0;
+  color: var(--text-primary);
+}
+
+.room-waiting-host-banner-copy svg {
+  flex-shrink: 0;
+  color: #fbbf24;
+}
+
 .remote-control-manager-empty {
   display: flex;
   flex-direction: column;

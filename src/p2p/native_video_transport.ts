@@ -8,14 +8,20 @@ import { buildNativeIceServers, summarizeIceDescription, summarizeIceStats } fro
 
 const SETUP_TIMEOUT_MS = 10_000;
 const FIRST_VIDEO_TIMEOUT_MS = 6_000;
+const RELAY_CANDIDATE_HEADSTART_MS = 1_500;
+
+function isRelayIceCandidate(candidate?: RTCIceCandidateInit): boolean {
+  return typeof candidate?.candidate === 'string' && /\btyp\s+relay\b/i.test(candidate.candidate);
+}
 
 type Signal = { id: string; kind: 'offer' | 'answer' | 'ice' | 'reject' | 'stop' | 'ready'; mediaId: string;
   sdp?: string; candidate?: RTCIceCandidateInit; descriptor?: StreamDescriptor; reason?: string };
 interface Outgoing { id: string; peer: string; descriptor: StreamDescriptor; source: NativeSenderSource; track: MediaStreamTrack;
-  started: number;
+  started: number; relayOnly?: boolean; delayedRelayTimers: Array<ReturnType<typeof setTimeout>>;
   offer?: Signal; retryTimer?: ReturnType<typeof setTimeout>; answering?: boolean; ready?: boolean; readyAt?: number;
   timer: ReturnType<typeof setTimeout>; offered: boolean; answered: boolean; candidates: RTCIceCandidateInit[]; localCandidates: RTCIceCandidateInit[] }
 interface Incoming { id: string; peer: string; descriptor: StreamDescriptor; pc?: RTCPeerConnection;
+  relayOnly?: boolean; delayedRelayTimers: Array<ReturnType<typeof setTimeout>>;
   timer: ReturnType<typeof setInterval>; remoteReady: boolean; candidates: RTCIceCandidateInit[]; started: number; connectedAt?: number;
   verifiedFrames?: boolean;
   rcDatagram?: RTCDataChannel; rcInput?: RTCDataChannel;
@@ -50,6 +56,16 @@ export class NativeVideoTransport {
       if (!route || this.closed) return;
       if (payload.kind === 'failed') { this.fail(route, 'native_sender_failure', payload.reason); return; }
       if (payload.kind === 'ice' && payload.candidate) {
+        if (!route.relayOnly && isRelayIceCandidate(payload.candidate)) {
+          const candidate = payload.candidate;
+          const delayTimer = setTimeout(() => {
+            if (!this.current(route)) return;
+            if (route.localCandidates.length < 64) route.localCandidates.push(candidate);
+            if (route.offered) this.send(route.peer, { id: route.id, mediaId: route.descriptor.id, kind: 'ice', candidate });
+          }, RELAY_CANDIDATE_HEADSTART_MS);
+          route.delayedRelayTimers.push(delayTimer);
+          return;
+        }
         if (route.localCandidates.length < 64) route.localCandidates.push(payload.candidate);
         if (route.offered) this.send(route.peer, { id: route.id, mediaId: route.descriptor.id, kind: 'ice', candidate: payload.candidate });
       }
@@ -64,7 +80,7 @@ export class NativeVideoTransport {
     if (existing?.track === track && !forceRestart) return true;
     if (existing) this.closeOutgoing(existing, true);
     const route: Outgoing = { id: crypto.randomUUID(), peer, descriptor, source, track, offered: false, answered: false, started: performance.now(),
-      candidates: [], localCandidates: [], timer: setTimeout(() => this.fail(route, 'setup_timeout'), SETUP_TIMEOUT_MS) };
+      delayedRelayTimers: [], candidates: [], localCandidates: [], timer: setTimeout(() => this.fail(route, 'setup_timeout'), SETUP_TIMEOUT_MS) };
     this.outgoing.set(key, route);
     void this.open(route).catch(error => {
       if (this.outgoing.get(key) !== route) return;
@@ -77,6 +93,7 @@ export class NativeVideoTransport {
     if (!this.current(route)) return;
     const rtc = await this.config.rtc(route.peer);
     if (!this.current(route)) return;
+    route.relayOnly = rtc.iceTransportPolicy === 'relay';
     const nativeIceServers = buildNativeIceServers(rtc.iceServers);
     logDiagnostic('INFO', 'transmission.native.ice', 'Creating native sender offer', {
       routeId: route.id, mediaId: route.descriptor.id, relayOnly: rtc.iceTransportPolicy === 'relay',
@@ -153,12 +170,13 @@ export class NativeVideoTransport {
         return;
       }
       if (old) this.closeIncoming(old);
-      const incoming: Incoming = { id: signal.id, peer, descriptor: signal.descriptor, candidates: [], remoteReady: false,
+      const incoming: Incoming = { id: signal.id, peer, descriptor: signal.descriptor, candidates: [], delayedRelayTimers: [], remoteReady: false,
         started: performance.now(), timer: setInterval(() => { void this.checkReceiver(incoming); }, 500) };
       this.incoming.set(key, incoming);
       try {
         const rtc = await this.config.rtc(peer);
         if (this.closed || this.incoming.get(key) !== incoming || !this.config.permitted(peer, signal.descriptor)) return;
+        incoming.relayOnly = rtc.iceTransportPolicy === 'relay';
         const pc = new RTCPeerConnection(rtc);
         incoming.pc = pc;
         pc.onconnectionstatechange = () => {
@@ -172,7 +190,18 @@ export class NativeVideoTransport {
           if (pc.iceConnectionState === 'failed') this.reject(incoming, 'connection_failed');
         };
         pc.onicecandidate = ({ candidate }) => {
-          if (candidate && this.incoming.get(key) === incoming) this.send(peer, { id: signal.id, mediaId: signal.mediaId, kind: 'ice', candidate: candidate.toJSON() });
+          if (!candidate || this.incoming.get(key) !== incoming) return;
+          const init = candidate.toJSON();
+          if (!incoming.relayOnly && isRelayIceCandidate(init)) {
+            const delayTimer = setTimeout(() => {
+              if (this.incoming.get(key) === incoming) {
+                this.send(peer, { id: signal.id, mediaId: signal.mediaId, kind: 'ice', candidate: init });
+              }
+            }, RELAY_CANDIDATE_HEADSTART_MS);
+            incoming.delayedRelayTimers.push(delayTimer);
+            return;
+          }
+          this.send(peer, { id: signal.id, mediaId: signal.mediaId, kind: 'ice', candidate: init });
         };
         pc.ondatachannel = ({ channel }) => {
           if (this.incoming.get(key) !== incoming) return;
@@ -296,10 +325,12 @@ export class NativeVideoTransport {
   }
   private closeOutgoing(r: Outgoing, notify: boolean): void {
     this.outgoing.delete(this.key(r.peer,r.descriptor.id)); clearTimeout(r.timer); clearTimeout(r.retryTimer);
+    r.delayedRelayTimers.forEach(clearTimeout); r.delayedRelayTimers.length = 0;
     if (notify && r.offered) this.send(r.peer,{id:r.id,mediaId:r.descriptor.id,kind:'stop'});
     void this.closeNative(r);
   }
   private closeIncoming(r: Incoming): void {
+    r.delayedRelayTimers.forEach(clearTimeout); r.delayedRelayTimers.length = 0;
     logDiagnostic('INFO', 'transmission.native.ice', 'Native receiver route retired', {
       routeId: r.id, mediaId: r.descriptor.id, elapsedMs: Math.round(performance.now() - r.started),
       connection: r.pc?.connectionState, ice: r.pc?.iceConnectionState, gathering: r.pc?.iceGatheringState,

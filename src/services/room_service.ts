@@ -2262,6 +2262,16 @@ export class RoomService {
 
   public isRoomAdmin(): boolean { return this.roomManager?.isRoomAdmin() ?? false; }
 
+  public isWaitingForAdmission(): boolean {
+    if (!this.roomManager || stateStore.roomSlots.length === 0 || !stateStore.currentRoomCode) return false;
+    return !this.roomManager.hasAdmission() && !this.isRoomHost() && !this.isRoomAdmin();
+  }
+
+  public isAdmitterOnline(): boolean {
+    if (!this.roomManager) return true;
+    return this.roomManager.hasAdmitterOnline();
+  }
+
   public kickPeer(peerId: string): Promise<boolean> {
     return this.roomManager?.kickPeer(peerId) ?? Promise.resolve(false);
   }

@@ -173,6 +173,24 @@ interface PeerExchangeItem {
   isCreator: boolean;
   joinedAt: number;
   platform?: AppPlatform;
+  publicKey?: string;
+  inVoice?: boolean;
+  voiceMuted?: boolean;
+  voiceDeafened?: boolean;
+}
+
+interface IndirectPeerReport {
+  publicKey?: string;
+  username: string;
+  platform: AppPlatform;
+  joinedAt: number;
+  inVoice: boolean;
+  muted: boolean;
+  deafened: boolean;
+  seenAt: number;
+  reporters: Set<string>;
+  wasIndirectBeforeJoin?: boolean;
+  directHandshakingUntil?: number;
 }
 
 export class GroupRoomManager {
@@ -188,6 +206,7 @@ export class GroupRoomManager {
   private pendingAdminAdmissions = new Map<string, AdminAdmission>();
   private verifiedPreviewByResponder = new Map<string, Array<{ id: string; username: string; color?: string }>>();
   private verifiedPreviewCanAdmit = new Map<string, boolean>();
+  private indirectPeerReports = new Map<string, IndirectPeerReport>();
   private roomJoinOptions: { config: any; topic: string; callbacks: any } | null = null;
   private admissionDenied = false;
   private lastAdmissionRetry = 0;
@@ -197,6 +216,22 @@ export class GroupRoomManager {
   public isAdmissionDenied(): boolean { return this.admissionDenied; }
   public hasDirectPeers(): boolean { return this.peerTracker.directConnectedPeers.size > 0; }
   public hasVerifiedPreviewMembers(): boolean { return this.verifiedPreviewByResponder.size > 0; }
+  public hasVerifiedIdentityPeers(): boolean {
+    for (const peerId of this.peerTracker.directConnectedPeers) {
+      if (this.chatAuth?.getKnownKey(peerId)) return true;
+    }
+    return false;
+  }
+  public hasHostOnline(): boolean {
+    if (!this.authority) {
+      return this.isCreator || [...this.peerTracker.directConnectedPeers].some((id) => this.peerTracker.isPeerCreator(id));
+    }
+    if (this.authority.isLocalHost()) return true;
+    for (const peerId of this.peerTracker.directConnectedPeers) {
+      if (this.authority.isPeerHost(peerId)) return true;
+    }
+    return false;
+  }
   public hasAdmitterOnline(): boolean {
     if (!this.authority) return true;
     if (this.authority.isLocalHost() || this.isRoomAdmin()) return true;
@@ -895,11 +930,16 @@ export class GroupRoomManager {
         isCreator: this.isCreator,
         joinedAt: this.myJoinedAt,
         platform: getLocalPlatform(),
+        publicKey: this.chatAuth?.publicKey,
+        inVoice: this.localVoiceState.inVoice,
+        voiceMuted: this.localVoiceState.muted,
+        voiceDeafened: this.localVoiceState.deafened,
       },
     ];
 
     const verifiedPeers = this.getConnectedPeers().filter(peer => this.peerTracker.isVerified(peer.id));
     verifiedPeers.forEach((p) => {
+      const voice = this.remoteVoiceStates.get(p.id);
       list.push({
         peerId: p.id,
         username: p.username,
@@ -907,6 +947,10 @@ export class GroupRoomManager {
         isCreator: this.peerTracker.isPeerCreator(p.id),
         joinedAt: this.peerTracker.getJoinedAt(p.id) || Date.now(),
         platform: p.platform,
+        publicKey: p.publicKey ?? this.chatAuth?.getKnownKey(p.id),
+        inVoice: voice?.inVoice ?? false,
+        voiceMuted: voice?.muted ?? false,
+        voiceDeafened: voice?.deafened ?? false,
       });
     });
 
@@ -1359,6 +1403,10 @@ export class GroupRoomManager {
       this.announceToPeer(peerId);
     }
     this.notifyPeersUpdate();
+    if (this.indirectPeerReports.size > 0) {
+      this.notifyStreamsUpdate();
+      this.notifyVoiceStatesUpdate();
+    }
     void this.sendAuthoritySummary(peerId === selfId ? undefined : peerId).catch((error) =>
       console.warn('[Rooms] Initial authority reconciliation failed:', error));
   }
@@ -1592,6 +1640,10 @@ export class GroupRoomManager {
     }
     if (peersUpdated || selfAdmitted || announcedTargets.size > 0) {
       this.notifyPeersUpdate();
+      if (this.indirectPeerReports.size > 0) {
+        this.notifyStreamsUpdate();
+        this.notifyVoiceStatesUpdate();
+      }
     }
     if (selfAdmitted || announcedTargets.size > 0) {
       void this.sendAuthoritySummary().catch((error) =>
@@ -2273,6 +2325,7 @@ export class GroupRoomManager {
       if (suppliedName) {
         const alreadyAnnounced = this.announcedPeerNames.has(peerId);
         this.announcedPeerNames.set(peerId, suppliedName);
+        this.indirectPeerReports.delete(peerId);
         if (!alreadyAnnounced) {
           this.reportPeerJoined({
             id: peerId,
@@ -2293,6 +2346,11 @@ export class GroupRoomManager {
             try { this.presenceAction?.send(this.buildPresencePayload(), { target: peerId }); } catch {}
             this.publishMediaManifest(peerId);
             this.syncVoiceWithPeer(peerId);
+            for (const otherPeer of this.admittedTargets()) {
+              if (otherPeer !== peerId) {
+                try { this.pexAction?.send({ peers: this.getPeersPayload() }, { target: otherPeer }); } catch {}
+              }
+            }
           }
         }
       }
@@ -2531,20 +2589,55 @@ export class GroupRoomManager {
       }
 
       let hasNewRumors = false;
+      let indirectVoiceChanged = false;
+      const now = Date.now();
+      const reportedBySender = new Set<string>();
       data.peers.forEach((p) => {
         if (p && typeof p.peerId === 'string' && p.peerId.length > 0 && p.peerId.length <= 80 &&
             p.peerId !== selfId && this.canTrackRumor(p.peerId)) {
+          reportedBySender.add(p.peerId);
           const isDirect = this.peerTracker.isVerified(p.peerId);
+          const peerPlatform: AppPlatform = (p.platform === 'web' || p.platform === 'desktop' || p.platform === 'mobile')
+            ? p.platform
+            : 'desktop';
+          const cleanName = typeof p.username === 'string' ? p.username.trim().slice(0, 80) : '';
+          const validKey = typeof p.publicKey === 'string' && /^04[0-9a-f]{128}$/.test(p.publicKey)
+            ? p.publicKey
+            : undefined;
+          if (!isDirect && cleanName && (this.indirectPeerReports.has(p.peerId) || this.indirectPeerReports.size < 64)) {
+            const prevReport = this.indirectPeerReports.get(p.peerId);
+            const nextInVoice = Boolean(p.inVoice);
+            const nextMuted = Boolean(p.voiceMuted);
+            const nextDeafened = Boolean(p.voiceDeafened);
+            if (!prevReport || prevReport.inVoice !== nextInVoice || prevReport.muted !== nextMuted || prevReport.deafened !== nextDeafened) {
+              indirectVoiceChanged = true;
+            }
+            if (!prevReport || prevReport.username !== cleanName || prevReport.publicKey !== (validKey ?? prevReport.publicKey)) {
+              hasNewRumors = true;
+            }
+            const reporters = prevReport?.reporters ?? new Set<string>();
+            reporters.add(meta.peerId);
+            this.indirectPeerReports.set(p.peerId, {
+              publicKey: validKey ?? prevReport?.publicKey,
+              username: cleanName,
+              platform: peerPlatform,
+              joinedAt: Number.isFinite(p.joinedAt) ? p.joinedAt : (prevReport?.joinedAt ?? now),
+              inVoice: nextInVoice,
+              muted: nextMuted,
+              deafened: nextDeafened,
+              seenAt: now,
+              reporters,
+              wasIndirectBeforeJoin: true,
+              directHandshakingUntil: prevReport?.directHandshakingUntil,
+            });
+          }
           if (isDirect) return;
           if (!isDirect) {
             this.rumorIntermediaries.set(p.peerId, meta.peerId);
             hasNewRumors = true;
           }
-          const peerPlatform = (p.platform === 'web' || p.platform === 'desktop' || p.platform === 'mobile')
-            ? p.platform
-            : undefined;
           this.peerTracker.receivePeerExchange(p.peerId, false,
-            typeof p.username === 'string' ? p.username.slice(0, 80) : undefined,
+            cleanName || undefined,
             undefined, undefined, peerPlatform);
 
           // If peer is not yet directly connected to us, bridge via intermediary peer
@@ -2553,10 +2646,23 @@ export class GroupRoomManager {
           }
         }
       });
+      for (const [indirectId, report] of this.indirectPeerReports) {
+        if (!reportedBySender.has(indirectId) && report.reporters.delete(meta.peerId)) {
+          if (report.reporters.size === 0 && !this.peerTracker.isVerified(indirectId)) {
+            this.indirectPeerReports.delete(indirectId);
+            this.peerTracker.unverifiedRumors.delete(indirectId);
+            hasNewRumors = true;
+            if (report.inVoice) indirectVoiceChanged = true;
+          }
+        }
+      }
 
       if (hasNewRumors) {
         this.notifyPeersUpdate();
         this.notifyStreamsUpdate();
+      }
+      if (indirectVoiceChanged || hasNewRumors) {
+        this.notifyVoiceStatesUpdate();
       }
     };
 
@@ -2625,12 +2731,31 @@ export class GroupRoomManager {
           if (this.signalingTopic) {
             signalingManager.reannounce(this.signalingTopic, data.origin);
           }
+        } else if (data.kind === 'webrtc_signal' && data.target === selfId &&
+                   typeof data.payload === 'string' && data.payload.length <= 24_000) {
+          if (!this.peerTracker.isVerified(data.origin)) {
+            this.rumorIntermediaries.set(data.origin, meta.peerId);
+          }
+          void this.room?.receiveMeshSignaling?.(data.origin, data.payload, (destPeerId: string, replyJson: string) => {
+            this.sendMeshWebRtcSignal(destPeerId, meta.peerId, replyJson);
+          });
+        } else if (data.kind === 'peer_leave' && !this.peerTracker.isVerified(data.origin)) {
+          const removedIndirect = this.indirectPeerReports.delete(data.origin);
+          this.peerTracker.unverifiedRumors.delete(data.origin);
+          this.rumorIntermediaries.delete(data.origin);
+          if (removedIndirect) {
+            this.notifyPeersUpdate();
+            this.notifyStreamsUpdate();
+            this.notifyVoiceStatesUpdate();
+          }
         } else if (data.kind === 'action_relay') {
           this.handleRelayedAction(data.action, data.payload, data.origin, meta.peerId);
         } else if (data.kind === 'stream_req' && data.origin === meta.peerId && this.localStream) {
           this.sendStreamToPeer(data.origin, true);
         }
-      } else if (data.target && this.peerTracker.hasPeer(data.target) && this.isLivePeerTarget(data.target)) {
+      } else if (data.target && data.origin === meta.peerId &&
+                 (this.peerTracker.hasPeer(data.target) || this.isAdmittedPeer(data.target)) &&
+                 this.isLivePeerTarget(data.target)) {
         try {
           this.meshRelayAction.send(data, { target: data.target });
         } catch {}
@@ -2737,6 +2862,10 @@ export class GroupRoomManager {
       this.clearMediaDispatch(peerId);
       this.admissionRequests.delete(peerId);
       this.announcedPeerNames.delete(peerId);
+      const indirectBeforeJoin = this.indirectPeerReports.get(peerId);
+      if (indirectBeforeJoin?.wasIndirectBeforeJoin) {
+        indirectBeforeJoin.directHandshakingUntil = Date.now() + 5000;
+      }
       console.log(`[P2P] Direct WebRTC peer connection active: ${peerId}`);
 
       // Verify and record direct WebRTC connection
@@ -3005,6 +3134,18 @@ export class GroupRoomManager {
     this.remoteVoiceStates.forEach((state, peerId) => {
       snapshot[peerId] = { ...state };
     });
+    const now = Date.now();
+    for (const peerId of this.indirectPeerReports.keys()) {
+      if (snapshot[peerId]) continue;
+      const report = this.getVisibleIndirectReport(peerId, now);
+      if (report?.inVoice) {
+        snapshot[peerId] = {
+          inVoice: true,
+          muted: report.muted,
+          deafened: report.deafened,
+        };
+      }
+    }
     this.callbacks.onVoiceStateUpdate(snapshot);
   }
 
@@ -3543,6 +3684,14 @@ export class GroupRoomManager {
     this.relayedAdmissionPeers.delete(peerId);
     this.verifiedPreviewByResponder.delete(peerId);
     this.verifiedPreviewCanAdmit.delete(peerId);
+    const hadIndirectVoice = Boolean(this.indirectPeerReports.get(peerId)?.inVoice);
+    this.indirectPeerReports.delete(peerId);
+    for (const report of this.indirectPeerReports.values()) {
+      report.reporters.delete(peerId);
+    }
+    if (hadIndirectVoice) {
+      this.notifyVoiceStatesUpdate();
+    }
     profileStats.forget(peerId);
     this.profileTransfer?.forget(peerId);
     this.bannerTransfer?.forget(peerId);
@@ -3701,7 +3850,24 @@ export class GroupRoomManager {
       } catch (err) {
         console.warn(`[P2P/Mesh] Failed to send mesh_hello to ${targetPeerId}:`, err);
       }
+      void this.room?.initiateMeshSignaling?.(targetPeerId, (destPeerId: string, payloadJson: string) => {
+        this.sendMeshWebRtcSignal(destPeerId, intermediaryPeerId, payloadJson);
+      });
     }
+  }
+
+  private sendMeshWebRtcSignal(targetPeerId: string, preferredIntermediary: string | undefined, signalJson: string): void {
+    if (!this.meshRelayAction || typeof signalJson !== 'string' || signalJson.length > 24_000) return;
+    const intermediary = (preferredIntermediary && this.peerTracker.isVerified(preferredIntermediary) && this.isLivePeerTarget(preferredIntermediary))
+      ? preferredIntermediary
+      : this.rumorIntermediaries.get(targetPeerId);
+    if (!intermediary || !this.peerTracker.isVerified(intermediary) || !this.isLivePeerTarget(intermediary)) return;
+    try {
+      this.meshRelayAction.send(
+        { target: targetPeerId, origin: selfId, kind: 'webrtc_signal', payload: signalJson },
+        { target: intermediary },
+      );
+    } catch {}
   }
 
   public watchStream(broadcasterId: string) {
@@ -5060,6 +5226,27 @@ export class GroupRoomManager {
     return signed;
   }
 
+  private getVisibleIndirectReport(peerId: string, now = Date.now()): IndirectPeerReport | null {
+    if (this.previewOnly) return null;
+    if (this.authority && !this.localAdmitted) return null;
+    const report = this.indirectPeerReports.get(peerId);
+    if (!report || now - report.seenAt > 15_000) return null;
+    if (this.peerTracker.isVerified(peerId)) {
+      if (!report.wasIndirectBeforeJoin || this.announcedPeerNames.has(peerId) ||
+          report.directHandshakingUntil === undefined || now >= report.directHandshakingUntil) {
+        return null;
+      }
+    }
+    if (this.authority) {
+      const admittedKey = this.admittedPeers.get(peerId) ??
+        this.adminAdmissions.get(peerId)?.targetKey ??
+        (report.publicKey && report.publicKey === this.authority.currentKey ? this.authority.currentKey : undefined);
+      if (!admittedKey || this.bannedKeys.has(admittedKey)) return null;
+      if (report.publicKey && report.publicKey !== admittedKey) return null;
+    }
+    return report;
+  }
+
   public getConnectedPeers(): PeerInfo[] {
     if (this.authority && !this.localAdmitted && !this.previewOnly) {
       const waitingPeers = new Map<string, PeerInfo>();
@@ -5090,14 +5277,36 @@ export class GroupRoomManager {
       }
       return Array.from(waitingPeers.values());
     }
-    return this.peerTracker.getAllRoomPeers().filter((peer) =>
-      !this.authority || (this.isAdmittedPeer(peer.id) && this.announcedPeerNames.has(peer.id)))
-      .map((peer) => ({
-        ...peer,
-        publicKey: this.chatAuth?.getKnownKey(peer.id),
-        nicknameStyle: this.peerNicknameStyles.get(peer.id),
-        isAdmin: this.isPeerAdmin(peer.id),
-      }));
+    const now = Date.now();
+    const peersById = new Map<string, PeerInfo>();
+    for (const peer of this.peerTracker.getAllRoomPeers()) {
+      if (!this.authority || (this.isAdmittedPeer(peer.id) && this.announcedPeerNames.has(peer.id))) {
+        peersById.set(peer.id, {
+          ...peer,
+          publicKey: this.chatAuth?.getKnownKey(peer.id),
+          nicknameStyle: this.peerNicknameStyles.get(peer.id),
+          isAdmin: this.isPeerAdmin(peer.id),
+        });
+      }
+    }
+    for (const peerId of this.indirectPeerReports.keys()) {
+      if (peerId === selfId || peersById.has(peerId)) continue;
+      const report = this.getVisibleIndirectReport(peerId, now);
+      if (!report) continue;
+      const resolvedKey = this.chatAuth?.getKnownKey(peerId) ?? report.publicKey ?? this.admittedPeers.get(peerId);
+      peersById.set(peerId, {
+        id: peerId,
+        publicKey: resolvedKey,
+        username: report.username,
+        connectionState: 'connecting',
+        joinedAt: report.joinedAt,
+        isCreator: Boolean(this.authority && resolvedKey && resolvedKey === this.authority.currentKey),
+        isAdmin: Boolean(resolvedKey && this.hasAdminGrant(resolvedKey)),
+        platform: report.platform,
+        nicknameStyle: this.peerNicknameStyles.get(peerId),
+      });
+    }
+    return Array.from(peersById.values());
   }
 
   private notifyPeersUpdate() {
@@ -5233,6 +5442,7 @@ export class GroupRoomManager {
     this.relayedAdmissionPeers.clear();
     this.verifiedPreviewByResponder.clear();
     this.verifiedPreviewCanAdmit.clear();
+    this.indirectPeerReports.clear();
     this.roomJoinOptions = null;
     this.profileTransfer?.close();
     this.profileTransfer = null;
