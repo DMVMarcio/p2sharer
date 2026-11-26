@@ -7667,11 +7667,17 @@ body:has(.fullscreen-dialog, .chat-image-viewer) .window-titlebar { display: non
   flex-shrink: 0;
 }
 
-.room-waiting-host-dismiss {
-  color: var(--text-muted);
+.btn-icon-header.room-waiting-host-dismiss {
+  width: 28px;
+  height: 28px;
+  flex-shrink: 0;
+  background: rgba(245, 158, 11, 0.14);
+  border: 1px solid rgba(245, 158, 11, 0.28);
+  color: var(--text-secondary);
 }
 
-.room-waiting-host-dismiss:hover {
+.btn-icon-header.room-waiting-host-dismiss:hover {
+  background: rgba(245, 158, 11, 0.24);
   color: var(--text-primary);
 }
 

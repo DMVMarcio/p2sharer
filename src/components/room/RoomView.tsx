@@ -112,7 +112,7 @@ export const RoomView: React.FC = () => {
                   <span>{t('room.waitingHostCreateAction')}</span>
                 </button>
                 <TooltipButton
-                  className="btn-icon-sm room-waiting-host-dismiss"
+                  className="btn-icon-header room-waiting-host-dismiss"
                   tooltip={t('room.dismissWaitingHostBanner')}
                   aria-label={t('room.dismissWaitingHostBanner')}
                   onClick={() => setWaitingHostDismissed(true)}
