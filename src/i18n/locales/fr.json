@@ -2131,5 +2131,10 @@
   "chess.reviewPrevious": "Coup précédent",
   "chess.reviewNext": "Coup suivant",
   "chess.reviewLatest": "Revenir à la position actuelle",
-  "chess.reviewPosition": "Révision de la position {{move}} sur {{total}}"
+  "chess.reviewPosition": "Révision de la position {{move}} sur {{total}}",
+  "chess.piece.p": "Pion",
+  "chess.piece.k": "Roi",
+  "chess.moveTooltip": "{{move}}. {{side}} : {{san}}",
+  "chess.moveTooltipCapture": "{{move}}. {{side}} : {{san}} — a pris {{captured}}",
+  "room.dismissWaitingHostBanner": "Masquer l’avis"
 }

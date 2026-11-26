@@ -2131,5 +2131,10 @@
   "chess.reviewPrevious": "पिछली चाल",
   "chess.reviewNext": "अगली चाल",
   "chess.reviewLatest": "वर्तमान स्थिति पर लौटें",
-  "chess.reviewPosition": "{{total}} में से {{move}}वीं स्थिति की समीक्षा"
+  "chess.reviewPosition": "{{total}} में से {{move}}वीं स्थिति की समीक्षा",
+  "chess.piece.p": "प्यादा (पॉन)",
+  "chess.piece.k": "राजा (किंग)",
+  "chess.moveTooltip": "{{move}}. {{side}}: {{san}}",
+  "chess.moveTooltipCapture": "{{move}}. {{side}}: {{san}} — {{captured}} काटा",
+  "room.dismissWaitingHostBanner": "सूचना हटाएँ"
 }

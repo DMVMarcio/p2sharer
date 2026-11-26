@@ -7660,6 +7660,21 @@ body:has(.fullscreen-dialog, .chat-image-viewer) .window-titlebar { display: non
   color: #fbbf24;
 }
 
+.room-waiting-host-banner-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+.room-waiting-host-dismiss {
+  color: var(--text-muted);
+}
+
+.room-waiting-host-dismiss:hover {
+  color: var(--text-primary);
+}
+
 .remote-control-manager-empty {
   display: flex;
   flex-direction: column;

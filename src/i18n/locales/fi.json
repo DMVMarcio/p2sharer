@@ -2131,5 +2131,10 @@
   "chess.reviewPrevious": "Edellinen siirto",
   "chess.reviewNext": "Seuraava siirto",
   "chess.reviewLatest": "Palaa nykyiseen asemaan",
-  "chess.reviewPosition": "Tarkastellaan asemaa {{move}} / {{total}}"
+  "chess.reviewPosition": "Tarkastellaan asemaa {{move}} / {{total}}",
+  "chess.piece.p": "Sotilas",
+  "chess.piece.k": "Kuningas",
+  "chess.moveTooltip": "{{move}}. {{side}}: {{san}}",
+  "chess.moveTooltipCapture": "{{move}}. {{side}}: {{san}} — löi: {{captured}}",
+  "room.dismissWaitingHostBanner": "Piilota ilmoitus"
 }

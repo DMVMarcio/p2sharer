@@ -1,6 +1,6 @@
 import { t } from '../../i18n';
 import { useLocale } from '../../hooks/useLocale';
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { usePanelSize } from '../../hooks/usePanelSize';
 import { PanelResizeHandle } from '../common/PanelResizeHandle';
 import { UnreadChatBadge } from './UnreadChatBadge';
@@ -13,7 +13,8 @@ import { useRoom } from '../../hooks/useRoom';
 import { useModal } from '../../hooks/useModal';
 import { useIsMobile } from '../../hooks/useIsMobile';
 import { stateStore } from '../../core/state_store';
-import { AlertTriangle, Plus } from 'lucide-react';
+import { TooltipButton } from '../common/TooltipButton';
+import { AlertTriangle, Plus, X } from 'lucide-react';
 
 export const RoomView: React.FC = () => {
   useLocale();
@@ -23,6 +24,13 @@ export const RoomView: React.FC = () => {
   const edgeRef = useRef<HTMLDivElement>(null);
   const isMobile = useIsMobile();
   const sidebarSize = usePanelSize(layoutRef, 'width', 'p2sharer_sidebar_width', 320, 240, 240, !isMobile);
+  const [waitingHostDismissed, setWaitingHostDismissed] = useState(false);
+
+  useEffect(() => {
+    if (!isWaitingForAdmission || isAdmitterOnline) {
+      setWaitingHostDismissed(false);
+    }
+  }, [isWaitingForAdmission, isAdmitterOnline]);
 
   useEffect(() => {
     if (isMobile) {
@@ -88,20 +96,30 @@ export const RoomView: React.FC = () => {
       >
         <div className="stream-area">
           <StreamHeaderBar />
-          {isWaitingForAdmission && !isAdmitterOnline && !connectingOverlay.visible && (
+          {isWaitingForAdmission && !isAdmitterOnline && !connectingOverlay.visible && !waitingHostDismissed && (
             <div className="room-waiting-host-banner" role="status" aria-live="polite">
               <div className="room-waiting-host-banner-copy">
                 <AlertTriangle size={16} aria-hidden="true" />
                 <span>{t('room.waitingHostBanner')}</span>
               </div>
-              <button
-                type="button"
-                className="btn btn-primary btn-sm"
-                onClick={() => openModal('createRoom')}
-              >
-                <Plus size={14} aria-hidden="true" />
-                <span>{t('room.waitingHostCreateAction')}</span>
-              </button>
+              <div className="room-waiting-host-banner-actions">
+                <button
+                  type="button"
+                  className="btn btn-primary btn-sm"
+                  onClick={() => openModal('createRoom')}
+                >
+                  <Plus size={14} aria-hidden="true" />
+                  <span>{t('room.waitingHostCreateAction')}</span>
+                </button>
+                <TooltipButton
+                  className="btn-icon-sm room-waiting-host-dismiss"
+                  tooltip={t('room.dismissWaitingHostBanner')}
+                  aria-label={t('room.dismissWaitingHostBanner')}
+                  onClick={() => setWaitingHostDismissed(true)}
+                >
+                  <X size={14} aria-hidden="true" />
+                </TooltipButton>
+              </div>
             </div>
           )}
           <RoomVideoContainer />

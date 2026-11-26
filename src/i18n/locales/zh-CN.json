@@ -2131,5 +2131,10 @@
   "chess.reviewPrevious": "上一步",
   "chess.reviewNext": "下一步",
   "chess.reviewLatest": "返回当前局面",
-  "chess.reviewPosition": "正在复盘第 {{move}} 步，共 {{total}} 步"
+  "chess.reviewPosition": "正在复盘第 {{move}} 步，共 {{total}} 步",
+  "chess.piece.p": "兵",
+  "chess.piece.k": "王",
+  "chess.moveTooltip": "{{move}}. {{side}}：{{san}}",
+  "chess.moveTooltipCapture": "{{move}}. {{side}}：{{san}} — 吃掉{{captured}}",
+  "room.dismissWaitingHostBanner": "关闭提示"
 }

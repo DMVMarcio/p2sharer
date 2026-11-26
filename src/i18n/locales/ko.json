@@ -2131,5 +2131,10 @@
   "chess.reviewPrevious": "이전 수",
   "chess.reviewNext": "다음 수",
   "chess.reviewLatest": "현재 위치로 돌아가기",
-  "chess.reviewPosition": "전체 {{total}}수 중 {{move}}수 검토 중"
+  "chess.reviewPosition": "전체 {{total}}수 중 {{move}}수 검토 중",
+  "chess.piece.p": "폰",
+  "chess.piece.k": "킹",
+  "chess.moveTooltip": "{{move}}. {{side}}: {{san}}",
+  "chess.moveTooltipCapture": "{{move}}. {{side}}: {{san}} — {{captured}} 잡음",
+  "room.dismissWaitingHostBanner": "알림 닫기"
 }

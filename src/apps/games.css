@@ -878,16 +878,20 @@
   gap: 4px;
 }
 
-.chess-review-button {
+.cozy-wood-btn.chess-review-button {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 28px;
-  height: 26px;
+  width: 30px;
+  height: 28px;
   padding: 0;
 }
 
-.chess-review-button:focus-visible {
+.cozy-wood-btn.chess-review-button svg {
+  flex-shrink: 0;
+}
+
+.cozy-wood-btn.chess-review-button:focus-visible {
   outline: 2px solid #fae9ce;
   outline-offset: 2px;
 }

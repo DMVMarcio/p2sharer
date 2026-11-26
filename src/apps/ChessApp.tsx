@@ -769,16 +769,16 @@ export const ChessApp: React.FC<RoomAppViewProps> = ({ instanceId, compact = fal
                       <div className="chess-review-controls" role="group" aria-label={t('chess.reviewControls')}>
                         <TooltipButton className="cozy-wood-btn is-secondary chess-review-button" tooltip={t('chess.reviewFirst')}
                           aria-label={t('chess.reviewFirst')} disabled={game.moveHistory.length === 0 || currentReviewPly === 0}
-                          onClick={() => moveReviewTo(0, false)}><SkipBack size={14} aria-hidden="true" /></TooltipButton>
+                          onClick={() => moveReviewTo(0, false)}><SkipBack size={15} aria-hidden="true" /></TooltipButton>
                         <TooltipButton className="cozy-wood-btn is-secondary chess-review-button" tooltip={t('chess.reviewPrevious')}
                           aria-label={t('chess.reviewPrevious')} disabled={game.moveHistory.length === 0 || currentReviewPly === 0}
-                          onClick={() => moveReviewTo(Math.max(0, currentReviewPly - 1), true)}><ChevronLeft size={16} aria-hidden="true" /></TooltipButton>
+                          onClick={() => moveReviewTo(Math.max(0, currentReviewPly - 1), true)}><ChevronLeft size={17} aria-hidden="true" /></TooltipButton>
                         <TooltipButton className="cozy-wood-btn is-secondary chess-review-button" tooltip={t('chess.reviewNext')}
                           aria-label={t('chess.reviewNext')} disabled={!isReviewing || currentReviewPly >= game.moveHistory.length}
-                          onClick={() => moveReviewTo(currentReviewPly + 1, true)}><ChevronRight size={16} aria-hidden="true" /></TooltipButton>
+                          onClick={() => moveReviewTo(currentReviewPly + 1, true)}><ChevronRight size={17} aria-hidden="true" /></TooltipButton>
                         <TooltipButton className="cozy-wood-btn is-secondary chess-review-button" tooltip={t('chess.reviewLatest')}
                           aria-label={t('chess.reviewLatest')} disabled={!isReviewing}
-                          onClick={() => moveReviewTo(game.moveHistory.length, false)}><SkipForward size={14} aria-hidden="true" /></TooltipButton>
+                          onClick={() => moveReviewTo(game.moveHistory.length, false)}><SkipForward size={15} aria-hidden="true" /></TooltipButton>
                       </div>
                     </div>
                     {game.moveHistory.length === 0 ? (
@@ -787,11 +787,26 @@ export const ChessApp: React.FC<RoomAppViewProps> = ({ instanceId, compact = fal
                       <div className="cozy-moves-list">
                         {game.moveHistory.map((m, idx) => {
                           const ply = idx + 1;
+                          const moveNum = Math.floor(idx / 2) + 1;
                           const isActive = currentReviewPly === ply;
+                          const sideLabel = m.color === 'w' ? t('games.white') : t('games.black');
+                          const moveTooltip = m.captured
+                            ? t('chess.moveTooltipCapture', {
+                                move: moveNum,
+                                side: sideLabel,
+                                san: m.san,
+                                captured: t(`chess.piece.${m.captured}`),
+                              })
+                            : t('chess.moveTooltip', {
+                                move: moveNum,
+                                side: sideLabel,
+                                san: m.san,
+                              });
                           return (
-                            <button
+                            <TooltipButton
                               key={idx}
-                              type="button"
+                              tooltip={moveTooltip}
+                              aria-label={moveTooltip}
                               aria-current={isActive ? 'step' : undefined}
                               className={`cozy-move-pill is-${m.color} is-interactive ${isActive ? 'is-active' : ''}`}
                               onClick={() => moveReviewTo(ply, true)}
@@ -804,7 +819,7 @@ export const ChessApp: React.FC<RoomAppViewProps> = ({ instanceId, compact = fal
                                   size={13}
                                 />
                               )}
-                            </button>
+                            </TooltipButton>
                           );
                         })}
                       </div>

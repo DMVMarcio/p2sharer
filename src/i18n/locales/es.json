@@ -2131,5 +2131,10 @@
   "chess.reviewPrevious": "Jugada anterior",
   "chess.reviewNext": "Jugada siguiente",
   "chess.reviewLatest": "Volver a la posición actual",
-  "chess.reviewPosition": "Revisando la posición {{move}} de {{total}}"
+  "chess.reviewPosition": "Revisando la posición {{move}} de {{total}}",
+  "chess.piece.p": "Peón",
+  "chess.piece.k": "Rey",
+  "chess.moveTooltip": "{{move}}. {{side}}: {{san}}",
+  "chess.moveTooltipCapture": "{{move}}. {{side}}: {{san}} — capturó {{captured}}",
+  "room.dismissWaitingHostBanner": "Descartar aviso"
 }

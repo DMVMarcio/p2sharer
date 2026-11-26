@@ -2131,5 +2131,10 @@
   "chess.reviewPrevious": "Предыдущий ход",
   "chess.reviewNext": "Следующий ход",
   "chess.reviewLatest": "Вернуться к текущей позиции",
-  "chess.reviewPosition": "Просмотр позиции {{move}} из {{total}}"
+  "chess.reviewPosition": "Просмотр позиции {{move}} из {{total}}",
+  "chess.piece.p": "Пешка",
+  "chess.piece.k": "Король",
+  "chess.moveTooltip": "{{move}}. {{side}}: {{san}}",
+  "chess.moveTooltipCapture": "{{move}}. {{side}}: {{san}} — взята {{captured}}",
+  "room.dismissWaitingHostBanner": "Скрыть уведомление"
 }

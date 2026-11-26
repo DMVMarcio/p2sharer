@@ -2131,5 +2131,10 @@
   "chess.reviewPrevious": "Mossa precedente",
   "chess.reviewNext": "Mossa successiva",
   "chess.reviewLatest": "Torna alla posizione attuale",
-  "chess.reviewPosition": "Revisione della posizione {{move}} di {{total}}"
+  "chess.reviewPosition": "Revisione della posizione {{move}} di {{total}}",
+  "chess.piece.p": "Pedone",
+  "chess.piece.k": "Re",
+  "chess.moveTooltip": "{{move}}. {{side}}: {{san}}",
+  "chess.moveTooltipCapture": "{{move}}. {{side}}: {{san}} — catturato {{captured}}",
+  "room.dismissWaitingHostBanner": "Chiudi avviso"
 }

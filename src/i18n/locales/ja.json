@@ -2131,5 +2131,10 @@
   "chess.reviewPrevious": "前の手",
   "chess.reviewNext": "次の手",
   "chess.reviewLatest": "現在の局面に戻る",
-  "chess.reviewPosition": "{{total}} 手中 {{move}} 手目を確認中"
+  "chess.reviewPosition": "{{total}} 手中 {{move}} 手目を確認中",
+  "chess.piece.p": "ポーン",
+  "chess.piece.k": "キング",
+  "chess.moveTooltip": "{{move}}. {{side}}: {{san}}",
+  "chess.moveTooltipCapture": "{{move}}. {{side}}: {{san}} — {{captured}}を獲得",
+  "room.dismissWaitingHostBanner": "通知を閉じる"
 }

@@ -2131,5 +2131,10 @@
   "voice.mobileMic": "Mic on",
   "voice.mobileMuted": "Muted",
   "chess.soloModeStatus": "Solo mode · switch sides after each move",
-  "games.roomLocked": "Locked"
+  "games.roomLocked": "Locked",
+  "chess.piece.p": "Pawn",
+  "chess.piece.k": "King",
+  "chess.moveTooltip": "{{move}}. {{side}}: {{san}}",
+  "chess.moveTooltipCapture": "{{move}}. {{side}}: {{san}} — captured {{captured}}",
+  "room.dismissWaitingHostBanner": "Dismiss notice"
 }

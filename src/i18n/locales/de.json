@@ -2131,5 +2131,10 @@
   "chess.reviewPrevious": "Vorheriger Zug",
   "chess.reviewNext": "Nächster Zug",
   "chess.reviewLatest": "Zur aktuellen Stellung zurückkehren",
-  "chess.reviewPosition": "Stellung {{move}} von {{total}} wird überprüft"
+  "chess.reviewPosition": "Stellung {{move}} von {{total}} wird überprüft",
+  "chess.piece.p": "Bauer",
+  "chess.piece.k": "König",
+  "chess.moveTooltip": "{{move}}. {{side}}: {{san}}",
+  "chess.moveTooltipCapture": "{{move}}. {{side}}: {{san}} — {{captured}} geschlagen",
+  "room.dismissWaitingHostBanner": "Hinweis ausblenden"
 }

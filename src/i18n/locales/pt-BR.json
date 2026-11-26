@@ -2131,5 +2131,10 @@
   "voice.mobileMic": "Mic ativo",
   "voice.mobileMuted": "Mutado",
   "chess.soloModeStatus": "Modo solo · alterne os lados a cada lance",
-  "games.roomLocked": "Sala trancada"
+  "games.roomLocked": "Sala trancada",
+  "chess.piece.p": "Peão",
+  "chess.piece.k": "Rei",
+  "chess.moveTooltip": "{{move}}. {{side}}: {{san}}",
+  "chess.moveTooltipCapture": "{{move}}. {{side}}: {{san}} — capturou {{captured}}",
+  "room.dismissWaitingHostBanner": "Dispensar aviso"
 }
