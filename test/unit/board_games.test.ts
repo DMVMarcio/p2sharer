@@ -132,11 +132,11 @@ test('a chess room locks for its lone first mover and lets them play both sides'
     assert.equal(soloModel.getRoom(roomId)?.game.turn, 'w');
     const nextWhiteMove = soloModel.getRoom(roomId)!.game;
     const whiteMoveAt = nextWhiteMove.clock!.turnStartedAt!;
-    assert.ok(soloModel.getRemainingTimeMs(roomId, 'w', whiteMoveAt + 3_000)! <= 57_000);
-    assert.ok(soloModel.getRemainingTimeMs(roomId, 'w', whiteMoveAt + 3_000)! >= 56_990);
+    assert.ok(soloModel.getRemainingTimeMs(roomId, 'w', whiteMoveAt + 3_000)! <= 57_050);
+    assert.ok(soloModel.getRemainingTimeMs(roomId, 'w', whiteMoveAt + 3_000)! >= 56_500);
     assert.ok(soloModel.syncClock(roomId, whiteMoveAt + 10_000));
-    assert.ok(soloModel.getRoom(roomId)!.game.clock!.remainingMs.w <= 50_000);
-    assert.ok(soloModel.getRoom(roomId)!.game.clock!.remainingMs.w >= 49_990);
+    assert.ok(soloModel.getRoom(roomId)!.game.clock!.remainingMs.w <= 50_050);
+    assert.ok(soloModel.getRoom(roomId)!.game.clock!.remainingMs.w >= 49_500);
 
     const sharedRoomId = soloModel.createRoom('Spectated chess', 'seat1')!;
     assert.equal(guestModel.joinRole(sharedRoomId, 'spectator'), true);

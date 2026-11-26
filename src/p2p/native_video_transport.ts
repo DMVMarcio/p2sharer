@@ -325,12 +325,14 @@ export class NativeVideoTransport {
   }
   private closeOutgoing(r: Outgoing, notify: boolean): void {
     this.outgoing.delete(this.key(r.peer,r.descriptor.id)); clearTimeout(r.timer); clearTimeout(r.retryTimer);
-    r.delayedRelayTimers.forEach(clearTimeout); r.delayedRelayTimers.length = 0;
+    r.delayedRelayTimers?.forEach(clearTimeout);
+    if (r.delayedRelayTimers) r.delayedRelayTimers.length = 0;
     if (notify && r.offered) this.send(r.peer,{id:r.id,mediaId:r.descriptor.id,kind:'stop'});
     void this.closeNative(r);
   }
   private closeIncoming(r: Incoming): void {
-    r.delayedRelayTimers.forEach(clearTimeout); r.delayedRelayTimers.length = 0;
+    r.delayedRelayTimers?.forEach(clearTimeout);
+    if (r.delayedRelayTimers) r.delayedRelayTimers.length = 0;
     logDiagnostic('INFO', 'transmission.native.ice', 'Native receiver route retired', {
       routeId: r.id, mediaId: r.descriptor.id, elapsedMs: Math.round(performance.now() - r.started),
       connection: r.pc?.connectionState, ice: r.pc?.iceConnectionState, gathering: r.pc?.iceGatheringState,

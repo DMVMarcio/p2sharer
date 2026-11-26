@@ -46,7 +46,7 @@ const bundle = await build({ stdin: { contents: "export { JoinRoomModal } from '
       args.path.endsWith('useRoom') ? "import { useSyncExternalStore } from 'react'; export const useRoom = () => { useSyncExternalStore(globalThis.previewUi.subscribe, globalThis.previewUi.snapshot); return globalThis.previewUi.roomService; };" :
       args.path.endsWith('room_service') ? 'export const roomService = globalThis.previewUi.roomService;' :
       args.path.endsWith('state_store') ? 'export const stateStore = globalThis.previewUi.store;' :
-      args.path.endsWith('group_room') ? 'export class GroupRoomManager { join(callbacks) { return globalThis.previewUi.discover(callbacks); } getInvite() { return globalThis.previewUi.resolvedInvite; } requestPreview() {} async leave() { globalThis.previewUi.release(); } }' :
+      args.path.endsWith('group_room') ? 'export class GroupRoomManager { join(callbacks) { return globalThis.previewUi.discover(callbacks); } getInvite() { return globalThis.previewUi.resolvedInvite; } requestPreview() {} hasAdmitterOnline() { return globalThis.previewUi.admitterOnline ?? true; } hasVerifiedIdentityPeers() { return globalThis.previewUi.verifiedIdentityPeers ?? true; } async leave() { globalThis.previewUi.release(); } }' :
       args.path.endsWith('saved_rooms') ? 'export const savedRooms = { get: async (id) => globalThis.previewUi.savedRooms?.[id] };' :
       "export const verifyRoomInvite = async (code) => code.startsWith('unsaved-') ? { version: 4, roomId: code, name: 'Signed Unsaved Room' } : { version: 4, roomId: 'fixture', name: 'Fixture room' };",
     }));
@@ -94,7 +94,7 @@ test('a saved room previews people and keeps connection and password errors in t
   assert.equal(left, releasedBefore, 'entry must not disconnect and redo the WebRTC handshake');
   assert.equal(closed, 0, 'an old admission result must not close a new attempt');
   assert.equal(joined.length, 1);
-  assert.deepEqual(joined[0], ['saved-fixture', 'remembered-fixture', true, { waitForAdmission: true }]);
+  assert.deepEqual(joined[0], ['saved-fixture', 'remembered-fixture', true, { waitForAdmission: false }]);
   assert.equal(document.querySelector('button[type="submit"]').disabled, true);
   await outcome('error', 'Senha incorreta para esta sala');
   assert.ok(document.querySelector('[role="alert"]'));
