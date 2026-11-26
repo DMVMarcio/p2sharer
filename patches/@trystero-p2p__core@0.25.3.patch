@@ -843,7 +843,7 @@ index cf12b0b808d11b85878e2a038138e8a64b5c40ba..dbb9a5cd14980ead09707ce7c34118f1
  	}
  };
 diff --git a/dist/strategy.mjs b/dist/strategy.mjs
-index a75dfcfddd14b2174d9acee37ecb84cd3c16c0eb..de126dc084071ee5f7cbdb5b9b1a2b2b51133452 100644
+index a75dfcfddd14b2174d9acee37ecb84cd3c16c0eb..77a27cfaa503f35fa2142103ceb591dd720a173e 100644
 --- a/dist/strategy.mjs
 +++ b/dist/strategy.mjs
 @@ -64,7 +64,6 @@ var strategy_default = ({ init, subscribe, announce, deactivate }) => {
@@ -911,14 +911,24 @@ index a75dfcfddd14b2174d9acee37ecb84cd3c16c0eb..de126dc084071ee5f7cbdb5b9b1a2b2b
  			cleanupWatchOnline();
  			cleanupRoomPresenceHandler(appId);
  		}, roomOptions);
-@@ -353,6 +357,31 @@ var strategy_default = ({ init, subscribe, announce, deactivate }) => {
+@@ -353,6 +357,44 @@ var strategy_default = ({ init, subscribe, announce, deactivate }) => {
  			});
  			if (!isPassive || ctx.isActive) advertiseRoomPresenceToAll(appId, roomToken, true);
  		});
++		const resetPendingMeshRelay = (peerId) => {
++			const state = ctx.peerStates[peerId];
++			if (!state || state.connectedPeer || state.answeringPeer || state.offerAnswered) return;
++			if (state.offerRelays[meshRelayId]) {
++				state.offerRelayTimers[meshRelayId] = resetTimer(state.offerRelayTimers[meshRelayId]);
++				state.offerRelays[meshRelayId] = void 0;
++				updateStatus(state);
++			}
++		};
 +		joinedRoom.initiateMeshSignaling = async (targetPeerId, sendToTarget) => {
 +			if (!targetPeerId || targetPeerId === selfId || didLeaveRoom || typeof sendToTarget !== "function") return;
 +			const selfTopic = await selfTopicP;
 +			if (didLeaveRoom) return;
++			resetPendingMeshRelay(targetPeerId);
 +			await handleMessage(meshRelayId)(selfTopic, { peerId: targetPeerId }, (_peerTopic, payloadJson) => {
 +				if (!didLeaveRoom) sendToTarget(targetPeerId, payloadJson);
 +			});
@@ -936,6 +946,9 @@ index a75dfcfddd14b2174d9acee37ecb84cd3c16c0eb..de126dc084071ee5f7cbdb5b9b1a2b2b
 +			if (!parsed || typeof parsed !== "object" || parsed.peerId !== fromPeerId) return;
 +			const selfTopic = await selfTopicP;
 +			if (didLeaveRoom) return;
++			if (!parsed.offer && !parsed.answer && !parsed.candidate) {
++				resetPendingMeshRelay(fromPeerId);
++			}
 +			await handleMessage(meshRelayId)(selfTopic, parsed, (_peerTopic, replyJson) => {
 +				if (!didLeaveRoom) sendToPeer(fromPeerId, replyJson);
 +			});

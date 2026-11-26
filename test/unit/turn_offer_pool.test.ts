@@ -220,3 +220,61 @@ test('direct ICE progress extends timeout before TURN fallback and disconnect re
   await flushMicrotasks();
   assert.equal(stateNoProgress.useFallbackRtc, true, 'zero direct ICE packets escalates at initial 6s deadline');
 });
+
+test('initiateMeshSignaling re-emits offer immediately on retry instead of blocking on relay cooldown', async () => {
+  const FakePc = class extends EventTarget {
+    connectionState = 'new';
+    signalingState = 'stable';
+    iceGatheringState = 'complete';
+    localDescription: RTCSessionDescriptionInit | null = null;
+    remoteDescription: RTCSessionDescriptionInit | null = null;
+    createDataChannel() {
+      return { readyState: 'connecting', close() { this.readyState = 'closed'; } };
+    }
+    async createOffer() {
+      return {
+        type: 'offer' as const,
+        sdp: 'v=0\r\ns=mesh\r\nt=0 0\r\nm=application 9 UDP/DTLS/SCTP webrtc-datachannel\r\n',
+      };
+    }
+    async setLocalDescription(description?: RTCSessionDescriptionInit) {
+      this.localDescription = description ?? await this.createOffer();
+      this.signalingState = 'have-local-offer';
+    }
+    close() { this.connectionState = 'closed'; }
+  };
+
+  const joinRoom = createStrategy({
+    init: () => ({}),
+    subscribe: () => () => {},
+    announce: () => {},
+  });
+
+  const room = joinRoom(
+    { appId: 'mesh-retry-test', rtcConfig: { iceServers: [] }, rtcPolyfill: FakePc, trickleIce: true },
+    'mesh-room',
+    { backgroundProbe: true },
+  );
+
+  try {
+    const sentPayloads: string[] = [];
+    // Target ID '~zzzzzzzzzzzzzzzzzzz' is lexicographically greater than any base62 selfId, so local leads offer.
+    await room.initiateMeshSignaling('~zzzzzzzzzzzzzzzzzzz', (_target: string, json: string) => {
+      sentPayloads.push(json);
+    });
+    assert.equal(sentPayloads.length, 1);
+    assert.ok(JSON.parse(sentPayloads[0]!).offer, 'first mesh signaling call emits encrypted offer');
+
+    await room.initiateMeshSignaling('~zzzzzzzzzzzzzzzzzzz', (_target: string, json: string) => {
+      sentPayloads.push(json);
+    });
+    assert.equal(sentPayloads.length, 2, 'immediate retry re-emits offer without waiting 4.8s');
+    assert.equal(
+      JSON.parse(sentPayloads[0]!).offerId,
+      JSON.parse(sentPayloads[1]!).offerId,
+      'retry reuses the active pending offer peer instead of leaking duplicate connections',
+    );
+  } finally {
+    await room.leave().catch(() => {});
+  }
+});

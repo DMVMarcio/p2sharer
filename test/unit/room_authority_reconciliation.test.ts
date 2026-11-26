@@ -464,3 +464,146 @@ test('relayed admission admits indirect newcomers through an admitted peer while
     (signalingManager as any).reannounce = originalReannounce;
   }
 });
+
+test('admin-managed room without host keeps indirect admins and preview-promoted peers visible and accepts forwarded admin-admit', async () => {
+  const created = await createAuthenticatedInvite('Admin room without host');
+  const baseInvite = parseRoomInvite(created.invite)!;
+  const hostAuth = await PeerAuthenticator.create(baseInvite.roomId, 'offline-host', created.identity);
+  const hostAuthority = new RoomAuthority(baseInvite.roomId, baseInvite.rootKey, hostAuth);
+
+  const adminA = await PeerAuthenticator.create(baseInvite.roomId, 'augusto-peer');
+  const adminB = await PeerAuthenticator.create(baseInvite.roomId, 'marcio-peer');
+  const eduardo = await PeerAuthenticator.create(baseInvite.roomId, 'eduardo-peer');
+
+  const grantA = await hostAuthority.makeCommand('admin', { targetPeerId: 'old-augusto-id', targetKey: adminA.publicKey });
+  const grantB = await hostAuthority.makeCommand('admin', { targetPeerId: 'old-marcio-id', targetKey: adminB.publicKey });
+  const signedInvite = await signRoomInvite({
+    ...baseInvite,
+    version: 4 as const,
+    revision: 2,
+    adminKeys: [adminA.publicKey, adminB.publicKey].sort(),
+  }, hostAuth);
+  const inviteCode = formatRoomInvite(signedInvite);
+
+  // Admin A (Augusto) previously admitted Eduardo while Host was offline.
+  const adminAAuthority = new RoomAuthority(baseInvite.roomId, baseInvite.rootKey, adminA);
+  const eduardoAdminAdmit = await adminAAuthority.signAdminAdmission('eduardo-peer', eduardo.publicKey, grantA);
+
+  // Save Admin B's identity in savedRooms so local manager joins as Admin B (not Host).
+  await savedRooms.put({
+    roomId: baseInvite.roomId,
+    invite: inviteCode,
+    name: 'Admin room without host',
+    saved: true,
+    owned: false,
+    identity: adminB.exportIdentity(),
+    hostCommands: [grantA, grantB],
+  });
+
+  const actions = new Map<string, Action>();
+  const sent: Array<{ action: string; data: any; target?: string }> = [];
+  const room = {
+    makeAction(name: string): Action {
+      const action: Action = {
+        send: async (data, options) => { sent.push({ action: name, data, target: options?.target }); },
+      };
+      actions.set(name, action);
+      return action;
+    },
+    getPeers: () => ({ 'eduardo-peer': {} }),
+    addStream: () => [],
+    onPeerJoin: (_peerId: string) => {},
+    onPeerLeave: (_peerId: string) => {},
+    onPeerStream: (_stream: MediaStream, _peerId: string) => {},
+  };
+
+  const originalJoin = signalingManager.joinRoom;
+  const originalLeave = signalingManager.leaveRoom;
+  const originalReannounce = signalingManager.reannounce;
+  (signalingManager as any).joinRoom = () => room;
+  (signalingManager as any).leaveRoom = async () => {};
+  (signalingManager as any).reannounce = async () => {};
+
+  const callbacks = {
+    onStreamsUpdate: () => {}, onSlotsUpdate: () => {}, onChat: () => {},
+    onChatHistory: () => {}, onPeersUpdate: () => {}, onStatusChange: () => {},
+  };
+
+  const manager = new GroupRoomManager('iMarcioo', inviteCode, '', false);
+  try {
+    // 1. Start in preview mode (JoinRoomModal) and receive signed preview from Eduardo (admin-admitted member).
+    await manager.join(callbacks, true);
+    room.onPeerJoin('eduardo-peer');
+    const nonce = sent.findLast((item) => item.action === 'peer_identity' && item.data.kind === 'challenge')!.data.nonce;
+    await actions.get('peer_identity')!.onMessage!({
+      kind: 'proof',
+      nonce,
+      key: eduardo.publicKey,
+      signature: await eduardo.signControl('identity', [baseInvite.roomId, 'eduardo-peer', nonce]),
+    }, { peerId: 'eduardo-peer' });
+
+    const previewNonce = (manager as any).previewNonce;
+    const preview = {
+      name: 'Admin room without host',
+      protected: false,
+      participants: [
+        { id: 'eduardo-peer', name: 'Eduardo', color: '#06b6d4' },
+        { id: 'augusto-peer', name: 'Augusto', color: '#f59e0b' },
+      ],
+    };
+    await actions.get('room_preview_v1')!.onMessage!({
+      kind: 'response',
+      nonce: previewNonce,
+      preview,
+      signature: await eduardo.signControl('room-preview', [previewNonce, preview]),
+      adminMembership: eduardoAdminAdmit,
+      canAdmit: false,
+    }, { peerId: 'eduardo-peer' });
+
+    // 2. Promote preview into active room as Admin B: Augusto must NOT vanish on entry!
+    await manager.join(callbacks, false);
+    assert.equal(manager.isRoomAdmin(), true);
+    assert.equal(manager.hasAdmission(), true);
+    assert.equal(
+      manager.getConnectedPeers().some((p) => p.id === 'augusto-peer' && p.username === 'Augusto' && p.connectionState === 'connecting'),
+      true,
+      'indirect admin seen in verified preview must remain visible immediately upon entering the room',
+    );
+
+    // 3. Even if Eduardo sends a legacy v1.8.4 peer_exchange without publicKey, Augusto stays visible;
+    //    and once mesh_ack delivers Augusto's admin publicKey, Augusto is recognized as an admin!
+    await actions.get('peer_exchange')!.onMessage!({
+      peers: [{ peerId: 'augusto-peer', username: 'Augusto', isStreaming: false, isCreator: false, joinedAt: Date.now() }],
+    }, { peerId: 'eduardo-peer' });
+    assert.equal(manager.getConnectedPeers().some((p) => p.id === 'augusto-peer'), true);
+
+    await actions.get('mesh_relay')!.onMessage!({
+      target: manager.getLocalPeerId(),
+      origin: 'augusto-peer',
+      kind: 'mesh_ack',
+      payload: { username: 'Augusto', isCreator: false, joinedAt: Date.now(), isStreaming: false, publicKey: adminA.publicKey },
+    }, { peerId: 'eduardo-peer' });
+    const augustoInfo = manager.getConnectedPeers().find((p) => p.id === 'augusto-peer');
+    assert.ok(augustoInfo);
+    assert.equal(augustoInfo.isAdmin, true, 'indirect admin key pinned via mesh_ack must surface admin role');
+
+    // 4. Forwarded admin-admit from non-admin Eduardo for another newcomer is accepted via cryptographic verification.
+    const guestAuth = await PeerAuthenticator.create(baseInvite.roomId, 'late-guest');
+    const relayedGuestAdmit = await adminAAuthority.signAdminAdmission('late-guest', guestAuth.publicKey, grantA);
+    await actions.get('room_admission')!.onMessage!({
+      kind: 'admin-admit',
+      admission: relayedGuestAdmit,
+    }, { peerId: 'eduardo-peer' });
+    assert.equal(
+      (manager as any).adminAdmissions.get('late-guest')?.targetKey,
+      guestAuth.publicKey,
+      'cryptographically valid admin-admit forwarded by an admitted non-admin member must be stored',
+    );
+  } finally {
+    await manager.leave();
+    await savedRooms.remove(baseInvite.roomId);
+    (signalingManager as any).joinRoom = originalJoin;
+    (signalingManager as any).leaveRoom = originalLeave;
+    (signalingManager as any).reannounce = originalReannounce;
+  }
+});
