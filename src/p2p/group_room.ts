@@ -4,8 +4,13 @@ import { logDiagnostic } from '../core/logger.ts';
 import { ProfileTransfer } from './profile_transfer.ts';
 import { profileImages, profileBanners } from '../core/profile_image.ts';
 import { profileStats } from '../core/profile_stats.ts';
-import { validStreamDescriptors, streamSlotKey, streamOwner, type StreamDescriptor } from "../core/media_streams.ts";
-import { validStreamPointer, validStreamPointerState, type StreamPointerState, type StreamPointerPacket } from '../core/stream_pointer.ts';
+import { validStreamDescriptors, streamSlotKey, streamOwner, type StreamDescriptor } from '../core/media_streams.ts';
+import {
+  validStreamPointer,
+  validStreamPointerState,
+  type StreamPointerState,
+  type StreamPointerPacket,
+} from '../core/stream_pointer.ts';
 import {
   decodeRemoteControlBinaryInput,
   decodeRemoteControlCursorSync,
@@ -21,17 +26,51 @@ import { selfId } from '@trystero-p2p/core';
 import { invoke } from '../platform/commands.ts';
 import type { AppWireEvent } from '../apps/types.ts';
 import { getRoomApp } from '../apps/registry.ts';
-import { chatHistoryChanged, chatRevision, chatRevisionKey, mergeChatHistory, nextChatOrder } from '../core/chat_history.ts';
-import { CHAT_FILE_CHUNK_BYTES, CHAT_FILE_IO_BATCH_BYTES, CHAT_FILE_IN_FLIGHT_CHUNKS, MAX_IMAGE_PREVIEW_BYTES } from '../core/chat_file_limits.ts';
-import { decodeSignedFileChunk, encodeSignedFileChunk,
-  fastFileChunkTag, fileChunkSignatureData, hashFileChunk } from '../core/chat_file_wire.ts';
+import {
+  chatHistoryChanged,
+  chatRevision,
+  chatRevisionKey,
+  mergeChatHistory,
+  nextChatOrder,
+} from '../core/chat_history.ts';
+import {
+  CHAT_FILE_CHUNK_BYTES,
+  CHAT_FILE_IO_BATCH_BYTES,
+  CHAT_FILE_IN_FLIGHT_CHUNKS,
+  MAX_IMAGE_PREVIEW_BYTES,
+} from '../core/chat_file_limits.ts';
+import {
+  decodeSignedFileChunk,
+  encodeSignedFileChunk,
+  fastFileChunkTag,
+  fileChunkSignatureData,
+  hashFileChunk,
+} from '../core/chat_file_wire.ts';
 import { PeerAuthenticator } from '../core/peer_auth.ts';
 import { readChatFileBytes, writeChatDownloadBytes } from '../core/chat_file_io.ts';
 import { selectedIcePair, selectedIceRoute, type IceStat } from '../core/ice_route.ts';
-import { cancelDirectFile, directFileAddress, directFileSignature, receiveDirectFile, validDirectFileOffer, type DirectFileOffer } from '../core/chat_file_direct.ts';
-import { RoomAuthority, type AdminAdmission, type AuthorityTransfer, type HostCommand } from '../core/room_authority.ts';
-import { compareRoomInvites, formatRoomInvite, parseRoomInvite, signRoomInvite, validRoomName,
-  type NamedRoomInvite } from '../core/room_invite.ts';
+import {
+  cancelDirectFile,
+  directFileAddress,
+  directFileSignature,
+  receiveDirectFile,
+  validDirectFileOffer,
+  type DirectFileOffer,
+} from '../core/chat_file_direct.ts';
+import {
+  RoomAuthority,
+  type AdminAdmission,
+  type AuthorityTransfer,
+  type HostCommand,
+} from '../core/room_authority.ts';
+import {
+  compareRoomInvites,
+  formatRoomInvite,
+  parseRoomInvite,
+  signRoomInvite,
+  validRoomName,
+  type NamedRoomInvite,
+} from '../core/room_invite.ts';
 import { isAuthorityChainPrefix, verifyRoomInvite } from '../core/room_invite_validation.ts';
 import { savedRoomCustomName, savedRooms, type SavedRoom } from '../core/saved_rooms.ts';
 import { latestAdminCommand, roomStateFingerprint } from '../core/room_state_sync.ts';
@@ -73,17 +112,73 @@ import { profileThumbnail, validRoomPreview, type RoomPreview } from '../core/ro
 const APP_ID = 'p2sharer-multi-stream-v5';
 
 const ADJECTIVES = [
-  'cyber', 'neon', 'rapid', 'swift', 'cosmic', 'hyper', 'solar', 'lunar',
-  'mystic', 'sonic', 'ultra', 'mega', 'royal', 'epic', 'prime', 'iron',
-  'silver', 'golden', 'shadow', 'crystal', 'astro', 'blaze', 'storm', 'vortex',
-  'quantum', 'echo', 'alpha', 'nova', 'turbo', 'ninja', 'pixel', 'phantom',
+  'cyber',
+  'neon',
+  'rapid',
+  'swift',
+  'cosmic',
+  'hyper',
+  'solar',
+  'lunar',
+  'mystic',
+  'sonic',
+  'ultra',
+  'mega',
+  'royal',
+  'epic',
+  'prime',
+  'iron',
+  'silver',
+  'golden',
+  'shadow',
+  'crystal',
+  'astro',
+  'blaze',
+  'storm',
+  'vortex',
+  'quantum',
+  'echo',
+  'alpha',
+  'nova',
+  'turbo',
+  'ninja',
+  'pixel',
+  'phantom',
 ];
 
 const NOUNS = [
-  'falcon', 'tiger', 'wolf', 'eagle', 'hawk', 'panther', 'fox', 'dragon',
-  'phoenix', 'bear', 'shark', 'cobra', 'viper', 'lion', 'lynx', 'titan',
-  'nomad', 'runner', 'driver', 'spark', 'storm', 'pulse', 'byte', 'core',
-  'matrix', 'drift', 'horizon', 'forge', 'nexus', 'rover', 'shield', 'vortex',
+  'falcon',
+  'tiger',
+  'wolf',
+  'eagle',
+  'hawk',
+  'panther',
+  'fox',
+  'dragon',
+  'phoenix',
+  'bear',
+  'shark',
+  'cobra',
+  'viper',
+  'lion',
+  'lynx',
+  'titan',
+  'nomad',
+  'runner',
+  'driver',
+  'spark',
+  'storm',
+  'pulse',
+  'byte',
+  'core',
+  'matrix',
+  'drift',
+  'horizon',
+  'forge',
+  'nexus',
+  'rover',
+  'shield',
+  'vortex',
 ];
 
 export function generateRandomRoomSlug(): string {
@@ -102,7 +197,10 @@ export async function computeSignalingRoomId(roomId: string, password = ''): Pro
   const data = new TextEncoder().encode(`p2sharer-auth:${cleanRoom}:${cleanPass}`);
   const hashBuffer = await crypto.subtle.digest('SHA-256', data);
   const hashArray = Array.from(new Uint8Array(hashBuffer));
-  const hashHex = hashArray.map((b) => b.toString(16).padStart(2, '0')).join('').substring(0, 16);
+  const hashHex = hashArray
+    .map((b) => b.toString(16).padStart(2, '0'))
+    .join('')
+    .substring(0, 16);
   return `sec-${cleanRoom}-${hashHex}`;
 }
 
@@ -145,13 +243,100 @@ export interface RoomCallbacks {
   onSenderConsumerChange?: (mediaId: string, consumerId: string, active: boolean) => void;
 }
 
-export interface NativeChatFile { id: string; name: string; path: string; size: number; hash: string; isImage: boolean }
-export interface FileRequest { requestId: string; messageId: string; peerId: string; peerName: string; path: string; name: string; preview: boolean }
-export interface FileTimings { readMs: number; prepareMs: number; wireMs: number; verifyMs: number; writeMs: number; ackMs: number }
-export interface FileTransportDiagnostics { protocol?: string; localCandidateType?: string; remoteCandidateType?: string; channelLabel?: string; queuedBytes?: number; queueLimitBytes?: number; pairBytesSent?: number; pairBytesReceived?: number; pairTimestamp?: number; pairBytesPerSecond?: number; availableOutgoingBitsPerSecond?: number; packetsDiscardedOnSend?: number }
-export interface FileProgress { requestId: string; messageId: string; direction: 'send' | 'receive'; bytes: number; total: number; status: 'pending' | 'active' | 'complete' | 'cancelled' | 'error'; error?: string; preview?: string; previewBytes?: Uint8Array; saved?: boolean; nativeDirect?: boolean; previewOnly?: boolean; peerId?: string; fileName?: string; peerName?: string; startedAt?: number; isImage?: boolean; bytesPerSecond?: number; connectionType?: string; rttMs?: number | null; timings?: FileTimings; transport?: FileTransportDiagnostics }
-type FilePacket = { kind: 'request' | 'accept' | 'ready' | 'deny' | 'ack' | 'cancel'; requestId: string; messageId: string; offset?: number; preview?: boolean; direct?: DirectFileOffer; signature: string };
-type FileSession = { messageId: string; peerId: string; peerName?: string; sourceId?: string; offset: number; sentOffset?: number; lastAckOffset?: number; sessionToken?: string; ackedOnce?: boolean; direct?: boolean; startedTransfer?: boolean; sending?: boolean; receiving?: boolean; writingUntil?: number; pendingChunks?: Map<number, Uint8Array>; total: number; direction: 'send' | 'receive'; preview?: boolean; chunks?: Uint8Array[]; timings: FileTimings };
+export interface NativeChatFile {
+  id: string;
+  name: string;
+  path: string;
+  size: number;
+  hash: string;
+  isImage: boolean;
+}
+export interface FileRequest {
+  requestId: string;
+  messageId: string;
+  peerId: string;
+  peerName: string;
+  path: string;
+  name: string;
+  preview: boolean;
+}
+export interface FileTimings {
+  readMs: number;
+  prepareMs: number;
+  wireMs: number;
+  verifyMs: number;
+  writeMs: number;
+  ackMs: number;
+}
+export interface FileTransportDiagnostics {
+  protocol?: string;
+  localCandidateType?: string;
+  remoteCandidateType?: string;
+  channelLabel?: string;
+  queuedBytes?: number;
+  queueLimitBytes?: number;
+  pairBytesSent?: number;
+  pairBytesReceived?: number;
+  pairTimestamp?: number;
+  pairBytesPerSecond?: number;
+  availableOutgoingBitsPerSecond?: number;
+  packetsDiscardedOnSend?: number;
+}
+export interface FileProgress {
+  requestId: string;
+  messageId: string;
+  direction: 'send' | 'receive';
+  bytes: number;
+  total: number;
+  status: 'pending' | 'active' | 'complete' | 'cancelled' | 'error';
+  error?: string;
+  preview?: string;
+  previewBytes?: Uint8Array;
+  saved?: boolean;
+  nativeDirect?: boolean;
+  previewOnly?: boolean;
+  peerId?: string;
+  fileName?: string;
+  peerName?: string;
+  startedAt?: number;
+  isImage?: boolean;
+  bytesPerSecond?: number;
+  connectionType?: string;
+  rttMs?: number | null;
+  timings?: FileTimings;
+  transport?: FileTransportDiagnostics;
+}
+type FilePacket = {
+  kind: 'request' | 'accept' | 'ready' | 'deny' | 'ack' | 'cancel';
+  requestId: string;
+  messageId: string;
+  offset?: number;
+  preview?: boolean;
+  direct?: DirectFileOffer;
+  signature: string;
+};
+type FileSession = {
+  messageId: string;
+  peerId: string;
+  peerName?: string;
+  sourceId?: string;
+  offset: number;
+  sentOffset?: number;
+  lastAckOffset?: number;
+  sessionToken?: string;
+  ackedOnce?: boolean;
+  direct?: boolean;
+  startedTransfer?: boolean;
+  sending?: boolean;
+  receiving?: boolean;
+  writingUntil?: number;
+  pendingChunks?: Map<number, Uint8Array>;
+  total: number;
+  direction: 'send' | 'receive';
+  preview?: boolean;
+  chunks?: Uint8Array[];
+  timings: FileTimings;
+};
 
 function newFileTimings(): FileTimings {
   return { readMs: 0, prepareMs: 0, wireMs: 0, verifyMs: 0, writeMs: 0, ackMs: 0 };
@@ -160,9 +345,9 @@ function newFileTimings(): FileTimings {
 function isVoiceStreamMetadata(meta: unknown): boolean {
   return Boolean(
     meta &&
-      typeof meta === 'object' &&
-      (meta as Record<string, unknown>).kind === 'voice' &&
-      (meta as Record<string, unknown>).id === 'voice',
+    typeof meta === 'object' &&
+    (meta as Record<string, unknown>).kind === 'voice' &&
+    (meta as Record<string, unknown>).id === 'voice',
   );
 }
 
@@ -213,15 +398,25 @@ export class GroupRoomManager {
   private lastAdmissionRetry = 0;
   private leavePromise: Promise<void> | null = null;
 
-  public hasAdmission(): boolean { return this.localAdmitted && !this.previewOnly; }
-  public isAdmissionDenied(): boolean { return this.admissionDenied; }
-  public hasDirectPeers(): boolean { return this.peerTracker.directConnectedPeers.size > 0; }
+  public hasAdmission(): boolean {
+    return this.localAdmitted && !this.previewOnly;
+  }
+  public isAdmissionDenied(): boolean {
+    return this.admissionDenied;
+  }
+  public hasDirectPeers(): boolean {
+    return this.peerTracker.directConnectedPeers.size > 0;
+  }
   public getActivePeerConnections(): RTCPeerConnection[] {
     const peers = this.room?.getPeers?.();
     if (!peers) return [];
-    return Object.values(peers).filter((pc): pc is RTCPeerConnection => Boolean(pc && typeof (pc as RTCPeerConnection).getStats === 'function'));
+    return Object.values(peers).filter((pc): pc is RTCPeerConnection =>
+      Boolean(pc && typeof (pc as RTCPeerConnection).getStats === 'function'),
+    );
   }
-  public hasVerifiedPreviewMembers(): boolean { return this.verifiedPreviewByResponder.size > 0; }
+  public hasVerifiedPreviewMembers(): boolean {
+    return this.verifiedPreviewByResponder.size > 0;
+  }
   public hasVerifiedIdentityPeers(): boolean {
     for (const peerId of this.peerTracker.directConnectedPeers) {
       if (this.chatAuth?.getKnownKey(peerId)) return true;
@@ -230,7 +425,9 @@ export class GroupRoomManager {
   }
   public hasHostOnline(): boolean {
     if (!this.authority) {
-      return this.isCreator || [...this.peerTracker.directConnectedPeers].some((id) => this.peerTracker.isPeerCreator(id));
+      return (
+        this.isCreator || [...this.peerTracker.directConnectedPeers].some((id) => this.peerTracker.isPeerCreator(id))
+      );
     }
     if (this.authority.isLocalHost()) return true;
     for (const peerId of this.peerTracker.directConnectedPeers) {
@@ -251,8 +448,9 @@ export class GroupRoomManager {
 
   public canResumeRoom(code: string): boolean {
     const invite = parseRoomInvite(code);
-    return Boolean(this.room && !this.leavePromise && invite &&
-      invite.roomId === this.roomId && invite.rootKey === this.rootKey);
+    return Boolean(
+      this.room && !this.leavePromise && invite && invite.roomId === this.roomId && invite.rootKey === this.rootKey,
+    );
   }
 
   public requestPreview(): void {
@@ -261,21 +459,27 @@ export class GroupRoomManager {
       void signalingManager.reannounce(this.signalingTopic);
     }
     for (const peerId of this.peerTracker.directConnectedPeers) {
-      if (this.isLivePeerTarget(peerId) && this.chatAuth?.getKnownKey(peerId)) void this.previewAction?.send(
-        { kind: 'request', nonce: this.previewNonce }, { target: peerId });
+      if (this.isLivePeerTarget(peerId) && this.chatAuth?.getKnownKey(peerId))
+        void this.previewAction?.send({ kind: 'request', nonce: this.previewNonce }, { target: peerId });
     }
   }
 
   private async requestAdmission(peerId: string): Promise<void> {
-    if (this.previewOnly) { this.requestPreview(); return; }
-    if (!this.isLivePeerTarget(peerId)) return;
+    if (this.previewOnly) {
+      this.requestPreview();
+      return;
+    }
+    if (this.localAdmitted || this.admissionDenied || !this.isLivePeerTarget(peerId)) return;
     await this.admissionAction?.send({ kind: 'request', password: this.password }, { target: peerId });
   }
 
   private findAdmissionRelayTarget(): string | null {
     for (const peerId of this.peerTracker.directConnectedPeers) {
-      if (this.isLivePeerTarget(peerId) && this.chatAuth?.getKnownKey(peerId) &&
-          (this.authority?.isPeerHost(peerId) || this.isPeerAdmin(peerId))) {
+      if (
+        this.isLivePeerTarget(peerId) &&
+        this.chatAuth?.getKnownKey(peerId) &&
+        (this.authority?.isPeerHost(peerId) || this.isPeerAdmin(peerId))
+      ) {
         return peerId;
       }
     }
@@ -283,18 +487,35 @@ export class GroupRoomManager {
   }
 
   private async sendRelayedAdmissionRequest(relayPeerId: string): Promise<void> {
-    if (this.previewOnly || !this.authority || !this.chatAuth || this.localAdmitted ||
-        this.admissionDenied || !this.admissionAction) return;
+    if (
+      this.previewOnly ||
+      !this.authority ||
+      !this.chatAuth ||
+      this.localAdmitted ||
+      this.admissionDenied ||
+      !this.admissionAction
+    )
+      return;
     if (!this.isLivePeerTarget(relayPeerId)) return;
     const signature = await this.chatAuth.signControl('relay-admit', [this.roomId, selfId, this.chatAuth.publicKey]);
-    if (!this.room || this.previewOnly || this.localAdmitted || this.admissionDenied || !this.isLivePeerTarget(relayPeerId)) return;
-    await this.admissionAction.send({
-      kind: 'relay-request',
-      targetPeerId: selfId,
-      targetKey: this.chatAuth.publicKey,
-      password: '',
-      signature,
-    }, { target: relayPeerId });
+    if (
+      !this.room ||
+      this.previewOnly ||
+      this.localAdmitted ||
+      this.admissionDenied ||
+      !this.isLivePeerTarget(relayPeerId)
+    )
+      return;
+    await this.admissionAction.send(
+      {
+        kind: 'relay-request',
+        targetPeerId: selfId,
+        targetKey: this.chatAuth.publicKey,
+        password: '',
+        signature,
+      },
+      { target: relayPeerId },
+    );
     logDiagnostic('INFO', 'p2p.admission', 'Sent relayed admission request via admitted peer', {
       relayPeer: relayPeerId.slice(0, 6),
     });
@@ -319,8 +540,16 @@ export class GroupRoomManager {
   private lastDisconnectedPing = new Map<string, number>();
   private disconnectedPeers = new Set<string>();
   private mediaRevision = 0;
-  private mediaDispatches = new Map<string, { room: unknown; connection: RTCPeerConnection | undefined;
-    revision: number; at: number; timers: ReturnType<typeof setTimeout>[] }>();
+  private mediaDispatches = new Map<
+    string,
+    {
+      room: unknown;
+      connection: RTCPeerConnection | undefined;
+      revision: number;
+      at: number;
+      timers: ReturnType<typeof setTimeout>[];
+    }
+  >();
   private mediaStatsSamples = new Map<string, { bytes: number; at: number; nativeFrames?: number }>();
   private localStream: MediaStream | null = null;
 
@@ -387,7 +616,9 @@ export class GroupRoomManager {
 
   private fileBulk = new FileBulkChannelManager(
     (peerId) => this.room?.getPeers?.()?.[peerId] as RTCPeerConnection | undefined,
-    (peerId, packet) => { void this.handleFileChunkWire(packet, peerId); },
+    (peerId, packet) => {
+      void this.handleFileChunkWire(packet, peerId);
+    },
   );
   private binaryPeers = new Set<string>();
   private remoteControlFastPeers = new Set<string>();
@@ -404,7 +635,7 @@ export class GroupRoomManager {
     lastLogAt: 0,
   };
   private payloadChannels = new PeerPayloadChannels(
-    peer => this.room?.getPeers?.()?.[peer] as RTCPeerConnection | undefined,
+    (peer) => this.room?.getPeers?.()?.[peer] as RTCPeerConnection | undefined,
     (peer, lane, frame) => {
       if (!this.payloadPeerAllowed(peer)) return;
       if ((lane === 'datagram' || lane === 'tunnel' || lane === 'input') && isRemoteControlBinaryFrame(frame)) {
@@ -416,7 +647,11 @@ export class GroupRoomManager {
             if (((decodedCursor.seq - prevSeq) | 0) <= 0) return;
             this.remoteControlCursorRxSeq.set(seqKey, decodedCursor.seq);
           }
-          const hasScreen = this.remoteDescriptors.get(peer)?.some(entry => entry.id === decodedCursor.packet.mediaId && entry.kind === 'screen') || this.remoteStreams.has(peer);
+          const hasScreen =
+            this.remoteDescriptors
+              .get(peer)
+              ?.some((entry) => entry.id === decodedCursor.packet.mediaId && entry.kind === 'screen') ||
+            this.remoteStreams.has(peer);
           if (hasScreen || !decodedCursor.packet.active) {
             this.callbacks?.onRemoteControlHost?.(decodedCursor.packet, peer);
           }
@@ -434,9 +669,10 @@ export class GroupRoomManager {
           }
           this.remoteControlRxSeq.set(seqKey, decodedRc.seq);
         } else if (lane === 'input' && (decodedRc.event.kind === 'key' || decodedRc.event.kind === 'mouseButton')) {
-          const itemKey = decodedRc.event.kind === 'key'
-            ? `${seqKey}:k:${decodedRc.event.code}`
-            : `${seqKey}:b:${decodedRc.event.button}`;
+          const itemKey =
+            decodedRc.event.kind === 'key'
+              ? `${seqKey}:k:${decodedRc.event.code}`
+              : `${seqKey}:b:${decodedRc.event.button}`;
           const prevSeq = this.remoteControlRxSeq.get(itemKey) ?? 0;
           if (((decodedRc.seq - prevSeq) | 0) <= 0) {
             this.remoteControlPerf.oooDropped += 1;
@@ -460,16 +696,36 @@ export class GroupRoomManager {
         const payload = header.payload;
         if (lane === 'datagram' && payload?.type === 'virtual-packet' && bytes.length <= 1280)
           this.callbacks?.onAppEvent?.({ ...header, payload: { ...payload, data: bytes } }, peer);
-        else if ((lane === 'tunnel' || (lane === 'datagram' && payload?.packet?.kind === 'datagram')) && payload?.type === 'wire' && payload.packet && typeof payload.packet === 'object')
-          this.callbacks?.onAppEvent?.({ ...header, payload: { ...payload, packet: { ...payload.packet,
-            ...(['data', 'datagram'].includes(payload.packet.kind) ? { data: bytes } : {}) } } }, peer);
+        else if (
+          (lane === 'tunnel' || (lane === 'datagram' && payload?.packet?.kind === 'datagram')) &&
+          payload?.type === 'wire' &&
+          payload.packet &&
+          typeof payload.packet === 'object'
+        )
+          this.callbacks?.onAppEvent?.(
+            {
+              ...header,
+              payload: {
+                ...payload,
+                packet: {
+                  ...payload.packet,
+                  ...(['data', 'datagram'].includes(payload.packet.kind) ? { data: bytes } : {}),
+                },
+              },
+            },
+            peer,
+          );
       }
     },
   );
   private payloadPeerAllowed(peer: string): boolean {
-    return Boolean(this.room && !this.previewOnly && this.peerTracker.isVerified(peer) &&
+    return Boolean(
+      this.room &&
+      !this.previewOnly &&
+      this.peerTracker.isVerified(peer) &&
       this.isLivePeerTarget(peer) &&
-      (!this.authority || (this.localAdmitted && this.isAdmittedPeer(peer))));
+      (!this.authority || (this.localAdmitted && this.isAdmittedPeer(peer))),
+    );
   }
   private async sendProfilePayload(packet: any, peer: string, banner = false): Promise<unknown> {
     if (!this.payloadPeerAllowed(peer)) throw new Error('Profile peer unavailable');
@@ -479,9 +735,12 @@ export class GroupRoomManager {
     }
     if (packet.kind === 'chunk' && packet.binary === true && this.binaryPeers.has(peer)) {
       const { data, ...metadata } = packet;
-      const sent = await this.payloadChannels.send(peer, 'profile',
+      const sent = await this.payloadChannels.send(
+        peer,
+        'profile',
         encodePeerPayload({ type: banner ? 'banner' : 'avatar', packet: metadata }, decodeFileBase64(data)),
-        () => this.payloadPeerAllowed(peer));
+        () => this.payloadPeerAllowed(peer),
+      );
       if (!sent) throw new Error('Profile binary channel unavailable');
       return;
     }
@@ -579,8 +838,15 @@ export class GroupRoomManager {
   private rtcConfig: RTCConfiguration | null = null;
   private fallbackRtcConfig: RTCConfiguration | null = null;
 
-  constructor(username: string, roomId: string, password = '', isCreator = false, turnConfig?: TurnConfig,
-    shortLookup = false, backgroundProbe = false) {
+  constructor(
+    username: string,
+    roomId: string,
+    password = '',
+    isCreator = false,
+    turnConfig?: TurnConfig,
+    shortLookup = false,
+    backgroundProbe = false,
+  ) {
     this.shortLookup = shortLookup;
     this.backgroundProbe = backgroundProbe;
     this.username = username;
@@ -597,9 +863,7 @@ export class GroupRoomManager {
     if (!this.backgroundProbe) {
       // Register signaling manager failover handler
       signalingManager.setRoomReconnectionHandler(async (newTransport, previousTransport) => {
-        console.log(
-          `[GroupRoomManager] Handling signaling failover: ${previousTransport} -> ${newTransport}`
-        );
+        console.log(`[GroupRoomManager] Handling signaling failover: ${previousTransport} -> ${newTransport}`);
         if (this.callbacks) {
           this.callbacks.onStatusChange(`Sinalização alternada para ${newTransport.toUpperCase()}`);
         }
@@ -612,8 +876,12 @@ export class GroupRoomManager {
     return this.roomId;
   }
 
-  public getLocalPeerId(): string { return selfId; }
-  public getRtcConfiguration(): RTCConfiguration { return structuredClone(this.rtcConfig ?? buildRtcConfiguration(this.turnConfig)); }
+  public getLocalPeerId(): string {
+    return selfId;
+  }
+  public getRtcConfiguration(): RTCConfiguration {
+    return structuredClone(this.rtcConfig ?? buildRtcConfiguration(this.turnConfig));
+  }
 
   private applyTurnConfiguration(turnConfig: TurnConfig | null): void {
     const useImmediateTurn = Boolean(turnConfig?.enabled && (turnConfig.forceRelay || !turnConfig.automatic));
@@ -659,26 +927,38 @@ export class GroupRoomManager {
   public sendStreamPointerState(state: StreamPointerState): void {
     if (!validStreamPointerState(state)) return;
     for (const watcher of this.getStreamWatchers('local')) {
-      if (!this.pointerAction || !this.peerTracker.isVerified(watcher.peerId) ||
-          !this.isLivePeerTarget(watcher.peerId) ||
-          (this.authority && (!this.localAdmitted || !this.isAdmittedPeer(watcher.peerId)))) continue;
+      if (
+        !this.pointerAction ||
+        !this.peerTracker.isVerified(watcher.peerId) ||
+        !this.isLivePeerTarget(watcher.peerId) ||
+        (this.authority && (!this.localAdmitted || !this.isAdmittedPeer(watcher.peerId)))
+      )
+        continue;
       void Promise.resolve(this.pointerAction.send(state, { target: watcher.peerId })).catch(() => {});
     }
   }
 
   public sendStreamPointer(packet: StreamPointerPacket, target: string): void {
     if (!validStreamPointer(packet)) return;
-    if (!this.pointerAction || !this.peerTracker.isVerified(target) ||
-        !this.isLivePeerTarget(target) ||
-        (this.authority && (!this.localAdmitted || !this.isAdmittedPeer(target)))) return;
+    if (
+      !this.pointerAction ||
+      !this.peerTracker.isVerified(target) ||
+      !this.isLivePeerTarget(target) ||
+      (this.authority && (!this.localAdmitted || !this.isAdmittedPeer(target)))
+    )
+      return;
     void Promise.resolve(this.pointerAction.send(packet, { target })).catch(() => {});
   }
 
   public sendRemoteControlClient(packet: RemoteControlClientPacket, target: string): void {
     if (!validRemoteControlClientPacket(packet)) return;
-    if (!this.remoteControlAction || !this.peerTracker.isVerified(target) ||
-        !this.isLivePeerTarget(target) ||
-        (this.authority && (!this.localAdmitted || !this.isAdmittedPeer(target)))) return;
+    if (
+      !this.remoteControlAction ||
+      !this.peerTracker.isVerified(target) ||
+      !this.isLivePeerTarget(target) ||
+      (this.authority && (!this.localAdmitted || !this.isAdmittedPeer(target)))
+    )
+      return;
     if (packet.type === 'request') {
       this.payloadChannels.ensure(target);
       void Promise.resolve(this.remoteControlAction.send({ ...packet, fastBinary: true }, { target })).catch(() => {});
@@ -729,7 +1009,10 @@ export class GroupRoomManager {
     const { datagramSent, tunnelSent, trysteroSent, oooDropped } = this.remoteControlPerf;
     if (datagramSent + tunnelSent + trysteroSent + oooDropped === 0) return;
     logDiagnostic('INFO', 'remoteControl.transport', 'Remote control transport summary', {
-      datagramSent, tunnelSent, trysteroSent, oooDropped,
+      datagramSent,
+      tunnelSent,
+      trysteroSent,
+      oooDropped,
       fastPeers: this.remoteControlFastPeers.size,
     });
     this.remoteControlPerf.datagramSent = 0;
@@ -760,8 +1043,12 @@ export class GroupRoomManager {
 
   public sendRemoteControlHost(packet: RemoteControlHostPacket, target: string): void {
     if (!validRemoteControlHostPacket(packet)) return;
-    if (!this.remoteControlAction || !this.peerTracker.isVerified(target) ||
-        (this.authority && (!this.localAdmitted || !this.isAdmittedPeer(target)))) return;
+    if (
+      !this.remoteControlAction ||
+      !this.peerTracker.isVerified(target) ||
+      (this.authority && (!this.localAdmitted || !this.isAdmittedPeer(target)))
+    )
+      return;
     if (packet.type === 'accept') {
       this.payloadChannels.ensure(target);
     }
@@ -778,9 +1065,7 @@ export class GroupRoomManager {
     void Promise.resolve(this.remoteControlAction.send(packet, { target })).catch(() => {});
   }
 
-  public broadcastRemoteControlCursorSync(
-    packet: Extract<RemoteControlHostPacket, { type: 'cursorSync' }>,
-  ): void {
+  public broadcastRemoteControlCursorSync(packet: Extract<RemoteControlHostPacket, { type: 'cursorSync' }>): void {
     if (!validRemoteControlHostPacket(packet) || !this.remoteControlAction) return;
     const watchers = new Set<string>();
     for (const watcher of this.getStreamWatchers(`local/${packet.mediaId}`)) watchers.add(watcher.peerId);
@@ -790,8 +1075,10 @@ export class GroupRoomManager {
     this.remoteControlCursorTxSeq = (this.remoteControlCursorTxSeq + 1) >>> 0 || 1;
     const frame = encodeRemoteControlCursorSync(packet, this.remoteControlCursorTxSeq);
     for (const target of watchers) {
-      if (!this.peerTracker.isVerified(target) ||
-          (this.authority && (!this.localAdmitted || !this.isAdmittedPeer(target)))) {
+      if (
+        !this.peerTracker.isVerified(target) ||
+        (this.authority && (!this.localAdmitted || !this.isAdmittedPeer(target)))
+      ) {
         continue;
       }
       if (frame && packet.active) {
@@ -810,8 +1097,7 @@ export class GroupRoomManager {
     for (const watcher of this.getStreamWatchers('local')) watchers.add(watcher.peerId);
     return Array.from(watchers).filter(
       (target) =>
-        this.peerTracker.isVerified(target) &&
-        (!this.authority || (this.localAdmitted && this.isAdmittedPeer(target))),
+        this.peerTracker.isVerified(target) && (!this.authority || (this.localAdmitted && this.isAdmittedPeer(target))),
     );
   }
 
@@ -819,19 +1105,28 @@ export class GroupRoomManager {
     if (!this.appAction || (this.authority && !this.localAdmitted)) return;
     if (target) {
       const key = this.chatAuth?.getKnownKey(target);
-      if (this.peerTracker.isVerified(target) &&
-          (!this.authority || (key && this.admittedPeers.get(target) === key)))
-      {
+      if (this.peerTracker.isVerified(target) && (!this.authority || (key && this.admittedPeers.get(target) === key))) {
         if (event.kind === 'data') {
           const payload = event.payload as any;
           if (payload?.type === 'virtual-packet' || payload?.type === 'wire') {
             this.payloadChannels.ensure(target);
             const data = payload.type === 'wire' ? payload.packet?.data : payload.data;
-            const bytes = data instanceof Uint8Array ? data : typeof data === 'string' ? decodeFileBase64(data) : new Uint8Array();
-            const metadata = payload.type === 'wire'
-              ? { ...payload, packet: { ...payload.packet, data: undefined } } : { ...payload, data: undefined };
-            if (await this.payloadChannels.send(target, payload.type === 'virtual-packet' || payload.packet?.kind === 'datagram' ? 'datagram' : 'tunnel',
-              encodePeerPayload({ ...event, payload: metadata }, bytes), () => this.payloadPeerAllowed(target), 512 * 1024)) return;
+            const bytes =
+              data instanceof Uint8Array ? data : typeof data === 'string' ? decodeFileBase64(data) : new Uint8Array();
+            const metadata =
+              payload.type === 'wire'
+                ? { ...payload, packet: { ...payload.packet, data: undefined } }
+                : { ...payload, data: undefined };
+            if (
+              await this.payloadChannels.send(
+                target,
+                payload.type === 'virtual-packet' || payload.packet?.kind === 'datagram' ? 'datagram' : 'tunnel',
+                encodePeerPayload({ ...event, payload: metadata }, bytes),
+                () => this.payloadPeerAllowed(target),
+                512 * 1024,
+              )
+            )
+              return;
           }
         }
         // Compatibility with older peers retains their original room action.
@@ -840,18 +1135,24 @@ export class GroupRoomManager {
           if (payload?.type === 'virtual-packet' && payload.data instanceof Uint8Array)
             event = { ...event, payload: { ...payload, data: encodeFileBase64(payload.data) } };
           else if (payload?.type === 'wire' && payload.packet?.data instanceof Uint8Array)
-            event = { ...event, payload: { ...payload, packet: { ...payload.packet, data: encodeFileBase64(payload.packet.data) } } };
+            event = {
+              ...event,
+              payload: { ...payload, packet: { ...payload.packet, data: encodeFileBase64(payload.packet.data) } },
+            };
         }
         await this.appAction.send(event, { target });
-      }
-      else throw new Error('Activity peer unavailable');
+      } else throw new Error('Activity peer unavailable');
     } else {
       this.sendRoomAction(this.appAction, event);
     }
   }
 
-  public getInvite(): string | null { return this.invite; }
-  public getRoomName(): string { return this.roomName; }
+  public getInvite(): string | null {
+    return this.invite;
+  }
+  public getRoomName(): string {
+    return this.roomName;
+  }
 
   public getPassword(): string {
     return this.password;
@@ -870,7 +1171,9 @@ export class GroupRoomManager {
   }
 
   public isRoomHost(): boolean {
-    return this.authority ? this.authority.isLocalHost() : this.peerTracker.isHost(selfId, this.myJoinedAt, this.isCreator);
+    return this.authority
+      ? this.authority.isLocalHost()
+      : this.peerTracker.isHost(selfId, this.myJoinedAt, this.isCreator);
   }
 
   public isRoomAdmin(): boolean {
@@ -884,15 +1187,17 @@ export class GroupRoomManager {
 
   public canManageRoomApps(peerId: string): boolean {
     if (peerId === selfId) return this.isRoomHost() || this.isRoomAdmin();
-    return Boolean(this.authority?.isPeerHost(peerId) || this.isPeerAdmin(peerId) ||
-      !this.authority && this.peerTracker.getHostPeerId(selfId, this.myJoinedAt, this.isCreator) === peerId);
+    return Boolean(
+      this.authority?.isPeerHost(peerId) ||
+      this.isPeerAdmin(peerId) ||
+      (!this.authority && this.peerTracker.getHostPeerId(selfId, this.myJoinedAt, this.isCreator) === peerId),
+    );
   }
 
   private hasAdminGrant(key: string): boolean {
     if (!this.authority || this.bannedKeys.has(key)) return false;
     const latest = latestAdminCommand(this.admissionHistory, this.authority.epoch, key);
-    if (this.snapshot?.epoch === this.authority.epoch &&
-        (!latest || latest.sequence <= this.snapshot.revision)) {
+    if (this.snapshot?.epoch === this.authority.epoch && (!latest || latest.sequence <= this.snapshot.revision)) {
       return this.snapshot.adminKeys.includes(key);
     }
     return latest?.kind === 'admin';
@@ -900,8 +1205,10 @@ export class GroupRoomManager {
 
   private adminGrant(key: string): HostCommand | undefined {
     if (!this.authority || !this.hasAdminGrant(key)) return undefined;
-    return this.admissionHistory.filter((command) => command.epoch === this.authority?.epoch &&
-      command.kind === 'admin' && command.targetKey === key)
+    return this.admissionHistory
+      .filter(
+        (command) => command.epoch === this.authority?.epoch && command.kind === 'admin' && command.targetKey === key,
+      )
       .sort((left, right) => right.sequence - left.sequence)[0];
   }
 
@@ -914,8 +1221,12 @@ export class GroupRoomManager {
     }
     const roles = [...latestRoles.values()].sort((left, right) => left.sequence - right.sequence).slice(-200);
     const otherLimit = 200 - roles.length;
-    const others = otherLimit > 0 ? this.admissionHistory.filter((command) =>
-      command.kind !== 'admin' && command.kind !== 'revoke-admin').slice(-otherLimit) : [];
+    const others =
+      otherLimit > 0
+        ? this.admissionHistory
+            .filter((command) => command.kind !== 'admin' && command.kind !== 'revoke-admin')
+            .slice(-otherLimit)
+        : [];
     this.admissionHistory = [...roles, ...others];
   }
 
@@ -943,7 +1254,7 @@ export class GroupRoomManager {
       },
     ];
 
-    const verifiedPeers = this.getConnectedPeers().filter(peer => this.peerTracker.isVerified(peer.id));
+    const verifiedPeers = this.getConnectedPeers().filter((peer) => this.peerTracker.isVerified(peer.id));
     verifiedPeers.forEach((p) => {
       const voice = this.remoteVoiceStates.get(p.id);
       list.push({
@@ -969,21 +1280,25 @@ export class GroupRoomManager {
   }
 
   private admittedTargets(): string[] {
-    return Array.from(this.peerTracker.directConnectedPeers).filter((peerId) =>
-      this.isLivePeerTarget(peerId) &&
-      (!this.authority || (this.localAdmitted && this.isAdmittedPeer(peerId))));
+    return Array.from(this.peerTracker.directConnectedPeers).filter(
+      (peerId) =>
+        this.isLivePeerTarget(peerId) && (!this.authority || (this.localAdmitted && this.isAdmittedPeer(peerId))),
+    );
   }
 
   private isAdmittedPeer(peerId: string): boolean {
     const key = this.chatAuth?.getKnownKey(peerId);
-    return Boolean(this.peerTracker.isVerified(peerId) && key && !this.bannedKeys.has(key) &&
-      this.admittedPeers.get(peerId) === key);
+    return Boolean(
+      this.peerTracker.isVerified(peerId) && key && !this.bannedKeys.has(key) && this.admittedPeers.get(peerId) === key,
+    );
   }
 
   // Trystero broadcasts to every connected edge, including peers awaiting admission.
   // Room content must be addressed only to established members.
-  private sendRoomAction(action: { send: (data: unknown, options?: { target: string }) => unknown } | null,
-    data: unknown): void {
+  private sendRoomAction(
+    action: { send: (data: unknown, options?: { target: string }) => unknown } | null,
+    data: unknown,
+  ): void {
     if (!action || this.previewOnly) return;
     if (!this.authority) {
       void action.send(data);
@@ -1002,20 +1317,27 @@ export class GroupRoomManager {
     if (!actionName) return;
 
     for (const [indirectPeerId, intermediaryPeerId] of this.rumorIntermediaries) {
-      if (this.peerTracker.isRelayed(indirectPeerId) &&
-          this.peerTracker.directConnectedPeers.has(intermediaryPeerId) &&
-          this.isLivePeerTarget(intermediaryPeerId)) {
+      if (
+        this.peerTracker.isRelayed(indirectPeerId) &&
+        this.peerTracker.directConnectedPeers.has(intermediaryPeerId) &&
+        this.isLivePeerTarget(intermediaryPeerId)
+      ) {
         try {
           this.meshRelayAction.send(
             { target: indirectPeerId, origin: selfId, kind: 'action_relay', action: actionName, payload: data },
-            { target: intermediaryPeerId }
+            { target: intermediaryPeerId },
           );
         } catch {}
       }
     }
   }
 
-  private handleRelayedAction(actionName: string | undefined, payload: unknown, originPeerId: string, _intermediaryPeerId: string): void {
+  private handleRelayedAction(
+    actionName: string | undefined,
+    payload: unknown,
+    originPeerId: string,
+    _intermediaryPeerId: string,
+  ): void {
     if (!actionName || typeof actionName !== 'string' || !originPeerId) return;
     this.peerTracker.touchPeer(originPeerId);
     if (actionName === 'chat' && this.chatAction?.onMessage) {
@@ -1034,12 +1356,19 @@ export class GroupRoomManager {
   private async persistJoinedIdentity(saved?: SavedRoom): Promise<void> {
     if (this.guestInOwnedRoom || this.previewOnly || !this.invite || !this.chatAuth || !this.authority) return;
     try {
-      await savedRooms.put({ roomId: this.roomId, invite: this.invite, name: this.roomName,
+      await savedRooms.put({
+        roomId: this.roomId,
+        invite: this.invite,
+        name: this.roomName,
         customName: saved ? savedRoomCustomName(saved) : undefined,
-        saved: saved?.saved ?? this.isCreator, owned: this.isCreator,
-        protected: saved?.protected ?? Boolean(this.password), password: saved?.password,
-        identity: this.chatAuth.exportIdentity(), authorityChain: this.authority.history(),
-        hostCommands: this.admissionHistory });
+        saved: saved?.saved ?? this.isCreator,
+        owned: this.isCreator,
+        protected: saved?.protected ?? Boolean(this.password),
+        password: saved?.password,
+        identity: this.chatAuth.exportIdentity(),
+        authorityChain: this.authority.history(),
+        hostCommands: this.admissionHistory,
+      });
     } catch (persistError) {
       console.warn('[P2P] Could not persist joined identity to room store:', persistError);
     }
@@ -1047,21 +1376,29 @@ export class GroupRoomManager {
 
   public async join(callbacks: RoomCallbacks, previewOnly = false, password = this.password) {
     if (this.leavePromise) return;
-    if (!previewOnly) { this.admissionDenied = false; this.lastAdmissionRetry = 0; }
-    if (this.shortLookup && !previewOnly && (!this.shortLookupReady ||
-        ![...this.peerTracker.directConnectedPeers].some(peer => this.isAdmittedPeer(peer)))) {
+    if (!previewOnly) {
+      this.admissionDenied = false;
+      this.lastAdmissionRetry = 0;
+    }
+    if (
+      this.shortLookup &&
+      !previewOnly &&
+      (!this.shortLookupReady || ![...this.peerTracker.directConnectedPeers].some((peer) => this.isAdmittedPeer(peer)))
+    ) {
       throw new Error('Short invitation requires an online room member');
     }
     if (this.room && !previewOnly) {
       this.callbacks = callbacks;
-      this.password = password;
       this.previewOnly = false;
       if (this.roomJoinOptions) {
-        (signalingManager as { promotePreviewRoom?: (room: unknown, config: unknown, topic: string, callbacks?: unknown) => void })
-          .promotePreviewRoom?.(this.room, this.roomJoinOptions.config, this.roomJoinOptions.topic, {
-            ...this.roomJoinOptions.callbacks,
-            previewOnly: false,
-          });
+        (
+          signalingManager as {
+            promotePreviewRoom?: (room: unknown, config: unknown, topic: string, callbacks?: unknown) => void;
+          }
+        ).promotePreviewRoom?.(this.room, this.roomJoinOptions.config, this.roomJoinOptions.topic, {
+          ...this.roomJoinOptions.callbacks,
+          previewOnly: false,
+        });
       }
       let saved: SavedRoom | undefined;
       try {
@@ -1070,6 +1407,14 @@ export class GroupRoomManager {
         console.warn('[P2P] Could not retrieve saved room record on rejoin:', savedError);
       }
       if (this.leavePromise) return;
+      const trimmedPassword = password.trim();
+      if (this.authority?.isLocalHost()) {
+        if (trimmedPassword) this.password = trimmedPassword;
+        else if (!this.password && saved?.password && this.latestPasswordCommand === -1) this.password = saved.password;
+      } else {
+        this.password = trimmedPassword;
+      }
+      await this.ensureInitialHostPasswordCommand();
       await this.persistJoinedIdentity(saved);
       if (this.leavePromise) return;
       this.startHeartbeatLoop();
@@ -1082,10 +1427,17 @@ export class GroupRoomManager {
         await this.issueAdminAdmission(selfId);
       }
       for (const peerId of this.peerTracker.directConnectedPeers) {
-        if (!this.chatAuth?.getKnownKey(peerId)) { this.sendIdentityChallenge(peerId); continue; }
+        if (!this.chatAuth?.getKnownKey(peerId)) {
+          this.sendIdentityChallenge(peerId);
+          continue;
+        }
         await this.admissionAction?.send({ kind: 'sync-request' }, { target: peerId });
         if (this.authority?.isPeerHost(peerId) || this.isPeerAdmin(peerId)) await this.requestAdmission(peerId);
-        else await this.admissionAction?.send({ kind: this.localAdmitted ? 'prompt' : 'admin-hello-request' }, { target: peerId });
+        else
+          await this.admissionAction?.send(
+            { kind: this.localAdmitted ? 'prompt' : 'admin-hello-request' },
+            { target: peerId },
+          );
         this.announceToPeer(peerId);
       }
       if (!this.localAdmitted) this.requestPreview();
@@ -1100,11 +1452,15 @@ export class GroupRoomManager {
     console.log(
       `[P2P] Joining room ${this.roomId} (Password Protected: ${Boolean(this.password)}) as ${
         this.username
-      } (Self ID: ${selfId})`
+      } (Self ID: ${selfId})`,
     );
 
     const parsedInviteForTurn = this.invite ? parseRoomInvite(this.invite) : null;
-    if (!this.backgroundProbe && !this.snapshot?.connection && !(parsedInviteForTurn && 'connection' in parsedInviteForTurn && parsedInviteForTurn.connection)) {
+    if (
+      !this.backgroundProbe &&
+      !this.snapshot?.connection &&
+      !(parsedInviteForTurn && 'connection' in parsedInviteForTurn && parsedInviteForTurn.connection)
+    ) {
       this.turnConfig = await resolveTurnConfig(this.turnConfig ?? stateStore.getTurnConfig());
       if (this.leavePromise) return;
     }
@@ -1130,8 +1486,10 @@ export class GroupRoomManager {
         throw new Error('Room identifier is pinned to another creator key');
       }
       const savedInvite = saved ? await verifyRoomInvite(saved.invite) : null;
-      const preferredInvite = incomingInvite && savedInvite &&
-        compareRoomInvites(savedInvite, incomingInvite) > 0 ? savedInvite : incomingInvite;
+      const preferredInvite =
+        incomingInvite && savedInvite && compareRoomInvites(savedInvite, incomingInvite) > 0
+          ? savedInvite
+          : incomingInvite;
       if (preferredInvite && preferredInvite.version !== 3) {
         this.invite = formatRoomInvite(preferredInvite);
         this.snapshot = preferredInvite;
@@ -1140,14 +1498,17 @@ export class GroupRoomManager {
         this.roomName = saved.name;
       }
       this.guestInOwnedRoom = Boolean(saved?.owned && !this.isCreator);
-      this.chatAuth = await PeerAuthenticator.create(this.roomId, selfId,
-        this.guestInOwnedRoom ? undefined : saved?.identity);
+      this.chatAuth = await PeerAuthenticator.create(
+        this.roomId,
+        selfId,
+        this.guestInOwnedRoom ? undefined : saved?.identity,
+      );
       if (this.rootKey) {
         this.authority = new RoomAuthority(this.roomId, this.rootKey, this.chatAuth);
-        if (this.snapshot && !await this.authority.importChain(this.snapshot.authorityChain)) {
+        if (this.snapshot && !(await this.authority.importChain(this.snapshot.authorityChain))) {
           throw new Error('Invitation authority chain is invalid');
         }
-        if (saved?.authorityChain && !await this.authority.importChain(saved.authorityChain)) {
+        if (saved?.authorityChain && !(await this.authority.importChain(saved.authorityChain))) {
           throw new Error('Saved room authority chain is invalid');
         }
         if (this.snapshot) this.authority.observeRevision(this.snapshot.revision);
@@ -1155,12 +1516,21 @@ export class GroupRoomManager {
         this.isCreator = this.authority.isLocalHost();
         this.localAdmitted = this.authority.isLocalHost();
         if (saved?.hostCommands) {
-          await this.acceptHostCommands(saved.hostCommands);
+          await this.acceptHostCommands(saved.hostCommands, true);
+        }
+        if (this.authority.isLocalHost() && !this.password && saved?.password && this.latestPasswordCommand === -1) {
+          this.password = saved.password;
+        }
+        if (!this.previewOnly && this.isCreator && this.password && this.latestPasswordCommand === -1) {
+          await this.ensureInitialHostPasswordCommand();
         }
         if (this.isRoomAdmin()) this.localAdmitted = true;
         await this.persistJoinedIdentity(saved);
       }
-      this.signalingTopic = this.invite || this.shortLookup ? `public-${this.roomId}` : await computeSignalingRoomId(this.roomId, this.password);
+      this.signalingTopic =
+        this.invite || this.shortLookup
+          ? `public-${this.roomId}`
+          : await computeSignalingRoomId(this.roomId, this.password);
       console.log(`[P2P] Computed signaling topic: "${this.signalingTopic}"`);
 
       if (this.snapshot?.connection) {
@@ -1222,11 +1592,7 @@ export class GroupRoomManager {
     };
     this.roomJoinOptions = { config: joinConfig, topic: this.signalingTopic, callbacks: joinCallbacks };
 
-    this.room = signalingManager.joinRoom(
-      joinConfig,
-      this.signalingTopic,
-      joinCallbacks
-    );
+    this.room = signalingManager.joinRoom(joinConfig, this.signalingTopic, joinCallbacks);
     const joinedRoom = this.room;
 
     this.bindRoomActions();
@@ -1253,7 +1619,11 @@ export class GroupRoomManager {
     }
     if (this.snapshot?.connection) {
       this.fallbackRtcConfig = null;
-      this.rtcConfig = await withLocalInterfaceStun({ iceServers: [], iceTransportPolicy: 'all', iceCandidatePoolSize: 0 });
+      this.rtcConfig = await withLocalInterfaceStun({
+        iceServers: [],
+        iceTransportPolicy: 'all',
+        iceCandidatePoolSize: 0,
+      });
     } else {
       this.applyTurnConfiguration(this.turnConfig);
     }
@@ -1291,22 +1661,38 @@ export class GroupRoomManager {
   private isConsistentChatClaim(message: ChatMessage): boolean {
     if (message.systemRoom && message.systemRoom !== this.roomId) return false;
     const knownName = this.announcedPeerNames.has(message.authorId || '')
-      ? this.peerTracker.getUsername(message.authorId || '') : undefined;
+      ? this.peerTracker.getUsername(message.authorId || '')
+      : undefined;
     if (message.isHost && !this.peerTracker.isPeerCreator(message.authorId || '')) return false;
     if (!knownName) return false;
-    if (!message.isSystem) return message.sender === knownName && !message.systemType &&
-      !message.systemActor && !message.systemRoom && !message.systemAppKind;
+    if (!message.isSystem)
+      return (
+        message.sender === knownName &&
+        !message.systemType &&
+        !message.systemActor &&
+        !message.systemRoom &&
+        !message.systemAppKind
+      );
     if (message.sender !== 'Sistema' || message.revision !== 0 || message.editedAt || message.deletedAt) return false;
-    if (message.systemRoom) return message.systemType === 'info' &&
-      (this.rootKey ? message.authorKey === this.rootKey :
-        this.peerTracker.isPeerCreator(message.authorId || '')) &&
-      message.text.startsWith('Sala criada: ') && message.text.length <= 95 &&
-      !message.systemActor && !message.systemAppKind;
+    if (message.systemRoom)
+      return (
+        message.systemType === 'info' &&
+        (this.rootKey ? message.authorKey === this.rootKey : this.peerTracker.isPeerCreator(message.authorId || '')) &&
+        message.text.startsWith('Sala criada: ') &&
+        message.text.length <= 95 &&
+        !message.systemActor &&
+        !message.systemAppKind
+      );
     if (message.systemActor !== knownName) return false;
     if (message.systemType === 'app-start' || message.systemType === 'app-stop') {
       const app = message.systemAppKind && getRoomApp(message.systemAppKind);
-      return Boolean(app && message.text === (message.systemType === 'app-start'
-        ? `${knownName} iniciou ${app.protocolLabel ?? app.label}` : `${knownName} encerrou ${app.protocolLabel ?? app.label}`));
+      return Boolean(
+        app &&
+        message.text ===
+          (message.systemType === 'app-start'
+            ? `${knownName} iniciou ${app.protocolLabel ?? app.label}`
+            : `${knownName} encerrou ${app.protocolLabel ?? app.label}`),
+      );
     }
     if (message.systemAppKind) return false;
     const expected: Partial<Record<NonNullable<ChatMessage['systemType']>, string>> = {
@@ -1315,56 +1701,63 @@ export class GroupRoomManager {
       'stream-start': `${knownName} iniciou uma transmissão`,
       'stream-stop': `${knownName} parou de transmitir`,
     };
-    if (message.systemType === 'info') return this.peerTracker.getHostPeerId(selfId, this.myJoinedAt, this.isCreator) === message.authorId &&
-      message.text === `Senha alterada por ${knownName}`;
+    if (message.systemType === 'info')
+      return (
+        this.peerTracker.getHostPeerId(selfId, this.myJoinedAt, this.isCreator) === message.authorId &&
+        message.text === `Senha alterada por ${knownName}`
+      );
     if (!message.systemType || !expected[message.systemType]) return false;
     return message.text === expected[message.systemType];
   }
 
   private canTrackRumor(peerId: string): boolean {
-    return this.peerTracker.isVerified(peerId) ||
+    return (
+      this.peerTracker.isVerified(peerId) ||
       this.peerTracker.getPendingRumors().includes(peerId) ||
-      this.peerTracker.getPendingRumors().length < 64;
+      this.peerTracker.getPendingRumors().length < 64
+    );
   }
 
   private syncHostRole(): void {
     if (!this.authority || !this.chatAuth) return;
     this.isCreator = this.authority.isLocalHost();
-    const host = this.peerTracker.getVerifiedPeers().find((peer) =>
-      this.chatAuth?.getKnownKey(peer.id) === this.authority?.currentKey);
+    const host = this.peerTracker
+      .getVerifiedPeers()
+      .find((peer) => this.chatAuth?.getKnownKey(peer.id) === this.authority?.currentKey);
     if (host) this.admittedPeers.set(host.id, this.authority.currentKey);
     this.peerTracker.setAuthenticatedHost(host?.id ?? null);
     this.callbacks?.onHostChange?.(this.isCreator);
     if (!this.previewOnly && this.invite && (!this.guestInOwnedRoom || this.authority.isLocalHost())) {
-      void savedRooms.get(this.roomId).then((record) => {
-        if (record && this.authority && this.chatAuth) {
-          if (this.authority.isLocalHost()) this.guestInOwnedRoom = false;
-          const nextInvite = this.invite && parseRoomInvite(this.invite)?.roomId === record.roomId
-            ? this.invite
-            : record.invite;
-          const rawName = typeof this.roomName === 'string' && this.roomName.trim()
-            ? this.roomName.trim()
-            : record.name;
-          const nextName = rawName.slice(0, 80) || record.name;
-          return savedRooms.put({
-            ...record,
-            invite: nextInvite,
-            name: nextName,
-            customName: savedRoomCustomName(record),
-            owned: this.authority.isLocalHost(),
-            identity: this.authority.isLocalHost() ? this.chatAuth.exportIdentity() : record.identity,
-            authorityChain: this.authority.history().slice(-100),
-            hostCommands: record.hostCommands?.slice(-200),
+      void savedRooms
+        .get(this.roomId)
+        .then((record) => {
+          if (record && this.authority && this.chatAuth) {
+            if (this.authority.isLocalHost()) this.guestInOwnedRoom = false;
+            const nextInvite =
+              this.invite && parseRoomInvite(this.invite)?.roomId === record.roomId ? this.invite : record.invite;
+            const rawName =
+              typeof this.roomName === 'string' && this.roomName.trim() ? this.roomName.trim() : record.name;
+            const nextName = rawName.slice(0, 80) || record.name;
+            return savedRooms.put({
+              ...record,
+              invite: nextInvite,
+              name: nextName,
+              customName: savedRoomCustomName(record),
+              owned: this.authority.isLocalHost(),
+              identity: this.authority.isLocalHost() ? this.chatAuth.exportIdentity() : record.identity,
+              authorityChain: this.authority.history().slice(-100),
+              hostCommands: record.hostCommands?.slice(-200),
+            });
+          }
+        })
+        .catch((error) => {
+          console.warn('[Rooms] Failed to persist host transition:', error);
+          logDiagnostic('WARN', 'p2p.rooms', 'Failed to persist host transition', {
+            roomId: this.roomId.slice(0, 8),
+            errorName: error instanceof Error ? error.name : typeof error,
+            errorMessage: error instanceof Error ? error.message : String(error),
           });
-        }
-      }).catch((error) => {
-        console.warn('[Rooms] Failed to persist host transition:', error);
-        logDiagnostic('WARN', 'p2p.rooms', 'Failed to persist host transition', {
-          roomId: this.roomId.slice(0, 8),
-          errorName: error instanceof Error ? error.name : typeof error,
-          errorMessage: error instanceof Error ? error.message : String(error),
         });
-      });
     }
     this.notifyPeersUpdate();
   }
@@ -1388,8 +1781,12 @@ export class GroupRoomManager {
 
   private activeAdminAdmissionsList(): AdminAdmission[] {
     return [...this.adminAdmissions.values()]
-      .filter((adm) => !this.bannedKeys.has(adm.adminKey) && !this.bannedKeys.has(adm.targetKey) &&
-        (!this.authority || adm.epoch === this.authority.epoch))
+      .filter(
+        (adm) =>
+          !this.bannedKeys.has(adm.adminKey) &&
+          !this.bannedKeys.has(adm.targetKey) &&
+          (!this.authority || adm.epoch === this.authority.epoch),
+      )
       .slice(-64);
   }
 
@@ -1435,9 +1832,11 @@ export class GroupRoomManager {
       this.seedIndirectPeersFromVerifiedPreview();
       this.verifiedPreviewByResponder.clear();
       this.verifiedPreviewCanAdmit.clear();
-      this.callbacks?.onStatusChange(this.turnConfig?.forceRelay
-        ? 'P2P (Relay Seguro)'
-        : `P2P Conectado (${signalingManager.getActiveTransport().toUpperCase()})`);
+      this.callbacks?.onStatusChange(
+        this.turnConfig?.forceRelay
+          ? 'P2P (Relay Seguro)'
+          : `P2P Conectado (${signalingManager.getActiveTransport().toUpperCase()})`,
+      );
     }
     if (isNewAdmission) {
       logDiagnostic('INFO', 'p2p.admission', 'Peer admitted to room', {
@@ -1462,7 +1861,8 @@ export class GroupRoomManager {
       this.notifyVoiceStatesUpdate();
     }
     void this.sendAuthoritySummary(peerId === selfId ? undefined : peerId).catch((error) =>
-      console.warn('[Rooms] Initial authority reconciliation failed:', error));
+      console.warn('[Rooms] Initial authority reconciliation failed:', error),
+    );
   }
 
   private removeKickedPeer(peerId: string, key: string): void {
@@ -1493,11 +1893,14 @@ export class GroupRoomManager {
     // Send the admission command and history before announcing presence/media/voice so
     // the newcomer sets localAdmitted before our initial room packets arrive.
     await this.admissionAction?.send({ kind: 'command', command });
-    await this.admissionAction?.send({
-      kind: 'sync',
-      commands: this.admissionHistory,
-      adminAdmissions: this.activeAdminAdmissionsList(),
-    }, { target: peerId });
+    await this.admissionAction?.send(
+      {
+        kind: 'sync',
+        commands: this.admissionHistory,
+        adminAdmissions: this.activeAdminAdmissionsList(),
+      },
+      { target: peerId },
+    );
     this.applyAdmittedPeer(peerId, key);
   }
 
@@ -1511,11 +1914,14 @@ export class GroupRoomManager {
     this.adminAdmissions.set(peerId, admission);
     await this.admissionAction?.send({ kind: 'admin-admit', admission });
     if (peerId !== selfId) {
-      await this.admissionAction?.send({
-        kind: 'sync',
-        commands: this.admissionHistory,
-        adminAdmissions: this.activeAdminAdmissionsList(),
-      }, { target: peerId });
+      await this.admissionAction?.send(
+        {
+          kind: 'sync',
+          commands: this.admissionHistory,
+          adminAdmissions: this.activeAdminAdmissionsList(),
+        },
+        { target: peerId },
+      );
       this.applyAdmittedPeer(peerId, key);
     }
   }
@@ -1525,9 +1931,12 @@ export class GroupRoomManager {
     packet: Record<string, unknown>,
     issuer: 'host' | 'admin',
   ): Promise<void> {
-    if (!this.relayedAdmissionPeers.delete(targetPeerId) ||
-        !this.isLivePeerTarget(targetPeerId) ||
-        !this.admissionAction) return;
+    if (
+      !this.relayedAdmissionPeers.delete(targetPeerId) ||
+      !this.isLivePeerTarget(targetPeerId) ||
+      !this.admissionAction
+    )
+      return;
     const selfKey = this.chatAuth?.publicKey;
     let selfAdmit: HostCommand | undefined;
     if (selfKey) {
@@ -1548,11 +1957,14 @@ export class GroupRoomManager {
       }
     }
     await this.admissionAction.send(packet, { target: targetPeerId });
-    await this.admissionAction.send({
-      kind: 'sync',
-      commands: this.admissionHistory,
-      adminAdmissions: this.activeAdminAdmissionsList(),
-    }, { target: targetPeerId });
+    await this.admissionAction.send(
+      {
+        kind: 'sync',
+        commands: this.admissionHistory,
+        adminAdmissions: this.activeAdminAdmissionsList(),
+      },
+      { target: targetPeerId },
+    );
     logDiagnostic('INFO', 'p2p.admission', 'Delivered relayed admission to newcomer', {
       targetPeer: targetPeerId.slice(0, 6),
       issuer,
@@ -1560,14 +1972,21 @@ export class GroupRoomManager {
   }
 
   private async acceptAdminAdmission(admission: AdminAdmission): Promise<void> {
-    if (!this.authority || !this.chatAuth || !await this.authority.verifyAdminAdmission(admission) ||
-        this.bannedKeys.has(admission.adminKey) || this.bannedKeys.has(admission.targetKey)) return;
-    const knownGrant = this.admissionHistory.some((command) => command.epoch === admission.epoch &&
-      command.sequence === admission.grant.sequence);
+    if (
+      !this.authority ||
+      !this.chatAuth ||
+      !(await this.authority.verifyAdminAdmission(admission)) ||
+      this.bannedKeys.has(admission.adminKey) ||
+      this.bannedKeys.has(admission.targetKey)
+    )
+      return;
+    const knownGrant = this.admissionHistory.some(
+      (command) => command.epoch === admission.epoch && command.sequence === admission.grant.sequence,
+    );
     if (!knownGrant) await this.acceptHostCommand(admission.grant);
     if (this.adminGrant(admission.adminKey)?.sequence !== admission.grant.sequence) return;
-    const targetKey = admission.targetPeerId === selfId
-      ? this.chatAuth.publicKey : this.chatAuth.getKnownKey(admission.targetPeerId);
+    const targetKey =
+      admission.targetPeerId === selfId ? this.chatAuth.publicKey : this.chatAuth.getKnownKey(admission.targetPeerId);
     if (!targetKey) {
       this.adminAdmissions.set(admission.targetPeerId, admission);
       return;
@@ -1585,19 +2004,43 @@ export class GroupRoomManager {
     if (record) await savedRooms.put({ ...record, hostCommands: this.admissionHistory.slice(-200) });
   }
 
+  private async ensureInitialHostPasswordCommand(): Promise<void> {
+    if (this.previewOnly || !this.authority?.isLocalHost() || !this.password || this.latestPasswordCommand !== -1)
+      return;
+    const command = await this.authority.makeCommand('password', { password: this.password });
+    this.passwordCommandEpoch = command.epoch;
+    this.latestPasswordCommand = command.sequence;
+    this.admissionHistory.push(command);
+    this.retainAdmissionHistory();
+    await this.persistHostCommands();
+  }
+
   private async persistRememberedPassword(): Promise<void> {
     if (this.previewOnly) return;
     if (!this.invite) return;
     const record = await savedRooms.get(this.roomId);
-    if (record?.password !== undefined) await savedRooms.put({ ...record, password: this.password });
+    if (!record) return;
+    const nextPassword = this.password || undefined;
+    if (record.owned || record.password !== undefined || record.protected !== Boolean(nextPassword)) {
+      await savedRooms.put({
+        ...record,
+        protected: Boolean(nextPassword),
+        password: record.owned || record.password !== undefined ? nextPassword : undefined,
+      });
+    }
   }
 
   private async persistSnapshot(): Promise<void> {
     if (this.previewOnly) return;
     if (!this.invite) return;
     const record = await savedRooms.get(this.roomId);
-    if (record) await savedRooms.put({ ...record, invite: this.invite, name: this.roomName,
-      customName: savedRoomCustomName(record) });
+    if (record)
+      await savedRooms.put({
+        ...record,
+        invite: this.invite,
+        name: this.roomName,
+        customName: savedRoomCustomName(record),
+      });
     this.callbacks?.onInviteChange?.(this.invite, this.roomName);
   }
 
@@ -1605,8 +2048,12 @@ export class GroupRoomManager {
     if (!this.authority) return [];
     const keys = new Set<string>();
     for (const command of this.admissionHistory) {
-      if (command.epoch === this.authority.epoch && command.targetKey &&
-          (command.kind === 'admin' || command.kind === 'revoke-admin')) keys.add(command.targetKey);
+      if (
+        command.epoch === this.authority.epoch &&
+        command.targetKey &&
+        (command.kind === 'admin' || command.kind === 'revoke-admin')
+      )
+        keys.add(command.targetKey);
     }
     if (this.snapshot?.epoch === this.authority.epoch) {
       for (const key of this.snapshot.adminKeys) keys.add(key);
@@ -1615,15 +2062,22 @@ export class GroupRoomManager {
   }
 
   private async publishSnapshot(name: string): Promise<boolean> {
-    if (!this.authority?.isLocalHost() || !this.chatAuth || !this.rootKey ||
-        !validRoomName(name)) return false;
+    if (!this.authority?.isLocalHost() || !this.chatAuth || !this.rootKey || !validRoomName(name)) return false;
     const revision = this.authority.nextSnapshotRevision();
-    const snapshot = await signRoomInvite({
-      version: this.snapshot?.version ?? 4, roomId: this.roomId, rootKey: this.rootKey, name,
-      epoch: this.authority.epoch, revision, adminKeys: this.activeAdminKeys(),
-      authorityChain: this.authority.history(),
-      ...(this.snapshot?.connection ? { connection: this.snapshot.connection } : {}),
-    }, this.chatAuth);
+    const snapshot = await signRoomInvite(
+      {
+        version: this.snapshot?.version ?? 4,
+        roomId: this.roomId,
+        rootKey: this.rootKey,
+        name,
+        epoch: this.authority.epoch,
+        revision,
+        adminKeys: this.activeAdminKeys(),
+        authorityChain: this.authority.history(),
+        ...(this.snapshot?.connection ? { connection: this.snapshot.connection } : {}),
+      },
+      this.chatAuth,
+    );
     this.snapshot = snapshot;
     this.roomName = name;
     this.invite = formatRoomInvite(snapshot);
@@ -1636,15 +2090,14 @@ export class GroupRoomManager {
   private async acceptSnapshot(value: string): Promise<void> {
     if (!this.authority || !this.rootKey || typeof value !== 'string' || value.length > 30010) return;
     const candidate = await verifyRoomInvite(value);
-    if (!candidate || candidate.version === 3 || candidate.roomId !== this.roomId ||
-        candidate.rootKey !== this.rootKey) return;
+    if (!candidate || candidate.version === 3 || candidate.roomId !== this.roomId || candidate.rootKey !== this.rootKey)
+      return;
     // Renaming and role changes cannot silently move an active room to another endpoint/mode.
     if (JSON.stringify(candidate.connection) !== JSON.stringify(this.snapshot?.connection)) return;
     if (this.snapshot && compareRoomInvites(candidate, this.snapshot) <= 0) return;
     const knownChain = this.authority.history();
-    if (candidate.epoch < this.authority.epoch ||
-        !isAuthorityChainPrefix(knownChain, candidate.authorityChain)) return;
-    if (!await this.authority.importChain(candidate.authorityChain)) return;
+    if (candidate.epoch < this.authority.epoch || !isAuthorityChainPrefix(knownChain, candidate.authorityChain)) return;
+    if (!(await this.authority.importChain(candidate.authorityChain))) return;
     this.authority.observeRevision(candidate.revision);
     this.snapshot = candidate;
     this.invite = value;
@@ -1669,29 +2122,31 @@ export class GroupRoomManager {
     for (const target of targets) {
       const key = this.chatAuth?.getKnownKey(target);
       if (!key || this.admittedPeers.get(target) !== key) continue;
-      await this.admissionAction.send({ kind: 'summary', epoch: this.authority.epoch, fingerprint },
-        { target });
+      await this.admissionAction.send({ kind: 'summary', epoch: this.authority.epoch, fingerprint }, { target });
       if (this.snapshot && this.invite) {
         await this.inviteAction?.send({ invite: this.invite }, { target });
       }
     }
   }
 
-  private async acceptHostCommands(commands: HostCommand[]): Promise<void> {
+  private async acceptHostCommands(commands: HostCommand[], silent = false): Promise<void> {
     if (!this.authority || commands.length === 0) return;
     let historyAdded = false;
     let peersUpdated = false;
     let selfAdmitted = false;
     const announcedTargets = new Set<string>();
     for (const command of commands) {
-      const result = await this.acceptHostCommand(command, true);
+      const result = await this.acceptHostCommand(command, true, silent);
       if (!result) continue;
       if (result.historyAdded) historyAdded = true;
       if (result.peersUpdated) peersUpdated = true;
       if (result.selfAdmitted) selfAdmitted = true;
-      if (result.admittedPeerId && result.admittedKey &&
-          this.chatAuth?.getKnownKey(result.admittedPeerId) === result.admittedKey &&
-          result.admittedPeerId !== selfId) {
+      if (
+        result.admittedPeerId &&
+        result.admittedKey &&
+        this.chatAuth?.getKnownKey(result.admittedPeerId) === result.admittedKey &&
+        result.admittedPeerId !== selfId
+      ) {
         announcedTargets.add(result.admittedPeerId);
       }
     }
@@ -1715,18 +2170,23 @@ export class GroupRoomManager {
     }
     if (selfAdmitted || announcedTargets.size > 0) {
       void this.sendAuthoritySummary().catch((error) =>
-        console.warn('[Rooms] Initial authority reconciliation failed:', error));
+        console.warn('[Rooms] Initial authority reconciliation failed:', error),
+      );
     }
   }
 
-  private async acceptHostCommand(command: HostCommand, batch = false): Promise<{
+  private async acceptHostCommand(
+    command: HostCommand,
+    batch = false,
+    silent = false,
+  ): Promise<{
     historyAdded: boolean;
     peersUpdated: boolean;
     selfAdmitted: boolean;
     admittedPeerId?: string;
     admittedKey?: string;
   } | null> {
-    if (!this.authority || !await this.authority.verifyCommand(command)) return null;
+    if (!this.authority || !(await this.authority.verifyCommand(command))) return null;
     let historyAdded = false;
     let peersUpdated = false;
     let selfAdmitted = false;
@@ -1767,15 +2227,19 @@ export class GroupRoomManager {
       }
       peersUpdated = true;
       if (!batch) this.notifyPeersUpdate();
-    } else if (command.kind === 'password' && typeof command.password === 'string' &&
-               (command.epoch > this.passwordCommandEpoch ||
-                (command.epoch === this.passwordCommandEpoch &&
-                 command.sequence > this.latestPasswordCommand))) {
+    } else if (
+      command.kind === 'password' &&
+      typeof command.password === 'string' &&
+      (command.epoch > this.passwordCommandEpoch ||
+        (command.epoch === this.passwordCommandEpoch && command.sequence > this.latestPasswordCommand))
+    ) {
       this.passwordCommandEpoch = command.epoch;
       this.latestPasswordCommand = command.sequence;
       this.password = command.password;
-      void this.persistRememberedPassword();
-      this.callbacks?.onPasswordChange?.(this.password, 'Anfitrião');
+      if (!silent) {
+        void this.persistRememberedPassword();
+        this.callbacks?.onPasswordChange?.(this.password, 'Anfitrião');
+      }
     }
     return { historyAdded, peersUpdated, selfAdmitted, admittedPeerId, admittedKey };
   }
@@ -1803,15 +2267,31 @@ export class GroupRoomManager {
             this.payloadChannels.ensure(meta.peerId);
           }
         }
-        const hasScreen = this.remoteDescriptors.get(meta.peerId)?.some(entry => entry.id === packet.mediaId && entry.kind === 'screen') || this.remoteStreams.has(meta.peerId);
-        if (hasScreen || packet.type === 'revoke' || packet.type === 'decline' || (packet.type === 'cursorSync' && !packet.active)) {
+        const hasScreen =
+          this.remoteDescriptors
+            .get(meta.peerId)
+            ?.some((entry) => entry.id === packet.mediaId && entry.kind === 'screen') ||
+          this.remoteStreams.has(meta.peerId);
+        if (
+          hasScreen ||
+          packet.type === 'revoke' ||
+          packet.type === 'decline' ||
+          (packet.type === 'cursorSync' && !packet.active)
+        ) {
           this.callbacks?.onRemoteControlHost?.(packet, meta.peerId);
         }
       }
     };
     this.pointerAction.onMessage = (packet: unknown, meta: { peerId: string }) => {
       if (validStreamPointerState(packet)) {
-        if (packet.mediaId ? this.remoteDescriptors.get(meta.peerId)?.some(entry => entry.id === packet.mediaId && entry.kind === 'screen') : this.remoteStreams.has(meta.peerId)) this.callbacks?.onStreamPointerState?.(packet, meta.peerId);
+        if (
+          packet.mediaId
+            ? this.remoteDescriptors
+                .get(meta.peerId)
+                ?.some((entry) => entry.id === packet.mediaId && entry.kind === 'screen')
+            : this.remoteStreams.has(meta.peerId)
+        )
+          this.callbacks?.onStreamPointerState?.(packet, meta.peerId);
         return;
       }
       if (!this.localStream || !validStreamPointer(packet)) return;
@@ -1838,19 +2318,18 @@ export class GroupRoomManager {
       }
       const peerId = meta.peerId;
       const requestVoice = payload.requestVoice === true;
-      const trackId = typeof payload.trackId === 'string' && payload.trackId.length > 0 && payload.trackId.length <= 128
-        ? payload.trackId
-        : undefined;
+      const trackId =
+        typeof payload.trackId === 'string' && payload.trackId.length > 0 && payload.trackId.length <= 128
+          ? payload.trackId
+          : undefined;
       const state = {
         inVoice: payload.inVoice,
         muted: payload.muted,
         deafened: payload.deafened,
       };
       const prev = this.remoteVoiceStates.get(peerId);
-      const stateChanged = !prev ||
-        prev.inVoice !== state.inVoice ||
-        prev.muted !== state.muted ||
-        prev.deafened !== state.deafened;
+      const stateChanged =
+        !prev || prev.inVoice !== state.inVoice || prev.muted !== state.muted || prev.deafened !== state.deafened;
       this.remoteVoiceStates.set(peerId, state);
       if (state.inVoice) {
         if (trackId) {
@@ -1892,14 +2371,15 @@ export class GroupRoomManager {
           const candidate = await verifyRoomInvite(data.invite);
           if (!candidate || candidate.version === 3 || candidate.roomId !== this.roomId || candidate.connection) return;
           let saved: SavedRoom | undefined;
-      try {
-        saved = await savedRooms.get(this.roomId);
-      } catch (savedError) {
-        console.warn('[P2P] Could not retrieve saved room record on rejoin:', savedError);
-      }
+          try {
+            saved = await savedRooms.get(this.roomId);
+          } catch (savedError) {
+            console.warn('[P2P] Could not retrieve saved room record on rejoin:', savedError);
+          }
           if (saved && parseRoomInvite(saved.invite)?.rootKey !== candidate.rootKey) return;
           const authority = new RoomAuthority(this.roomId, candidate.rootKey, this.chatAuth);
-          if (!await authority.importChain(candidate.authorityChain) || this.room !== boundRoom || this.rootKey) return;
+          if (!(await authority.importChain(candidate.authorityChain)) || this.room !== boundRoom || this.rootKey)
+            return;
           authority.observeRevision(candidate.revision);
           this.rootKey = candidate.rootKey;
           this.guestInOwnedRoom = Boolean(saved?.owned);
@@ -1908,67 +2388,140 @@ export class GroupRoomManager {
           this.invite = data.invite;
           this.roomName = candidate.name;
           this.requestPreview();
-        } finally { this.bootstrapPending = false; }
+        } finally {
+          this.bootstrapPending = false;
+        }
         return;
       }
       await this.acceptSnapshot(data.invite);
     };
 
     this.previewAction = this.room.makeAction('room_preview_v1');
-    this.previewAction.onMessage = async (data: { kind?: string; nonce?: string; preview?: unknown; signature?: string;
-      membership?: HostCommand; adminMembership?: AdminAdmission; canAdmit?: boolean }, meta: { peerId: string }) => {
+    this.previewAction.onMessage = async (
+      data: {
+        kind?: string;
+        nonce?: string;
+        preview?: unknown;
+        signature?: string;
+        membership?: HostCommand;
+        adminMembership?: AdminAdmission;
+        canAdmit?: boolean;
+      },
+      meta: { peerId: string },
+    ) => {
       const key = this.chatAuth?.getKnownKey(meta.peerId);
-      if (!key || this.bannedKeys.has(key) || !this.chatAuth || !data || typeof data.nonce !== 'string' ||
-          !/^[0-9a-f-]{36}$/.test(data.nonce)) return;
+      if (
+        !key ||
+        this.bannedKeys.has(key) ||
+        !this.chatAuth ||
+        !data ||
+        typeof data.nonce !== 'string' ||
+        !/^[0-9a-f-]{36}$/.test(data.nonce)
+      )
+        return;
       if (data.kind === 'request' && !this.previewOnly && this.localAdmitted) {
         const now = Date.now();
         if (now - (this.previewRequests.get(meta.peerId) ?? 0) < 1500) return;
         this.previewRequests.set(meta.peerId, now);
-        const people = [{ id: selfId, name: this.username, local: true },
-          ...this.peerTracker.getAllRoomPeers().filter(peer => peer.id !== meta.peerId &&
-            this.isAdmittedPeer(peer.id) && this.announcedPeerNames.has(peer.id) &&
-            Boolean(this.room?.getPeers?.()[peer.id]))
-            .map(peer => ({ id: peer.id, name: peer.username, local: false }))].slice(0, 64);
-        const preview: RoomPreview = { name: this.roomName, protected: Boolean(this.password),
-          participants: await Promise.all(people.map(async person => ({ id: person.id,
-            name: person.name.slice(0, 100), color: profileImages.color(person.id, person.local) ?? '#06b6d4',
-            avatar: await profileThumbnail(profileImages.url(person.id, person.local)) }))) };
+        const people = [
+          { id: selfId, name: this.username, local: true },
+          ...this.peerTracker
+            .getAllRoomPeers()
+            .filter(
+              (peer) =>
+                peer.id !== meta.peerId &&
+                this.isAdmittedPeer(peer.id) &&
+                this.announcedPeerNames.has(peer.id) &&
+                Boolean(this.room?.getPeers?.()[peer.id]),
+            )
+            .map((peer) => ({ id: peer.id, name: peer.username, local: false })),
+        ].slice(0, 64);
+        const preview: RoomPreview = {
+          name: this.roomName,
+          protected: Boolean(this.password),
+          participants: await Promise.all(
+            people.map(async (person) => ({
+              id: person.id,
+              name: person.name.slice(0, 100),
+              color: profileImages.color(person.id, person.local) ?? '#06b6d4',
+              avatar: await profileThumbnail(profileImages.url(person.id, person.local)),
+            })),
+          ),
+        };
         const signature = await this.chatAuth.signControl('room-preview', [data.nonce, preview]);
-        const membership = [...this.admissionHistory].reverse().find(command => command.kind === 'admit' &&
-          command.epoch === this.authority?.epoch && command.targetPeerId === selfId &&
-          command.targetKey === this.chatAuth?.publicKey);
-        if (this.room === boundRoom) await this.previewAction.send(
-          { kind: 'response', nonce: data.nonce, preview, signature, membership,
-            adminMembership: this.adminAdmissions.get(selfId),
-            canAdmit: Boolean(this.authority?.isLocalHost() || this.isRoomAdmin()) }, { target: meta.peerId });
-      } else if (data.kind === 'response' && (this.previewOnly || !this.localAdmitted && !this.admissionDenied) && data.nonce === this.previewNonce &&
-                 validRoomPreview(data.preview) && typeof data.signature === 'string' &&
-                 await this.chatAuth.verifyControl('room-preview', [data.nonce, data.preview], data.signature, key)) {
-        let member = this.authority?.isPeerHost(meta.peerId) || this.isPeerAdmin(meta.peerId) || this.isAdmittedPeer(meta.peerId);
-        if (!member && data.membership?.kind === 'admit' && data.membership.targetPeerId === meta.peerId &&
-            data.membership.targetKey === key && await this.authority?.verifyCommand(data.membership)) member = true;
-        if (!member && data.adminMembership?.targetPeerId === meta.peerId && data.adminMembership.targetKey === key &&
-            await this.authority?.verifyAdminAdmission(data.adminMembership)) member = true;
+        const membership = [...this.admissionHistory]
+          .reverse()
+          .find(
+            (command) =>
+              command.kind === 'admit' &&
+              command.epoch === this.authority?.epoch &&
+              command.targetPeerId === selfId &&
+              command.targetKey === this.chatAuth?.publicKey,
+          );
+        if (this.room === boundRoom)
+          await this.previewAction.send(
+            {
+              kind: 'response',
+              nonce: data.nonce,
+              preview,
+              signature,
+              membership,
+              adminMembership: this.adminAdmissions.get(selfId),
+              canAdmit: Boolean(this.authority?.isLocalHost() || this.isRoomAdmin()),
+            },
+            { target: meta.peerId },
+          );
+      } else if (
+        data.kind === 'response' &&
+        (this.previewOnly || (!this.localAdmitted && !this.admissionDenied)) &&
+        data.nonce === this.previewNonce &&
+        validRoomPreview(data.preview) &&
+        typeof data.signature === 'string' &&
+        (await this.chatAuth.verifyControl('room-preview', [data.nonce, data.preview], data.signature, key))
+      ) {
+        let member =
+          this.authority?.isPeerHost(meta.peerId) || this.isPeerAdmin(meta.peerId) || this.isAdmittedPeer(meta.peerId);
+        if (
+          !member &&
+          data.membership?.kind === 'admit' &&
+          data.membership.targetPeerId === meta.peerId &&
+          data.membership.targetKey === key &&
+          (await this.authority?.verifyCommand(data.membership))
+        )
+          member = true;
+        if (
+          !member &&
+          data.adminMembership?.targetPeerId === meta.peerId &&
+          data.adminMembership.targetKey === key &&
+          (await this.authority?.verifyAdminAdmission(data.adminMembership))
+        )
+          member = true;
         if (this.room === boundRoom && member) {
           this.admittedPeers.set(meta.peerId, key);
           this.shortLookupReady = true;
           this.verifiedPreviewCanAdmit.set(
             meta.peerId,
-            Boolean(data.canAdmit || this.authority?.isPeerHost(meta.peerId) || this.isPeerAdmin(meta.peerId))
+            Boolean(data.canAdmit || this.authority?.isPeerHost(meta.peerId) || this.isPeerAdmin(meta.peerId)),
           );
           this.verifiedPreviewByResponder.set(
             meta.peerId,
             data.preview.participants
-              .filter(person => person.id !== selfId && person.id && person.id.length <= 80)
-              .map(person => ({ id: person.id, username: person.name, color: person.color }))
+              .filter((person) => person.id !== selfId && person.id && person.id.length <= 80)
+              .map((person) => ({ id: person.id, username: person.name, color: person.color })),
           );
           this.callbacks?.onPreview?.(data.preview, meta.peerId);
           if (!this.previewOnly && !this.localAdmitted) {
             // Signed preview rosters aid rendezvous only; every edge still needs identity and admission.
             for (const person of data.preview.participants) {
-              if (person.id === selfId || !person.id || person.id.length > 80 ||
-                  this.peerTracker.isVerified(person.id) || this.peerTracker.getPendingRumors().includes(person.id) ||
-                  !this.canTrackRumor(person.id)) continue;
+              if (
+                person.id === selfId ||
+                !person.id ||
+                person.id.length > 80 ||
+                this.peerTracker.isVerified(person.id) ||
+                this.peerTracker.getPendingRumors().includes(person.id) ||
+                !this.canTrackRumor(person.id)
+              )
+                continue;
               this.peerTracker.receivePeerExchange(person.id, false, person.name);
               if (this.signalingTopic) void signalingManager.reannounce(this.signalingTopic, person.id).catch(() => {});
             }
@@ -1980,21 +2533,41 @@ export class GroupRoomManager {
     };
 
     this.identityAction = this.room.makeAction('peer_identity');
-    this.identityAction.onMessage = async (data: {
-      kind?: string; nonce?: string; key?: string; signature?: string;
-    }, meta: { peerId: string }) => {
-      if (!this.chatAuth || !data || typeof data.nonce !== 'string' ||
-          !/^[0-9a-f-]{20,50}$/.test(data.nonce)) return;
+    this.identityAction.onMessage = async (
+      data: {
+        kind?: string;
+        nonce?: string;
+        key?: string;
+        signature?: string;
+      },
+      meta: { peerId: string },
+    ) => {
+      if (!this.chatAuth || !data || typeof data.nonce !== 'string' || !/^[0-9a-f-]{20,50}$/.test(data.nonce)) return;
       if (data.kind === 'challenge') {
         const signature = await this.chatAuth.signControl('identity', [this.roomId, selfId, data.nonce]);
-        if (this.room === boundRoom) await this.identityAction.send({
-          kind: 'proof', nonce: data.nonce, key: this.chatAuth.publicKey, signature,
-        }, { target: meta.peerId });
-      } else if (data.kind === 'proof' && data.key && data.signature &&
-                 this.pendingChallenges.get(meta.peerId) === data.nonce &&
-                 !this.bannedKeys.has(data.key) &&
-                 await this.chatAuth.verifyControl('identity',
-                   [this.roomId, meta.peerId, data.nonce], data.signature, data.key)) {
+        if (this.room === boundRoom)
+          await this.identityAction.send(
+            {
+              kind: 'proof',
+              nonce: data.nonce,
+              key: this.chatAuth.publicKey,
+              signature,
+            },
+            { target: meta.peerId },
+          );
+      } else if (
+        data.kind === 'proof' &&
+        data.key &&
+        data.signature &&
+        this.pendingChallenges.get(meta.peerId) === data.nonce &&
+        !this.bannedKeys.has(data.key) &&
+        (await this.chatAuth.verifyControl(
+          'identity',
+          [this.roomId, meta.peerId, data.nonce],
+          data.signature,
+          data.key,
+        ))
+      ) {
         if (this.room !== boundRoom || !this.chatAuth.pinDirect(meta.peerId, data.key)) return;
         this.pendingChallenges.delete(meta.peerId);
         logDiagnostic('INFO', 'p2p.admission', 'Peer identity proof verified', {
@@ -2006,24 +2579,36 @@ export class GroupRoomManager {
           await this.inviteAction?.send({ invite: this.invite }, { target: meta.peerId });
         }
         this.syncHostRole();
-        if (this.previewOnly) { this.requestPreview(); return; }
+        if (this.previewOnly) {
+          this.requestPreview();
+          return;
+        }
         if (this.authority?.isPeerHost(meta.peerId) || this.isPeerAdmin(meta.peerId)) {
           this.admittedPeers.set(meta.peerId, data.key);
         }
         const deferredAdmin = this.pendingAdminAdmissions.get(meta.peerId);
         if (deferredAdmin) {
           this.pendingAdminAdmissions.delete(meta.peerId);
-          if (deferredAdmin.adminKey === data.key || deferredAdmin.targetKey === data.key ||
-              this.authority?.isPeerHost(meta.peerId) || this.isPeerAdmin(meta.peerId) ||
-              this.admittedPeers.get(meta.peerId) === data.key) {
+          if (
+            deferredAdmin.adminKey === data.key ||
+            deferredAdmin.targetKey === data.key ||
+            this.authority?.isPeerHost(meta.peerId) ||
+            this.isPeerAdmin(meta.peerId) ||
+            this.admittedPeers.get(meta.peerId) === data.key
+          ) {
             await this.acceptAdminAdmission(deferredAdmin);
           }
         }
         const pendingAdminAdmission = this.adminAdmissions.get(meta.peerId);
         if (pendingAdminAdmission) await this.acceptAdminAdmission(pendingAdminAdmission);
-        if (this.localAdmitted && this.isLivePeerTarget(meta.peerId) &&
-            (this.isRoomAdmin() || this.authority?.isPeerHost(meta.peerId) ||
-             this.isPeerAdmin(meta.peerId) || this.admittedPeers.get(meta.peerId) === data.key)) {
+        if (
+          this.localAdmitted &&
+          this.isLivePeerTarget(meta.peerId) &&
+          (this.isRoomAdmin() ||
+            this.authority?.isPeerHost(meta.peerId) ||
+            this.isPeerAdmin(meta.peerId) ||
+            this.admittedPeers.get(meta.peerId) === data.key)
+        ) {
           for (const admission of this.activeAdminAdmissionsList()) {
             await this.admissionAction?.send({ kind: 'admin-admit', admission }, { target: meta.peerId });
           }
@@ -2050,18 +2635,26 @@ export class GroupRoomManager {
     };
 
     this.authorityAction = this.room.makeAction('room_authority');
-    this.authorityAction.onMessage = async (data: {
-      kind?: string; chain?: AuthorityTransfer[];
-      proposal?: Omit<AuthorityTransfer, 'nextSignature'>; transfer?: AuthorityTransfer;
-    }, meta: { peerId: string }) => {
+    this.authorityAction.onMessage = async (
+      data: {
+        kind?: string;
+        chain?: AuthorityTransfer[];
+        proposal?: Omit<AuthorityTransfer, 'nextSignature'>;
+        transfer?: AuthorityTransfer;
+      },
+      meta: { peerId: string },
+    ) => {
       if (!this.authority || !data) return;
       if (this.previewOnly && data.kind !== 'request' && data.kind !== 'chain') return;
       if (data.kind === 'request') {
         await this.authorityAction.send({ kind: 'chain', chain: this.authority.history() }, { target: meta.peerId });
-      } else if (data.kind === 'chain' && data.chain && await this.authority.importChain(data.chain)) {
+      } else if (data.kind === 'chain' && data.chain && (await this.authority.importChain(data.chain))) {
         if (this.room !== boundRoom) return;
         this.syncHostRole();
-        if (this.previewOnly) { this.requestPreview(); return; }
+        if (this.previewOnly) {
+          this.requestPreview();
+          return;
+        }
         await this.admissionAction?.send({ kind: 'sync-request' }, { target: meta.peerId });
         for (const peerId of this.peerTracker.directConnectedPeers) {
           if (this.authority.isPeerHost(peerId) || this.isPeerAdmin(peerId)) {
@@ -2074,7 +2667,7 @@ export class GroupRoomManager {
           if (this.room === boundRoom) await this.authorityAction.send({ kind: 'commit', transfer });
         } catch {}
       } else if (data.kind === 'commit' && data.transfer) {
-        if (await this.authority.applyTransfer(data.transfer) && this.room === boundRoom) {
+        if ((await this.authority.applyTransfer(data.transfer)) && this.room === boundRoom) {
           this.syncHostRole();
           if (this.isRoomHost()) {
             await this.authorityAction.send({ kind: 'chain', chain: this.authority.history() });
@@ -2086,29 +2679,48 @@ export class GroupRoomManager {
     };
 
     this.admissionAction = this.room.makeAction('room_admission');
-    this.admissionAction.onMessage = async (data: {
-      kind?: string; password?: string; command?: HostCommand; commands?: HostCommand[];
-      adminAdmissions?: AdminAdmission[];
-      admission?: AdminAdmission; epoch?: number; fingerprint?: string;
-      targetPeerId?: string; targetKey?: string; signature?: string;
-    }, meta: { peerId: string }) => {
+    this.admissionAction.onMessage = async (
+      data: {
+        kind?: string;
+        password?: string;
+        command?: HostCommand;
+        commands?: HostCommand[];
+        adminAdmissions?: AdminAdmission[];
+        admission?: AdminAdmission;
+        epoch?: number;
+        fingerprint?: string;
+        targetPeerId?: string;
+        targetKey?: string;
+        signature?: string;
+      },
+      meta: { peerId: string },
+    ) => {
       if (this.previewOnly || !this.authority || !this.chatAuth || !data) return;
       const senderKey = this.chatAuth.getKnownKey(meta.peerId);
-      const trustedStateSender = Boolean(senderKey &&
-        (this.authority.isPeerHost(meta.peerId) || this.isPeerAdmin(meta.peerId) ||
-         (this.localAdmitted && this.admittedPeers.get(meta.peerId) === senderKey)));
+      const trustedStateSender = Boolean(
+        senderKey &&
+        (this.authority.isPeerHost(meta.peerId) ||
+          this.isPeerAdmin(meta.peerId) ||
+          (this.localAdmitted && this.admittedPeers.get(meta.peerId) === senderKey)),
+      );
       if (data.kind === 'request' && (this.authority.isLocalHost() || this.isRoomAdmin())) {
         const key = this.chatAuth.getKnownKey(meta.peerId);
-        const returningMember = Boolean(key && !this.bannedKeys.has(key) &&
-          this.admissionHistory.some((command) => command.kind === 'admit' && command.targetKey === key));
-        if (key && (data.password === this.password || returningMember)) {
+        if (!key || this.bannedKeys.has(key)) return;
+        if (this.authority.isPeerHost(meta.peerId) || this.isPeerAdmin(meta.peerId)) {
+          this.admittedPeers.set(meta.peerId, key);
+          return;
+        }
+        const returningMember = this.admissionHistory.some(
+          (command) => command.kind === 'admit' && command.targetKey === key,
+        );
+        if (data.password === this.password || returningMember) {
           const now = Date.now();
           const previous = this.admissionRequests.get(meta.peerId);
           if (previous !== undefined && now - previous < 1500) return;
           this.admissionRequests.set(meta.peerId, now);
           if (this.authority.isLocalHost()) await this.issueAdmission(meta.peerId);
           else await this.issueAdminAdmission(meta.peerId);
-        } else if (key && this.isLivePeerTarget(meta.peerId)) {
+        } else if (this.isLivePeerTarget(meta.peerId)) {
           await this.admissionAction.send({ kind: 'denied' }, { target: meta.peerId });
         }
       } else if (data.kind === 'prompt') {
@@ -2122,36 +2734,52 @@ export class GroupRoomManager {
         if (this.isLivePeerTarget(meta.peerId)) {
           await this.admissionAction.send({ kind: 'prompt' }, { target: meta.peerId });
         }
-      } else if (data.kind === 'admin-hello-request' && this.localAdmitted &&
-                 this.findAdmissionRelayTarget() && this.isLivePeerTarget(meta.peerId)) {
+      } else if (
+        data.kind === 'admin-hello-request' &&
+        this.localAdmitted &&
+        this.findAdmissionRelayTarget() &&
+        this.isLivePeerTarget(meta.peerId)
+      ) {
         await this.admissionAction.send({ kind: 'relay-ready' }, { target: meta.peerId });
       } else if (data.kind === 'relay-ready') {
         if (!this.localAdmitted && !this.admissionDenied && !this.findAdmissionRelayTarget()) {
           await this.sendRelayedAdmissionRequest(meta.peerId);
         }
       } else if (data.kind === 'relay-request') {
-        const targetPeerId = typeof data.targetPeerId === 'string' &&
-          data.targetPeerId.length > 0 && data.targetPeerId.length <= 80 ? data.targetPeerId : null;
-        const targetKey = typeof data.targetKey === 'string' &&
-          /^04[0-9a-f]{128}$/.test(data.targetKey) ? data.targetKey : null;
-        const signature = typeof data.signature === 'string' &&
-          /^[0-9a-f]{128}$/.test(data.signature) ? data.signature : null;
+        const targetPeerId =
+          typeof data.targetPeerId === 'string' && data.targetPeerId.length > 0 && data.targetPeerId.length <= 80
+            ? data.targetPeerId
+            : null;
+        const targetKey =
+          typeof data.targetKey === 'string' && /^04[0-9a-f]{128}$/.test(data.targetKey) ? data.targetKey : null;
+        const signature =
+          typeof data.signature === 'string' && /^[0-9a-f]{128}$/.test(data.signature) ? data.signature : null;
         if (!targetPeerId || !targetKey || !signature || this.bannedKeys.has(targetKey)) return;
 
         if (this.authority.isLocalHost() || this.isRoomAdmin()) {
           const relayAllowed = trustedStateSender || (meta.peerId === targetPeerId && senderKey === targetKey);
-          if (!relayAllowed || !await this.chatAuth.verifyControl('relay-admit',
-              [this.roomId, targetPeerId, targetKey], signature, targetKey)) {
+          if (
+            !relayAllowed ||
+            !(await this.chatAuth.verifyControl(
+              'relay-admit',
+              [this.roomId, targetPeerId, targetKey],
+              signature,
+              targetKey,
+            ))
+          ) {
             logDiagnostic('WARN', 'p2p.admission', 'Relayed admission rejected (invalid relay proof)', {
-              targetPeer: targetPeerId.slice(0, 6), viaPeer: meta.peerId.slice(0, 6),
+              targetPeer: targetPeerId.slice(0, 6),
+              viaPeer: meta.peerId.slice(0, 6),
             });
             return;
           }
-          const returningMember = this.admissionHistory.some((command) =>
-            command.kind === 'admit' && command.targetKey === targetKey);
+          const returningMember = this.admissionHistory.some(
+            (command) => command.kind === 'admit' && command.targetKey === targetKey,
+          );
           if ((data.password ?? '') !== this.password && !returningMember) {
             logDiagnostic('WARN', 'p2p.admission', 'Relayed admission rejected (password required)', {
-              targetPeer: targetPeerId.slice(0, 6), viaPeer: meta.peerId.slice(0, 6),
+              targetPeer: targetPeerId.slice(0, 6),
+              viaPeer: meta.peerId.slice(0, 6),
             });
             return;
           }
@@ -2175,7 +2803,8 @@ export class GroupRoomManager {
             }
             this.applyAdmittedPeer(targetPeerId, targetKey);
             logDiagnostic('INFO', 'p2p.admission', 'Host issued relayed admission', {
-              targetPeer: targetPeerId.slice(0, 6), viaPeer: meta.peerId.slice(0, 6),
+              targetPeer: targetPeerId.slice(0, 6),
+              viaPeer: meta.peerId.slice(0, 6),
             });
           } else {
             const grant = this.adminGrant(this.chatAuth.publicKey);
@@ -2192,7 +2821,8 @@ export class GroupRoomManager {
             }
             this.applyAdmittedPeer(targetPeerId, targetKey);
             logDiagnostic('INFO', 'p2p.admission', 'Admin issued relayed admission', {
-              targetPeer: targetPeerId.slice(0, 6), viaPeer: meta.peerId.slice(0, 6),
+              targetPeer: targetPeerId.slice(0, 6),
+              viaPeer: meta.peerId.slice(0, 6),
             });
           }
         } else if (this.localAdmitted) {
@@ -2209,36 +2839,55 @@ export class GroupRoomManager {
             return;
           }
           this.relayedAdmissionPeers.add(targetPeerId);
-          await this.admissionAction.send({
-            kind: 'relay-request',
-            targetPeerId,
-            targetKey,
-            password: '',
-            signature,
-          }, { target: hostTarget });
+          await this.admissionAction.send(
+            {
+              kind: 'relay-request',
+              targetPeerId,
+              targetKey,
+              password: '',
+              signature,
+            },
+            { target: hostTarget },
+          );
           logDiagnostic('INFO', 'p2p.admission', 'Forwarded relayed admission request to host/admin', {
-            targetPeer: targetPeerId.slice(0, 6), hostPeer: hostTarget.slice(0, 6),
+            targetPeer: targetPeerId.slice(0, 6),
+            hostPeer: hostTarget.slice(0, 6),
           });
         }
-      } else if (data.kind === 'sync-request' && this.localAdmitted && senderKey &&
-                  this.admittedPeers.get(meta.peerId) === senderKey && this.isLivePeerTarget(meta.peerId)) {
-        await this.admissionAction.send({
-          kind: 'sync',
-          commands: this.admissionHistory,
-          adminAdmissions: this.activeAdminAdmissionsList(),
-        }, { target: meta.peerId });
-      } else if (data.kind === 'summary' && trustedStateSender && this.localAdmitted &&
-                 Number.isSafeInteger(data.epoch) && typeof data.fingerprint === 'string' &&
-                 /^[0-9a-f]{64}$/.test(data.fingerprint)) {
-        const localFingerprint = await roomStateFingerprint(this.authority.epoch, this.admissionHistory);
-        if (data.epoch !== this.authority.epoch || data.fingerprint !== localFingerprint) {
-          await this.authorityAction?.send({ kind: 'chain', chain: this.authority.history() },
-            { target: meta.peerId });
-          await this.admissionAction.send({
+      } else if (
+        data.kind === 'sync-request' &&
+        this.localAdmitted &&
+        senderKey &&
+        this.admittedPeers.get(meta.peerId) === senderKey &&
+        this.isLivePeerTarget(meta.peerId)
+      ) {
+        await this.admissionAction.send(
+          {
             kind: 'sync',
             commands: this.admissionHistory,
             adminAdmissions: this.activeAdminAdmissionsList(),
-          }, { target: meta.peerId });
+          },
+          { target: meta.peerId },
+        );
+      } else if (
+        data.kind === 'summary' &&
+        trustedStateSender &&
+        this.localAdmitted &&
+        Number.isSafeInteger(data.epoch) &&
+        typeof data.fingerprint === 'string' &&
+        /^[0-9a-f]{64}$/.test(data.fingerprint)
+      ) {
+        const localFingerprint = await roomStateFingerprint(this.authority.epoch, this.admissionHistory);
+        if (data.epoch !== this.authority.epoch || data.fingerprint !== localFingerprint) {
+          await this.authorityAction?.send({ kind: 'chain', chain: this.authority.history() }, { target: meta.peerId });
+          await this.admissionAction.send(
+            {
+              kind: 'sync',
+              commands: this.admissionHistory,
+              adminAdmissions: this.activeAdminAdmissionsList(),
+            },
+            { target: meta.peerId },
+          );
         }
       } else if (data.kind === 'sync' && trustedStateSender) {
         if (Array.isArray(data.commands) && data.commands.length <= 200) {
@@ -2259,16 +2908,22 @@ export class GroupRoomManager {
           }
           return;
         }
-        if (data.admission.adminKey === senderPeerKey ||
-            data.admission.targetKey === senderPeerKey ||
-            trustedStateSender) {
+        if (
+          data.admission.adminKey === senderPeerKey ||
+          data.admission.targetKey === senderPeerKey ||
+          trustedStateSender
+        ) {
           await this.acceptAdminAdmission(data.admission);
           if (data.admission.targetPeerId === meta.peerId && this.isPeerAdmin(meta.peerId)) {
             if (!this.localAdmitted) await this.requestAdmission(meta.peerId);
           }
         }
-      } else if (data.kind === 'denied' &&
-                 (this.authority.isPeerHost(meta.peerId) || this.isPeerAdmin(meta.peerId))) {
+      } else if (
+        data.kind === 'denied' &&
+        !this.localAdmitted &&
+        !this.admissionDenied &&
+        (this.authority.isPeerHost(meta.peerId) || this.isPeerAdmin(meta.peerId))
+      ) {
         this.admissionDenied = true;
         this.callbacks?.onStatusChange('Senha incorreta para esta sala');
       }
@@ -2290,7 +2945,7 @@ export class GroupRoomManager {
     // 1. Setup Chat Action with In-Mesh Forwarding & Deduplication
     this.chatAction = this.room.makeAction('chat');
     this.chatAction.onMessage = async (msg: ChatMessage, meta: { peerId: string }) => {
-      if (!this.chatAuth || !await this.chatAuth.verify(msg, meta.peerId)) return;
+      if (!this.chatAuth || !(await this.chatAuth.verify(msg, meta.peerId))) return;
       if (this.room !== boundRoom) return;
       if (!this.isConsistentChatClaim(msg)) return;
       const revisionKey = chatRevisionKey(msg);
@@ -2318,10 +2973,14 @@ export class GroupRoomManager {
     this.profileAction = this.room.makeAction('profile_image_v1');
     this.profileTransfer = new ProfileTransfer(
       (packet, peerId) => this.sendProfilePayload(packet, peerId),
-      (peerId) => Boolean(this.room && this.peerTracker.isVerified(peerId) &&
-        (!this.authority || (this.localAdmitted && this.isAdmittedPeer(peerId)))),
+      (peerId) =>
+        Boolean(
+          this.room &&
+          this.peerTracker.isVerified(peerId) &&
+          (!this.authority || (this.localAdmitted && this.isAdmittedPeer(peerId))),
+        ),
       profileImages,
-      peer => this.binaryPeers.has(peer),
+      (peer) => this.binaryPeers.has(peer),
     );
     this.profileAction.onMessage = (packet: any, meta: { peerId: string }) => {
       this.receiveProfilePayload(packet, meta.peerId);
@@ -2330,17 +2989,22 @@ export class GroupRoomManager {
     this.bannerAction = this.room.makeAction('profile_banner_v1');
     this.bannerTransfer = new ProfileTransfer(
       (packet, peerId) => this.sendProfilePayload(packet, peerId, true),
-      (peerId) => Boolean(this.room && this.peerTracker.isVerified(peerId) &&
-        (!this.authority || (this.localAdmitted && this.isAdmittedPeer(peerId)))),
+      (peerId) =>
+        Boolean(
+          this.room &&
+          this.peerTracker.isVerified(peerId) &&
+          (!this.authority || (this.localAdmitted && this.isAdmittedPeer(peerId))),
+        ),
       profileBanners,
-      peer => this.binaryPeers.has(peer),
+      (peer) => this.binaryPeers.has(peer),
     );
     this.bannerAction.onMessage = (packet: unknown, meta: { peerId: string }) => {
       this.receiveProfilePayload(packet, meta.peerId, true);
     };
     this.fileAction = this.room.makeAction('chat_file_v2');
     this.profileStatsAction = this.room.makeAction('profile_stats_v1');
-    this.profileStatsAction.onMessage = (packet: unknown, meta: { peerId: string }) => profileStats.receive(meta.peerId, packet);
+    this.profileStatsAction.onMessage = (packet: unknown, meta: { peerId: string }) =>
+      profileStats.receive(meta.peerId, packet);
     this.unsubscribeProfileStats?.();
     clearTimeout(this.profileStatsTimer);
     this.unsubscribeProfileStats = profileStats.subscribeLocal(() => {
@@ -2359,7 +3023,7 @@ export class GroupRoomManager {
     this.historyAction = this.room.makeAction('history_sync');
     this.historyAction.onMessage = async (
       data: { request?: boolean; history?: ChatMessage[] },
-      meta: { peerId: string }
+      meta: { peerId: string },
     ) => {
       const peerId = meta.peerId;
       if (data?.request === true) {
@@ -2375,8 +3039,8 @@ export class GroupRoomManager {
             if (this.room !== boundRoom) return;
           }
           verifiedChecks++;
-          if (this.chatAuth && await this.chatAuth.verify(message, peerId) &&
-              this.isConsistentChatClaim(message)) verified.push(message);
+          if (this.chatAuth && (await this.chatAuth.verify(message, peerId)) && this.isConsistentChatClaim(message))
+            verified.push(message);
         }
         if (this.room !== boundRoom || verified.length === 0) return;
         const merged = mergeChatHistory(this.chatHistory, verified);
@@ -2393,25 +3057,45 @@ export class GroupRoomManager {
     // 3. Setup Presence Action (Exchange usernames, host status & broadcast stream state)
     this.presenceAction = this.room.makeAction('presence');
     this.presenceAction.onMessage = (
-      data: { username: string; nicknameStyle?: unknown; isCreator?: boolean; isStreaming?: boolean; joinedAt?: number; watching?: unknown; watchRevision?: unknown; platform?: unknown },
-      meta: { peerId: string }
+      data: {
+        username: string;
+        nicknameStyle?: unknown;
+        isCreator?: boolean;
+        isStreaming?: boolean;
+        joinedAt?: number;
+        watching?: unknown;
+        watchRevision?: unknown;
+        platform?: unknown;
+      },
+      meta: { peerId: string },
     ) => {
       const peerId = meta.peerId;
-      if (!data || typeof data.username !== 'string' || data.username.length > 80 ||
-          (data.joinedAt !== undefined && !Number.isFinite(data.joinedAt)) ||
-          (data.isCreator !== undefined && typeof data.isCreator !== 'boolean') ||
-          (data.isStreaming !== undefined && typeof data.isStreaming !== 'boolean')) return;
+      if (
+        !data ||
+        typeof data.username !== 'string' ||
+        data.username.length > 80 ||
+        (data.joinedAt !== undefined && !Number.isFinite(data.joinedAt)) ||
+        (data.isCreator !== undefined && typeof data.isCreator !== 'boolean') ||
+        (data.isStreaming !== undefined && typeof data.isStreaming !== 'boolean')
+      )
+        return;
       this.peerNicknameStyles.set(peerId, normalizeNicknameStyle(data.nicknameStyle));
       this.peerTracker.touchPeer(peerId);
 
-      const platform: AppPlatform = (data.platform === 'web' || data.platform === 'desktop' || data.platform === 'mobile')
-        ? data.platform
-        : 'desktop';
+      const platform: AppPlatform =
+        data.platform === 'web' || data.platform === 'desktop' || data.platform === 'mobile'
+          ? data.platform
+          : 'desktop';
 
       const suppliedName = typeof data.username === 'string' ? data.username.trim() : '';
       const newName = suppliedName || this.peerTracker.getUsername(peerId) || `Usuário (${peerId.slice(0, 4)})`;
-      this.peerTracker.addPeer(peerId, newName,
-        this.authority ? this.authority.isPeerHost(peerId) : Boolean(data.isCreator), data.joinedAt, platform);
+      this.peerTracker.addPeer(
+        peerId,
+        newName,
+        this.authority ? this.authority.isPeerHost(peerId) : Boolean(data.isCreator),
+        data.joinedAt,
+        platform,
+      );
 
       if (suppliedName) {
         const alreadyAnnounced = this.announcedPeerNames.has(peerId);
@@ -2428,18 +3112,27 @@ export class GroupRoomManager {
           });
           // A signed history may arrive before the sender's role/name presence.
           // Retry after identity metadata is pinned so claims can be validated.
-          try { this.historyAction?.send({ request: true }, { target: peerId }); } catch {}
+          try {
+            this.historyAction?.send({ request: true }, { target: peerId });
+          } catch {}
           // Reply once with our own presence/media/voice so a newcomer whose admission
           // finished milliseconds after our initial announce sees us immediately without
           // waiting for the 2-second heartbeat.
-          if (!this.previewOnly && this.isLivePeerTarget(peerId) &&
-              (!this.authority || (this.localAdmitted && this.isAdmittedPeer(peerId)))) {
-            try { this.presenceAction?.send(this.buildPresencePayload(), { target: peerId }); } catch {}
+          if (
+            !this.previewOnly &&
+            this.isLivePeerTarget(peerId) &&
+            (!this.authority || (this.localAdmitted && this.isAdmittedPeer(peerId)))
+          ) {
+            try {
+              this.presenceAction?.send(this.buildPresencePayload(), { target: peerId });
+            } catch {}
             this.publishMediaManifest(peerId);
             this.syncVoiceWithPeer(peerId);
             for (const otherPeer of this.admittedTargets()) {
               if (otherPeer !== peerId) {
-                try { this.pexAction?.send({ peers: this.getPeersPayload() }, { target: otherPeer }); } catch {}
+                try {
+                  this.pexAction?.send({ peers: this.getPeersPayload() }, { target: otherPeer });
+                } catch {}
               }
             }
           }
@@ -2481,22 +3174,27 @@ export class GroupRoomManager {
       this.callbacks?.onStatusChange(
         this.turnConfig?.forceRelay
           ? 'P2P (Relay Seguro)'
-          : `P2P Conectado (${signalingManager.getActiveTransport().toUpperCase()})`
+          : `P2P Conectado (${signalingManager.getActiveTransport().toUpperCase()})`,
       );
     };
 
     // 4. Setup Stream Status Action (Screen share toggle bug fix & stream recovery protocol)
     this.streamStatusAction = this.room.makeAction('stream_status');
     this.streamStatusAction.onMessage = (data: StreamStatusPayload, meta: { peerId: string }) => {
-      if (!data || typeof data.isStreaming !== 'boolean' ||
-          (data.streamId !== undefined && (typeof data.streamId !== 'string' || data.streamId.length > 100))) return;
+      if (
+        !data ||
+        typeof data.isStreaming !== 'boolean' ||
+        (data.streamId !== undefined && (typeof data.streamId !== 'string' || data.streamId.length > 100))
+      )
+        return;
       const peerId = meta.peerId;
       this.peerTracker.touchPeer(peerId);
 
       const senderName = this.peerTracker.getUsername(peerId) || `Participante (${peerId.slice(0, 4)})`;
       if (data.streams !== undefined) {
         if (!validStreamDescriptors(data.streams)) return;
-        if (!Number.isSafeInteger(data.revision) || data.revision! < (this.remoteMediaRevisions.get(peerId) ?? -1)) return;
+        if (!Number.isSafeInteger(data.revision) || data.revision! < (this.remoteMediaRevisions.get(peerId) ?? -1))
+          return;
         const wasStreaming = this.peerTracker.isStreaming(peerId);
         this.remoteMediaRevisions.set(peerId, data.revision!);
         const previousDescriptors = this.remoteDescriptors.get(peerId) || [];
@@ -2508,12 +3206,15 @@ export class GroupRoomManager {
             this.remoteDescriptorFirstSeen.set(key, now);
           }
         }
-        for (const entry of previousDescriptors) if (!data.streams.some((next) => next.id === entry.id)) {
-          this.remoteDescriptorFirstSeen.delete(streamSlotKey(peerId, entry.id));
-          this.cleanupStreamWatchers(streamSlotKey(peerId, entry.id), senderName);
-        }
+        for (const entry of previousDescriptors)
+          if (!data.streams.some((next) => next.id === entry.id)) {
+            this.remoteDescriptorFirstSeen.delete(streamSlotKey(peerId, entry.id));
+            this.cleanupStreamWatchers(streamSlotKey(peerId, entry.id), senderName);
+          }
         const previous = this.remoteMedia.get(peerId);
-        if (previous) for (const id of previous.keys()) if (!data.streams.some(entry => entry.id === id)) this.nativeVideo?.stop(id, peerId);
+        if (previous)
+          for (const id of previous.keys())
+            if (!data.streams.some((entry) => entry.id === id)) this.nativeVideo?.stop(id, peerId);
         const media = this.remoteMedia.get(peerId);
         if (media) for (const id of media.keys()) if (!data.streams.some((entry) => entry.id === id)) media.delete(id);
         this.peerTracker.setStreaming(peerId, data.streams.length > 0);
@@ -2565,7 +3266,7 @@ export class GroupRoomManager {
               this.lastBroadcasterStreamIds.set(peerId, data.streamId);
             }
             console.log(
-              `[P2P/Recovery] Triggering stream recovery request for broadcaster ${peerId} (streamId: ${data.streamId})`
+              `[P2P/Recovery] Triggering stream recovery request for broadcaster ${peerId} (streamId: ${data.streamId})`,
             );
             if (this.streamReqAction && this.isLivePeerTarget(peerId)) {
               const reqPayload: StreamRequestPayload = {
@@ -2596,8 +3297,14 @@ export class GroupRoomManager {
     // 4.5. Setup Live Watch Status Action (Tracks who is watching whose screen share)
     this.watchAction = this.room.makeAction('watch_status');
     this.watchAction.onMessage = (
-      data: { broadcasterId?: string; isWatching?: boolean; watcherName?: string; watching?: unknown; revision?: unknown },
-      meta: { peerId: string }
+      data: {
+        broadcasterId?: string;
+        isWatching?: boolean;
+        watcherName?: string;
+        watching?: unknown;
+        revision?: unknown;
+      },
+      meta: { peerId: string },
     ) => {
       const watcherPeerId = meta.peerId;
       if (data?.watching !== undefined) {
@@ -2607,9 +3314,12 @@ export class GroupRoomManager {
       if (!data || typeof data.isWatching !== 'boolean') return;
       const watcherName = this.peerTracker.getUsername(watcherPeerId) || `Participante (${watcherPeerId.slice(0, 4)})`;
       const broadcasterId = data.broadcasterId;
-      if (typeof broadcasterId !== 'string' ||
-          (streamOwner(broadcasterId) !== selfId && !this.peerTracker.isVerified(streamOwner(broadcasterId))) ||
-          streamOwner(broadcasterId) === watcherPeerId) return;
+      if (
+        typeof broadcasterId !== 'string' ||
+        (streamOwner(broadcasterId) !== selfId && !this.peerTracker.isVerified(streamOwner(broadcasterId))) ||
+        streamOwner(broadcasterId) === watcherPeerId
+      )
+        return;
 
       const currentWatchers = this.peerTracker.getWatchers(broadcasterId);
       const isAlreadyWatching = currentWatchers.some((w) => w.peerId === watcherPeerId);
@@ -2631,12 +3341,23 @@ export class GroupRoomManager {
 
     // 5. Setup On-Demand Stream Request Action (Stream Recovery Protocol Receiver)
     this.streamReqAction = this.room.makeAction('stream_req');
-    this.streamReqAction.onMessage = (data: {
-      request?: boolean; broadcasterId?: string; requesterId?: string;
-      missingVideo?: boolean; missingAudio?: boolean;
-    }, meta: { peerId: string }) => {
-      if (!data || data.request !== true || (data.broadcasterId && data.broadcasterId !== selfId) ||
-          (data.requesterId && data.requesterId !== meta.peerId)) return;
+    this.streamReqAction.onMessage = (
+      data: {
+        request?: boolean;
+        broadcasterId?: string;
+        requesterId?: string;
+        missingVideo?: boolean;
+        missingAudio?: boolean;
+      },
+      meta: { peerId: string },
+    ) => {
+      if (
+        !data ||
+        data.request !== true ||
+        (data.broadcasterId && data.broadcasterId !== selfId) ||
+        (data.requesterId && data.requesterId !== meta.peerId)
+      )
+        return;
       const requesterId = meta.peerId;
       this.peerTracker.touchPeer(requesterId);
 
@@ -2684,26 +3405,43 @@ export class GroupRoomManager {
       const now = Date.now();
       const reportedBySender = new Set<string>();
       data.peers.forEach((p) => {
-        if (p && typeof p.peerId === 'string' && p.peerId.length > 0 && p.peerId.length <= 80 &&
-            p.peerId !== selfId && this.canTrackRumor(p.peerId)) {
+        if (
+          p &&
+          typeof p.peerId === 'string' &&
+          p.peerId.length > 0 &&
+          p.peerId.length <= 80 &&
+          p.peerId !== selfId &&
+          this.canTrackRumor(p.peerId)
+        ) {
           reportedBySender.add(p.peerId);
           const isDirect = this.peerTracker.isVerified(p.peerId);
-          const peerPlatform: AppPlatform = (p.platform === 'web' || p.platform === 'desktop' || p.platform === 'mobile')
-            ? p.platform
-            : 'desktop';
+          const peerPlatform: AppPlatform =
+            p.platform === 'web' || p.platform === 'desktop' || p.platform === 'mobile' ? p.platform : 'desktop';
           const cleanName = typeof p.username === 'string' ? p.username.trim().slice(0, 80) : '';
-          const validKey = typeof p.publicKey === 'string' && /^04[0-9a-f]{128}$/.test(p.publicKey)
-            ? p.publicKey
-            : undefined;
-          if (!isDirect && cleanName && (this.indirectPeerReports.has(p.peerId) || this.indirectPeerReports.size < 64)) {
+          const validKey =
+            typeof p.publicKey === 'string' && /^04[0-9a-f]{128}$/.test(p.publicKey) ? p.publicKey : undefined;
+          if (
+            !isDirect &&
+            cleanName &&
+            (this.indirectPeerReports.has(p.peerId) || this.indirectPeerReports.size < 64)
+          ) {
             const prevReport = this.indirectPeerReports.get(p.peerId);
             const nextInVoice = Boolean(p.inVoice);
             const nextMuted = Boolean(p.voiceMuted);
             const nextDeafened = Boolean(p.voiceDeafened);
-            if (!prevReport || prevReport.inVoice !== nextInVoice || prevReport.muted !== nextMuted || prevReport.deafened !== nextDeafened) {
+            if (
+              !prevReport ||
+              prevReport.inVoice !== nextInVoice ||
+              prevReport.muted !== nextMuted ||
+              prevReport.deafened !== nextDeafened
+            ) {
               indirectVoiceChanged = true;
             }
-            if (!prevReport || prevReport.username !== cleanName || prevReport.publicKey !== (validKey ?? prevReport.publicKey)) {
+            if (
+              !prevReport ||
+              prevReport.username !== cleanName ||
+              prevReport.publicKey !== (validKey ?? prevReport.publicKey)
+            ) {
               hasNewRumors = true;
             }
             const reporters = prevReport?.reporters ?? new Set<string>();
@@ -2728,9 +3466,14 @@ export class GroupRoomManager {
             this.rumorIntermediaries.set(p.peerId, meta.peerId);
             hasNewRumors = true;
           }
-          this.peerTracker.receivePeerExchange(p.peerId, false,
+          this.peerTracker.receivePeerExchange(
+            p.peerId,
+            false,
             cleanName || undefined,
-            undefined, undefined, peerPlatform);
+            undefined,
+            undefined,
+            peerPlatform,
+          );
 
           // If peer is not yet directly connected to us, bridge via intermediary peer
           if (!isDirect && !this.peerTracker.isVerified(p.peerId)) {
@@ -2763,10 +3506,17 @@ export class GroupRoomManager {
     this.meshRelayAction.onMessage = (
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       data: { target: string; origin: string; kind: string; payload: any; action?: string },
-      meta: { peerId: string }
+      meta: { peerId: string },
     ) => {
-      if (!data || typeof data.origin !== 'string' || !data.origin || data.origin.length > 80 ||
-          typeof data.target !== 'string' || data.target.length > 80) return;
+      if (
+        !data ||
+        typeof data.origin !== 'string' ||
+        !data.origin ||
+        data.origin.length > 80 ||
+        typeof data.target !== 'string' ||
+        data.target.length > 80
+      )
+        return;
       if (data.origin === selfId || !this.canTrackRumor(data.origin)) return;
       this.peerTracker.touchPeer(meta.peerId);
 
@@ -2775,12 +3525,18 @@ export class GroupRoomManager {
           console.log(`[P2P/Mesh] Received mesh_hello from indirect peer ${data.origin}`);
           const p = data.payload || {};
           this.rumorIntermediaries.set(data.origin, meta.peerId);
-          this.peerTracker.receivePeerExchange(data.origin, false, typeof p.username === 'string' ? p.username.slice(0, 80) : undefined);
+          this.peerTracker.receivePeerExchange(
+            data.origin,
+            false,
+            typeof p.username === 'string' ? p.username.slice(0, 80) : undefined,
+          );
 
           if (typeof p.publicKey === 'string' && /^04[0-9a-f]{128}$/.test(p.publicKey)) {
             this.chatAuth?.pinDirect(data.origin, p.publicKey);
-            if (!this.peerTracker.isVerified(data.origin) &&
-                (this.indirectPeerReports.has(data.origin) || this.indirectPeerReports.size < 64)) {
+            if (
+              !this.peerTracker.isVerified(data.origin) &&
+              (this.indirectPeerReports.has(data.origin) || this.indirectPeerReports.size < 64)
+            ) {
               const prev = this.indirectPeerReports.get(data.origin);
               const reporters = prev?.reporters ?? new Set<string>();
               reporters.add(meta.peerId);
@@ -2823,7 +3579,7 @@ export class GroupRoomManager {
                     publicKey: this.chatAuth?.publicKey,
                   },
                 },
-                { target: meta.peerId }
+                { target: meta.peerId },
               );
             } catch {}
             void this.room?.initiateMeshSignaling?.(data.origin, (destPeerId: string, payloadJson: string) => {
@@ -2839,11 +3595,17 @@ export class GroupRoomManager {
           console.log(`[P2P/Mesh] Received mesh_ack from indirect peer ${data.origin}`);
           const p = data.payload || {};
           this.rumorIntermediaries.set(data.origin, meta.peerId);
-          this.peerTracker.receivePeerExchange(data.origin, false, typeof p.username === 'string' ? p.username.slice(0, 80) : undefined);
+          this.peerTracker.receivePeerExchange(
+            data.origin,
+            false,
+            typeof p.username === 'string' ? p.username.slice(0, 80) : undefined,
+          );
           if (typeof p.publicKey === 'string' && /^04[0-9a-f]{128}$/.test(p.publicKey)) {
             this.chatAuth?.pinDirect(data.origin, p.publicKey);
-            if (!this.peerTracker.isVerified(data.origin) &&
-                (this.indirectPeerReports.has(data.origin) || this.indirectPeerReports.size < 64)) {
+            if (
+              !this.peerTracker.isVerified(data.origin) &&
+              (this.indirectPeerReports.has(data.origin) || this.indirectPeerReports.size < 64)
+            ) {
               const prev = this.indirectPeerReports.get(data.origin);
               const reporters = prev?.reporters ?? new Set<string>();
               reporters.add(meta.peerId);
@@ -2877,8 +3639,12 @@ export class GroupRoomManager {
           if (this.signalingTopic) {
             signalingManager.reannounce(this.signalingTopic, data.origin);
           }
-        } else if (data.kind === 'webrtc_signal' && data.target === selfId &&
-                   typeof data.payload === 'string' && data.payload.length <= 24_000) {
+        } else if (
+          data.kind === 'webrtc_signal' &&
+          data.target === selfId &&
+          typeof data.payload === 'string' &&
+          data.payload.length <= 24_000
+        ) {
           if (!this.peerTracker.isVerified(data.origin)) {
             this.rumorIntermediaries.set(data.origin, meta.peerId);
           }
@@ -2899,9 +3665,12 @@ export class GroupRoomManager {
         } else if (data.kind === 'stream_req' && data.origin === meta.peerId && this.localStream) {
           this.sendStreamToPeer(data.origin, true);
         }
-      } else if (data.target && data.origin === meta.peerId &&
-                 (this.peerTracker.hasPeer(data.target) || this.isAdmittedPeer(data.target)) &&
-                 this.isLivePeerTarget(data.target)) {
+      } else if (
+        data.target &&
+        data.origin === meta.peerId &&
+        (this.peerTracker.hasPeer(data.target) || this.isAdmittedPeer(data.target)) &&
+        this.isLivePeerTarget(data.target)
+      ) {
         try {
           this.meshRelayAction.send(data, { target: data.target });
         } catch {}
@@ -2913,8 +3682,12 @@ export class GroupRoomManager {
     this.pongAction = this.room.makeAction('peer_pong');
 
     this.pingAction.onMessage = (data: { t: number }, meta: { peerId: string }) => {
-      if (Number.isFinite(data?.t) && Math.abs(Date.now() - data.t) < 30000 && this.pongAction &&
-          this.isLivePeerTarget(meta.peerId)) {
+      if (
+        Number.isFinite(data?.t) &&
+        Math.abs(Date.now() - data.t) < 30000 &&
+        this.pongAction &&
+        this.isLivePeerTarget(meta.peerId)
+      ) {
         try {
           this.pongAction.send({ t: data.t }, { target: meta.peerId });
         } catch {}
@@ -2937,9 +3710,14 @@ export class GroupRoomManager {
           return this.nativeVideoAction?.send(signal, { target: peerId });
         }
       },
-      permitted: (peerId, descriptor) => this.room === boundRoom && this.peerTracker.isVerified(peerId) &&
-        (!this.authority || this.localAdmitted && this.isAdmittedPeer(peerId)) &&
-        (!descriptor || !!this.remoteDescriptors.get(peerId)?.some(entry => entry.id === descriptor.id && entry.videoTrackId === descriptor.videoTrackId)),
+      permitted: (peerId, descriptor) =>
+        this.room === boundRoom &&
+        this.peerTracker.isVerified(peerId) &&
+        (!this.authority || (this.localAdmitted && this.isAdmittedPeer(peerId))) &&
+        (!descriptor ||
+          !!this.remoteDescriptors
+            .get(peerId)
+            ?.some((entry) => entry.id === descriptor.id && entry.videoTrackId === descriptor.videoTrackId)),
       receive: (peerId, stream, descriptor) => this.receivePeerStream(stream, peerId, descriptor),
       ready: (peerId, mediaId) => {
         if (this.room === boundRoom) this.dispatchMediaToPeer(peerId, false, mediaId);
@@ -2947,26 +3725,50 @@ export class GroupRoomManager {
       fallback: (peerId, mediaId) => {
         const entry = this.localMedia.get(mediaId);
         if (entry && this.room === boundRoom) {
-          logDiagnostic('INFO', 'transmission.fallback', 'Publishing browser video after native route failure', { mediaId });
+          logDiagnostic('INFO', 'transmission.fallback', 'Publishing browser video after native route failure', {
+            mediaId,
+          });
 
           this.setSenderConsumer(entry.descriptor.id, peerId, 'required');
-      this.dispatchBrowserMediaToPeer(peerId, entry);
+          this.dispatchBrowserMediaToPeer(peerId, entry);
         }
       },
     });
     this.nativeVideoAction.onMessage = (data: unknown, meta: { peerId: string }) => {
-      void this.nativeVideo?.signal(meta.peerId, data).catch(error => console.warn('[Native RTP] Signal rejected:', error));
+      void this.nativeVideo
+        ?.signal(meta.peerId, data)
+        .catch((error) => console.warn('[Native RTP] Signal rejected:', error));
     };
 
     // Trystero delivers action handlers asynchronously. A queued message from
     // the previous transport must not mutate the replacement room's state.
     [
-      this.passwordAction, this.chatAction, this.historyAction, this.presenceAction,
-      this.streamStatusAction, this.streamReqAction, this.leaveAction,
-      this.pexAction, this.meshRelayAction, this.watchAction,
-      this.pingAction, this.pongAction, this.identityAction,
-      this.authorityAction, this.admissionAction, this.inviteAction,
-      this.previewAction, this.appAction, this.voiceAction, this.fileAction, this.pointerAction, this.remoteControlAction, this.nativeVideoAction, this.profileAction, this.bannerAction, this.profileStatsAction,
+      this.passwordAction,
+      this.chatAction,
+      this.historyAction,
+      this.presenceAction,
+      this.streamStatusAction,
+      this.streamReqAction,
+      this.leaveAction,
+      this.pexAction,
+      this.meshRelayAction,
+      this.watchAction,
+      this.pingAction,
+      this.pongAction,
+      this.identityAction,
+      this.authorityAction,
+      this.admissionAction,
+      this.inviteAction,
+      this.previewAction,
+      this.appAction,
+      this.voiceAction,
+      this.fileAction,
+      this.pointerAction,
+      this.remoteControlAction,
+      this.nativeVideoAction,
+      this.profileAction,
+      this.bannerAction,
+      this.profileStatsAction,
     ].forEach((action) => {
       if (!action?.onMessage) return;
       const handler = action.onMessage;
@@ -2974,11 +3776,24 @@ export class GroupRoomManager {
       action.onMessage = (...args: any[]) => {
         if (this.room !== boundRoom) return;
         if (!this.peerTracker.isVerified(args[1]?.peerId)) return;
-        if ((this.authority || this.shortLookup) && ![this.identityAction, this.authorityAction, this.admissionAction,
-          this.inviteAction, this.previewAction].includes(action)) {
+        if (
+          (this.authority || this.shortLookup) &&
+          ![
+            this.identityAction,
+            this.authorityAction,
+            this.admissionAction,
+            this.inviteAction,
+            this.previewAction,
+          ].includes(action)
+        ) {
           const peerId = args[1]?.peerId;
-          if (this.previewOnly || !this.localAdmitted || !this.chatAuth?.getKnownKey(peerId) ||
-              this.admittedPeers.get(peerId) !== this.chatAuth.getKnownKey(peerId)) return;
+          if (
+            this.previewOnly ||
+            !this.localAdmitted ||
+            !this.chatAuth?.getKnownKey(peerId) ||
+            this.admittedPeers.get(peerId) !== this.chatAuth.getKnownKey(peerId)
+          )
+            return;
         }
         this.peerTracker.touchPeer(args[1].peerId);
         return handler(...args);
@@ -3062,7 +3877,7 @@ export class GroupRoomManager {
       this.callbacks?.onStatusChange(
         this.turnConfig?.forceRelay
           ? 'P2P (Relay Seguro)'
-          : `P2P Conectado (${signalingManager.getActiveTransport().toUpperCase()})`
+          : `P2P Conectado (${signalingManager.getActiveTransport().toUpperCase()})`,
       );
     };
 
@@ -3074,7 +3889,12 @@ export class GroupRoomManager {
     };
 
     // 10. Incoming Stream Listener
-    this.room.onPeerTrack = (_track: MediaStreamTrack, stream: MediaStream, peerId: string, metadata?: StreamDescriptor) => {
+    this.room.onPeerTrack = (
+      _track: MediaStreamTrack,
+      stream: MediaStream,
+      peerId: string,
+      metadata?: StreamDescriptor,
+    ) => {
       if (this.room !== boundRoom) return;
       if (isVoiceStreamMetadata(metadata)) {
         this.receiveVoiceStream(stream, peerId);
@@ -3093,7 +3913,6 @@ export class GroupRoomManager {
       }
       this.receiveBrowserStream(stream, peerId, metadata);
     };
-
   }
 
   private buildVoiceStatePayload(requestVoice = false): {
@@ -3141,13 +3960,15 @@ export class GroupRoomManager {
     const pc: RTCPeerConnection | undefined = peerObj?.connection || peerObj?.pc || peerObj;
     if (!pc || typeof pc.getReceivers !== 'function') return false;
 
-    const matchingReceiver = pc.getReceivers().find(
-      (receiver) =>
-        receiver.track &&
-        receiver.track.kind === 'audio' &&
-        receiver.track.readyState === 'live' &&
-        receiver.track.id === expectedTrackId,
-    );
+    const matchingReceiver = pc
+      .getReceivers()
+      .find(
+        (receiver) =>
+          receiver.track &&
+          receiver.track.kind === 'audio' &&
+          receiver.track.readyState === 'live' &&
+          receiver.track.id === expectedTrackId,
+      );
     if (!matchingReceiver?.track) return false;
 
     const stream = new MediaStream([matchingReceiver.track]);
@@ -3167,35 +3988,37 @@ export class GroupRoomManager {
     const timers: ReturnType<typeof setTimeout>[] = [];
     delays.forEach((delay, index) => {
       const isLast = index === delays.length - 1;
-      timers.push(setTimeout(() => {
-        if (isLast && this.voiceRecoveryTimers.get(peerId) === timers) {
-          this.voiceRecoveryTimers.delete(peerId);
-        }
-        if (this.room !== boundRoom || this.previewOnly) {
-          this.clearVoiceRecovery(peerId);
-          return;
-        }
-        const remote = this.remoteVoiceStates.get(peerId);
-        if (!remote || !remote.inVoice || remote.muted || this.hasLiveRemoteVoiceStream(peerId)) {
-          this.clearVoiceRecovery(peerId);
-          return;
-        }
-        if (this.recoverVoiceFromReceivers(peerId)) {
-          this.clearVoiceRecovery(peerId);
-          return;
-        }
-        if (!this.peerTracker.isVerified(peerId) || !this.isLivePeerTarget(peerId)) return;
-        if (this.authority && (!this.localAdmitted || !this.isAdmittedPeer(peerId))) return;
-        this.lastVoiceRecoveryRequest.set(peerId, Date.now());
-        logDiagnostic('WARN', 'voice.p2p', 'Requesting remote voice stream recovery', {
-          peer: peerId.slice(0, 6),
-          attempt: index + 1,
-          expectedTrackId: this.remoteVoiceTrackIds.get(peerId)?.slice(0, 8),
-        });
-        try {
-          this.voiceAction?.send(this.buildVoiceStatePayload(true), { target: peerId });
-        } catch {}
-      }, delay));
+      timers.push(
+        setTimeout(() => {
+          if (isLast && this.voiceRecoveryTimers.get(peerId) === timers) {
+            this.voiceRecoveryTimers.delete(peerId);
+          }
+          if (this.room !== boundRoom || this.previewOnly) {
+            this.clearVoiceRecovery(peerId);
+            return;
+          }
+          const remote = this.remoteVoiceStates.get(peerId);
+          if (!remote || !remote.inVoice || remote.muted || this.hasLiveRemoteVoiceStream(peerId)) {
+            this.clearVoiceRecovery(peerId);
+            return;
+          }
+          if (this.recoverVoiceFromReceivers(peerId)) {
+            this.clearVoiceRecovery(peerId);
+            return;
+          }
+          if (!this.peerTracker.isVerified(peerId) || !this.isLivePeerTarget(peerId)) return;
+          if (this.authority && (!this.localAdmitted || !this.isAdmittedPeer(peerId))) return;
+          this.lastVoiceRecoveryRequest.set(peerId, Date.now());
+          logDiagnostic('WARN', 'voice.p2p', 'Requesting remote voice stream recovery', {
+            peer: peerId.slice(0, 6),
+            attempt: index + 1,
+            expectedTrackId: this.remoteVoiceTrackIds.get(peerId)?.slice(0, 8),
+          });
+          try {
+            this.voiceAction?.send(this.buildVoiceStatePayload(true), { target: peerId });
+          } catch {}
+        }, delay),
+      );
     });
     this.voiceRecoveryTimers.set(peerId, timers);
   }
@@ -3221,7 +4044,10 @@ export class GroupRoomManager {
     source: 'trystero' | 'pending-flush' | 'receiver-fallback' | 'addtrack' = 'trystero',
   ): void {
     if (this.previewOnly) return;
-    if (!this.peerTracker.isVerified(peerId) || (this.authority && (!this.localAdmitted || !this.isAdmittedPeer(peerId)))) {
+    if (
+      !this.peerTracker.isVerified(peerId) ||
+      (this.authority && (!this.localAdmitted || !this.isAdmittedPeer(peerId)))
+    ) {
       // Buffer voice tracks that arrive before admission/verification completes so Trystero's
       // one-shot track emission is never permanently lost.
       this.pendingVoiceStreams.set(peerId, stream);
@@ -3345,7 +4171,9 @@ export class GroupRoomManager {
     }
 
     const senderAlreadyPresent = Boolean(
-      pc && typeof pc.getSenders === 'function' && liveTracks.some((track) => pc.getSenders().some((s) => s.track === track)),
+      pc &&
+      typeof pc.getSenders === 'function' &&
+      liveTracks.some((track) => pc.getSenders().some((s) => s.track === track)),
     );
     logDiagnostic('INFO', 'voice.p2p', 'Dispatching local voice stream to peer', {
       peer: peerId.slice(0, 6),
@@ -3361,22 +4189,26 @@ export class GroupRoomManager {
       if (typeof room.addTrack === 'function') {
         for (const track of liveTracks) {
           for (const op of room.addTrack(track, stream, { target: peerId, metadata }) || []) {
-            operations.push(Promise.resolve(op).catch((err) => {
-              if (this.voiceDispatches.get(peerId)?.stream === stream) {
-                this.voiceDispatches.delete(peerId);
-              }
-              console.warn('[Voice] Track dispatch failed:', peerId, err);
-            }));
+            operations.push(
+              Promise.resolve(op).catch((err) => {
+                if (this.voiceDispatches.get(peerId)?.stream === stream) {
+                  this.voiceDispatches.delete(peerId);
+                }
+                console.warn('[Voice] Track dispatch failed:', peerId, err);
+              }),
+            );
           }
         }
       } else if (typeof room.addStream === 'function') {
         for (const op of room.addStream(stream, { target: peerId, metadata }) || []) {
-          operations.push(Promise.resolve(op).catch((err) => {
-            if (this.voiceDispatches.get(peerId)?.stream === stream) {
-              this.voiceDispatches.delete(peerId);
-            }
-            console.warn('[Voice] Stream dispatch failed:', peerId, err);
-          }));
+          operations.push(
+            Promise.resolve(op).catch((err) => {
+              if (this.voiceDispatches.get(peerId)?.stream === stream) {
+                this.voiceDispatches.delete(peerId);
+              }
+              console.warn('[Voice] Stream dispatch failed:', peerId, err);
+            }),
+          );
         }
       }
       if (recovery && typeof room.renegotiate === 'function') {
@@ -3471,120 +4303,133 @@ export class GroupRoomManager {
   }
 
   private receivePeerStream(stream: MediaStream, peerId: string, metadata?: StreamDescriptor, browser = false): void {
-      if (this.previewOnly) return;
-      if (metadata !== undefined && !validStreamDescriptors([metadata])) return;
-      if (!this.peerTracker.isVerified(peerId) || (this.authority && (!this.localAdmitted || !this.isAdmittedPeer(peerId)))) {
-        if (browser) {
-          const queue = this.pendingRemoteMedia.get(peerId) ?? [];
-          const key = metadata?.id ?? stream.id;
-          const filtered = queue.filter((item) => (item.metadata?.id ?? item.stream.id) !== key);
-          if (filtered.length < 16) {
-            filtered.push({ stream, metadata });
-            this.pendingRemoteMedia.set(peerId, filtered);
-          }
+    if (this.previewOnly) return;
+    if (metadata !== undefined && !validStreamDescriptors([metadata])) return;
+    if (
+      !this.peerTracker.isVerified(peerId) ||
+      (this.authority && (!this.localAdmitted || !this.isAdmittedPeer(peerId)))
+    ) {
+      if (browser) {
+        const queue = this.pendingRemoteMedia.get(peerId) ?? [];
+        const key = metadata?.id ?? stream.id;
+        const filtered = queue.filter((item) => (item.metadata?.id ?? item.stream.id) !== key);
+        if (filtered.length < 16) {
+          filtered.push({ stream, metadata });
+          this.pendingRemoteMedia.set(peerId, filtered);
         }
-        return;
       }
-      if (browser && metadata && this.nativeVideo?.receiving(peerId, metadata.id)) {
+      return;
+    }
+    if (browser && metadata && this.nativeVideo?.receiving(peerId, metadata.id)) {
+      const incoming = stream;
+      if (!this.observedRemoteStreams.has(incoming)) {
+        this.observedRemoteStreams.add(incoming);
+        incoming.addEventListener('addtrack', () => this.receiveBrowserStream(incoming, peerId, metadata));
+      }
+      // Browser audio can arrive after the native handoff. Preserve its
+      // container observer, but never let its retired video undo the handoff.
+      if (!stream.getAudioTracks().length) return;
+      stream = new MediaStream(stream.getAudioTracks());
+    }
+    // Shared connections can replay a container emptied by SDP removal during
+    // room detach. It must never replace a playable native/browser stream.
+    if (!stream.getTracks().some((track) => track.readyState === 'live')) {
+      logDiagnostic('WARN', 'transmission.receive', 'Ignoring retired or empty remote stream', {
+        mediaId: metadata?.id,
+        streamId: stream.id,
+      });
+      return;
+    }
+    console.log(`[P2P] Received stream from peer: ${peerId}`);
+    this.peerTracker.touchPeer(peerId);
+    this.peerTracker.setStreaming(peerId, true);
+    if (metadata && validStreamDescriptors([metadata])) {
+      const entries = this.remoteDescriptors.get(peerId) || [];
+      if (this.remoteMediaRevisions.has(peerId) && !entries.some((entry) => entry.id === metadata.id)) return;
+      if (!entries.some((entry) => entry.id === metadata.id)) {
+        if (entries.length >= 16) return;
+        this.remoteDescriptors.set(peerId, [...entries, metadata]);
+      }
+      const media = this.remoteMedia.get(peerId) || new Map<string, MediaStream>();
+      const existing = media.get(metadata.id);
+      if (existing) {
+        const liveVideo = stream.getVideoTracks().filter((t) => t.readyState === 'live');
+        const liveAudio = stream.getAudioTracks().filter((t) => t.readyState === 'live');
+        const existingLiveVideo = existing.getVideoTracks().filter((t) => t.readyState === 'live');
+        const existingLiveAudio = existing.getAudioTracks().filter((t) => t.readyState === 'live');
+        const video = liveVideo.length ? liveVideo : existingLiveVideo;
+        const audio = liveAudio.length ? liveAudio : existingLiveAudio;
         const incoming = stream;
+        const tracks = [...video, ...audio];
+        const current = existing.getTracks();
+        // Presence re-advertises the same tracks every two seconds. Keep the
+        // playback container stable instead of resetting video, audio and pointing.
+        stream =
+          tracks.length === current.length && tracks.every((track) => current.includes(track))
+            ? existing
+            : new MediaStream(tracks);
         if (!this.observedRemoteStreams.has(incoming)) {
           this.observedRemoteStreams.add(incoming);
-          incoming.addEventListener('addtrack', () => this.receiveBrowserStream(incoming, peerId, metadata));
+          incoming.addEventListener('addtrack', () => this.receivePeerStream(incoming, peerId, metadata, browser));
         }
-        // Browser audio can arrive after the native handoff. Preserve its
-        // container observer, but never let its retired video undo the handoff.
-        if (!stream.getAudioTracks().length) return;
-        stream = new MediaStream(stream.getAudioTracks());
       }
-      // Shared connections can replay a container emptied by SDP removal during
-      // room detach. It must never replace a playable native/browser stream.
-      if (!stream.getTracks().some(track => track.readyState === 'live')) {
-        logDiagnostic('WARN', 'transmission.receive', 'Ignoring retired or empty remote stream', { mediaId: metadata?.id, streamId: stream.id });
-        return;
-      }
-      console.log(`[P2P] Received stream from peer: ${peerId}`);
-      this.peerTracker.touchPeer(peerId);
-      this.peerTracker.setStreaming(peerId, true);
-      if (metadata && validStreamDescriptors([metadata])) {
-        const entries = this.remoteDescriptors.get(peerId) || [];
-        if (this.remoteMediaRevisions.has(peerId) && !entries.some((entry) => entry.id === metadata.id)) return;
-        if (!entries.some((entry) => entry.id === metadata.id)) {
-          if (entries.length >= 16) return;
-          this.remoteDescriptors.set(peerId, [...entries, metadata]);
-        }
-        const media = this.remoteMedia.get(peerId) || new Map<string, MediaStream>();
-        const existing = media.get(metadata.id);
-        if (existing) {
-          const liveVideo = stream.getVideoTracks().filter(t => t.readyState === 'live');
-          const liveAudio = stream.getAudioTracks().filter(t => t.readyState === 'live');
-          const existingLiveVideo = existing.getVideoTracks().filter(t => t.readyState === 'live');
-          const existingLiveAudio = existing.getAudioTracks().filter(t => t.readyState === 'live');
-          const video = liveVideo.length ? liveVideo : existingLiveVideo;
-          const audio = liveAudio.length ? liveAudio : existingLiveAudio;
-          const incoming = stream;
-          const tracks = [...video, ...audio];
-          const current = existing.getTracks();
-          // Presence re-advertises the same tracks every two seconds. Keep the
-          // playback container stable instead of resetting video, audio and pointing.
-          stream = tracks.length === current.length && tracks.every(track => current.includes(track))
-            ? existing : new MediaStream(tracks);
-          if (!this.observedRemoteStreams.has(incoming)) {
-            this.observedRemoteStreams.add(incoming);
-            incoming.addEventListener('addtrack', () => this.receivePeerStream(incoming, peerId, metadata, browser));
-          }
-        }
-        if (stream !== existing) logDiagnostic('INFO', 'transmission.receive', 'Remote media tracks attached', {
-          mediaId: metadata.id, streamId: stream.id,
-          tracks: stream.getTracks().map(track => ({ id: track.id, kind: track.kind, state: track.readyState, muted: track.muted })) });
-        media.set(metadata.id, stream);
-        this.remoteMedia.set(peerId, media);
-      }
-      this.remoteStreams.set(peerId, stream);
-      if (metadata && stream.addEventListener && !this.observedRemoteStreams.has(stream)) {
-        this.observedRemoteStreams.add(stream);
-        stream.addEventListener('addtrack', () => {
-          if (this.remoteDescriptors.get(peerId)?.some((entry) => entry.id === metadata.id)) {
-            this.receivePeerStream(stream, peerId, metadata, browser);
-          }
+      if (stream !== existing)
+        logDiagnostic('INFO', 'transmission.receive', 'Remote media tracks attached', {
+          mediaId: metadata.id,
+          streamId: stream.id,
+          tracks: stream
+            .getTracks()
+            .map((track) => ({ id: track.id, kind: track.kind, state: track.readyState, muted: track.muted })),
         });
-      }
-      if (this.hasCompleteRemoteMedia(peerId)) {
-        this.lastStreamRecoveryRequests.delete(peerId);
-      }
-
-      // Listen to track state so if host stops, remote stream clears cleanly
-      stream.getVideoTracks().forEach((track) => {
-        track.onended = () => {
-          console.log(`[P2P] Track ended for peer: ${peerId}`);
-          let changed = false;
-          if (metadata && this.remoteMedia.get(peerId)?.get(metadata.id) === stream) {
-            this.remoteMedia.get(peerId)?.delete(metadata.id);
-            changed = true;
-          }
-          if (this.remoteStreams.get(peerId)?.id === stream.id) {
-            this.remoteStreams.delete(peerId);
-            changed = true;
-          }
-          if (changed) {
-            this.notifyStreamsUpdate();
-          }
-        };
-      });
-
-      // Eliminate video receiver jitter buffer delay for true real-time P2P while protecting audio NetEQ
-      try {
-        const peers = this.room?.getPeers?.() || {};
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const peerObj: any = peers[peerId];
-        const pc: RTCPeerConnection = peerObj?.connection || peerObj?.pc || peerObj;
-        if (pc) {
-          MediaCoordinator.tuneReceiverJitterBuffer(pc, this.remoteControlLowLatencyPeers.has(peerId));
+      media.set(metadata.id, stream);
+      this.remoteMedia.set(peerId, media);
+    }
+    this.remoteStreams.set(peerId, stream);
+    if (metadata && stream.addEventListener && !this.observedRemoteStreams.has(stream)) {
+      this.observedRemoteStreams.add(stream);
+      stream.addEventListener('addtrack', () => {
+        if (this.remoteDescriptors.get(peerId)?.some((entry) => entry.id === metadata.id)) {
+          this.receivePeerStream(stream, peerId, metadata, browser);
         }
-        this.nativeVideo?.tunePeerJitterBuffer(peerId, this.remoteControlLowLatencyPeers.has(peerId));
-      } catch {}
+      });
+    }
+    if (this.hasCompleteRemoteMedia(peerId)) {
+      this.lastStreamRecoveryRequests.delete(peerId);
+    }
 
-      this.notifyStreamsUpdate();
-      this.callbacks?.onStatusChange('Ao Vivo');
+    // Listen to track state so if host stops, remote stream clears cleanly
+    stream.getVideoTracks().forEach((track) => {
+      track.onended = () => {
+        console.log(`[P2P] Track ended for peer: ${peerId}`);
+        let changed = false;
+        if (metadata && this.remoteMedia.get(peerId)?.get(metadata.id) === stream) {
+          this.remoteMedia.get(peerId)?.delete(metadata.id);
+          changed = true;
+        }
+        if (this.remoteStreams.get(peerId)?.id === stream.id) {
+          this.remoteStreams.delete(peerId);
+          changed = true;
+        }
+        if (changed) {
+          this.notifyStreamsUpdate();
+        }
+      };
+    });
+
+    // Eliminate video receiver jitter buffer delay for true real-time P2P while protecting audio NetEQ
+    try {
+      const peers = this.room?.getPeers?.() || {};
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const peerObj: any = peers[peerId];
+      const pc: RTCPeerConnection = peerObj?.connection || peerObj?.pc || peerObj;
+      if (pc) {
+        MediaCoordinator.tuneReceiverJitterBuffer(pc, this.remoteControlLowLatencyPeers.has(peerId));
+      }
+      this.nativeVideo?.tunePeerJitterBuffer(peerId, this.remoteControlLowLatencyPeers.has(peerId));
+    } catch {}
+
+    this.notifyStreamsUpdate();
+    this.callbacks?.onStatusChange('Ao Vivo');
   }
 
   private isPeerTransportDisconnected(peerId: string): boolean {
@@ -3653,8 +4498,13 @@ export class GroupRoomManager {
           this.disconnectedPeers.add(peerId);
         } else if (this.disconnectedPeers.delete(peerId)) {
           this.lastDisconnectedPing.delete(peerId);
-          if (this.isLivePeerTarget(peerId) && (!this.authority || (this.localAdmitted && this.isAdmittedPeer(peerId)))) {
-            try { this.presenceAction?.send(this.buildPresencePayload(), { target: peerId }); } catch {}
+          if (
+            this.isLivePeerTarget(peerId) &&
+            (!this.authority || (this.localAdmitted && this.isAdmittedPeer(peerId)))
+          ) {
+            try {
+              this.presenceAction?.send(this.buildPresencePayload(), { target: peerId });
+            } catch {}
             this.publishMediaManifest(peerId);
           }
         }
@@ -3735,7 +4585,9 @@ export class GroupRoomManager {
       // Continuous presence re-announcement on broker until direct peers connect or if rumors exist
       const hasNoDirectPeers = this.peerTracker.directConnectedPeers.size === 0;
       const rumors = this.peerTracker.getPendingRumors();
-      const pendingAdmission = Boolean(this.authority && !this.previewOnly && !this.localAdmitted && !this.admissionDenied);
+      const pendingAdmission = Boolean(
+        this.authority && !this.previewOnly && !this.localAdmitted && !this.admissionDenied,
+      );
       if (pendingAdmission && now - this.lastAdmissionRetry >= 4000) {
         this.lastAdmissionRetry = now;
         this.requestPreview();
@@ -3743,9 +4595,11 @@ export class GroupRoomManager {
         for (const peerId of this.peerTracker.directConnectedPeers) {
           if (!this.isLivePeerTarget(peerId) || !this.chatAuth?.getKnownKey(peerId)) continue;
           if (this.authority?.isPeerHost(peerId) || this.isPeerAdmin(peerId)) {
-            void this.requestAdmission(peerId).catch(error => console.warn('[Rooms] Admission retry failed:', error));
+            void this.requestAdmission(peerId).catch((error) => console.warn('[Rooms] Admission retry failed:', error));
           } else {
-            void Promise.resolve(this.admissionAction?.send({ kind: 'admin-hello-request' }, { target: peerId })).catch(() => {});
+            void Promise.resolve(this.admissionAction?.send({ kind: 'admin-hello-request' }, { target: peerId })).catch(
+              () => {},
+            );
             if (!hasDirectAdmitter) {
               void this.sendRelayedAdmissionRequest(peerId).catch(() => {});
             }
@@ -3755,7 +4609,8 @@ export class GroupRoomManager {
       if (this.authority && now - this.lastAuthoritySummary >= 20_000) {
         this.lastAuthoritySummary = now;
         void this.sendAuthoritySummary().catch((error) =>
-          console.warn('[Rooms] Authority reconciliation failed:', error));
+          console.warn('[Rooms] Authority reconciliation failed:', error),
+        );
       }
       if (
         (hasNoDirectPeers || pendingAdmission || rumors.length > 0) &&
@@ -3784,13 +4639,18 @@ export class GroupRoomManager {
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
           const peerObj: any = activePeers[p];
           const pc: RTCPeerConnection = peerObj?.connection || peerObj?.pc || peerObj;
-          if (pc && ![pc.connectionState, pc.iceConnectionState].some(state => state === 'failed' || state === 'closed')) {
+          if (
+            pc &&
+            ![pc.connectionState, pc.iceConnectionState].some((state) => state === 'failed' || state === 'closed')
+          ) {
             if (!hardZombieIds.has(p)) {
               // Give recovering ICE/SCTP edges time to restore without resetting their silence timer.
               return;
             }
             console.log(`[P2P] Closing unresponsive peer transport after extended silence: ${p}`);
-            try { pc.close?.(); } catch {}
+            try {
+              pc.close?.();
+            } catch {}
           } else {
             console.log(`[P2P] Pruning silent peer with no active room transport: ${p}`);
           }
@@ -3849,7 +4709,8 @@ export class GroupRoomManager {
     }
     this.pendingChallenges.delete(peerId);
     this.fileBulk.close(peerId);
-    this.payloadChannels.close(peerId); this.binaryPeers.delete(peerId);
+    this.payloadChannels.close(peerId);
+    this.binaryPeers.delete(peerId);
     this.remoteControlFastPeers.delete(peerId);
     for (const seqKey of this.remoteControlRxSeq.keys()) {
       if (seqKey.startsWith(`${peerId}:`)) this.remoteControlRxSeq.delete(seqKey);
@@ -3860,7 +4721,14 @@ export class GroupRoomManager {
       void cancelDirectFile(requestId).catch(() => {});
       if (session.preview) this.requestedImagePreviews.delete(session.messageId);
       if (session.direction === 'receive' && !session.preview) void invoke('cancel_chat_download', { id: requestId });
-      this.emitFileProgress(requestId, 'cancelled', session.offset, session.messageId, session.direction, session.total);
+      this.emitFileProgress(
+        requestId,
+        'cancelled',
+        session.offset,
+        session.messageId,
+        session.direction,
+        session.total,
+      );
     }
     for (const [requestId, request] of this.pendingFileRequests) {
       if (request.peerId === peerId) this.removePendingFileRequest(requestId);
@@ -3916,38 +4784,53 @@ export class GroupRoomManager {
 
   /** Snapshots repair missed stop events and populate late joiners without treating received media as viewing. */
   private applyWatchSnapshot(watcherId: string, value: unknown, revision: unknown): void {
-    if (!this.peerTracker.isVerified(watcherId) || !Array.isArray(value) || value.length > 256 ||
-        !value.every((key) => typeof key === 'string' && key.length <= 250 &&
-          /^[a-zA-Z0-9_-]+(?:\/[a-zA-Z0-9_-]+)?$/.test(key)) ||
-        !Number.isSafeInteger(revision) || (revision as number) < 0 ||
-        (revision as number) < (this.remoteWatchRevisions.get(watcherId) ?? -1)) return;
+    if (
+      !this.peerTracker.isVerified(watcherId) ||
+      !Array.isArray(value) ||
+      value.length > 256 ||
+      !value.every(
+        (key) => typeof key === 'string' && key.length <= 250 && /^[a-zA-Z0-9_-]+(?:\/[a-zA-Z0-9_-]+)?$/.test(key),
+      ) ||
+      !Number.isSafeInteger(revision) ||
+      (revision as number) < 0 ||
+      (revision as number) < (this.remoteWatchRevisions.get(watcherId) ?? -1)
+    )
+      return;
     this.remoteWatchRevisions.set(watcherId, revision as number);
-    const targets = new Set<string>(value.filter((key) => {
-      const owner = streamOwner(key);
-      if (owner === watcherId || (owner !== selfId && !this.peerTracker.isVerified(owner))) return false;
-      const mediaId = key.split('/')[1];
-      if (mediaId) return owner === selfId ? this.localMedia.has(mediaId)
-        : Boolean(this.remoteDescriptors.get(owner)?.some((entry) => entry.id === mediaId));
-      return owner === selfId ? Boolean(this.localStream) : this.peerTracker.isStreaming(owner);
-    }));
+    const targets = new Set<string>(
+      value.filter((key) => {
+        const owner = streamOwner(key);
+        if (owner === watcherId || (owner !== selfId && !this.peerTracker.isVerified(owner))) return false;
+        const mediaId = key.split('/')[1];
+        if (mediaId)
+          return owner === selfId
+            ? this.localMedia.has(mediaId)
+            : Boolean(this.remoteDescriptors.get(owner)?.some((entry) => entry.id === mediaId));
+        return owner === selfId ? Boolean(this.localStream) : this.peerTracker.isStreaming(owner);
+      }),
+    );
     const old = new Set(this.peerTracker.getWatchedStreams(watcherId));
     const name = this.peerTracker.getUsername(watcherId) || 'Participante';
-    for (const key of old) if (!targets.has(key)) {
-      this.peerTracker.removeWatcher(key, watcherId);
-      this.callbacks?.onWatchStopped?.(watcherId, name, streamOwner(key));
-    }
-    for (const key of targets) if (!old.has(key)) {
-      this.peerTracker.addWatcher(key, watcherId, name);
-      this.callbacks?.onWatchStarted?.(watcherId, name, streamOwner(key));
-    }
+    for (const key of old)
+      if (!targets.has(key)) {
+        this.peerTracker.removeWatcher(key, watcherId);
+        this.callbacks?.onWatchStopped?.(watcherId, name, streamOwner(key));
+      }
+    for (const key of targets)
+      if (!old.has(key)) {
+        this.peerTracker.addWatcher(key, watcherId, name);
+        this.callbacks?.onWatchStarted?.(watcherId, name, streamOwner(key));
+      }
     this.notifyStreamsUpdate();
   }
 
   private publishWatchState(): void {
     this.watchRevision++;
-    if (this.watchAction) this.sendRoomAction(this.watchAction, {
-      watching: [...this.localWatching], revision: this.watchRevision,
-    });
+    if (this.watchAction)
+      this.sendRoomAction(this.watchAction, {
+        watching: [...this.localWatching],
+        revision: this.watchRevision,
+      });
   }
 
   private bridgeIndirectPeer(targetPeerId: string, intermediaryPeerId: string, targetUsername?: string): void {
@@ -3991,7 +4874,7 @@ export class GroupRoomManager {
               targetUsername,
             },
           },
-          { target: intermediaryPeerId }
+          { target: intermediaryPeerId },
         );
       } catch (err) {
         console.warn(`[P2P/Mesh] Failed to send mesh_hello to ${targetPeerId}:`, err);
@@ -4002,11 +4885,18 @@ export class GroupRoomManager {
     }
   }
 
-  private sendMeshWebRtcSignal(targetPeerId: string, preferredIntermediary: string | undefined, signalJson: string): void {
+  private sendMeshWebRtcSignal(
+    targetPeerId: string,
+    preferredIntermediary: string | undefined,
+    signalJson: string,
+  ): void {
     if (!this.meshRelayAction || typeof signalJson !== 'string' || signalJson.length > 24_000) return;
-    const intermediary = (preferredIntermediary && this.peerTracker.isVerified(preferredIntermediary) && this.isLivePeerTarget(preferredIntermediary))
-      ? preferredIntermediary
-      : this.rumorIntermediaries.get(targetPeerId);
+    const intermediary =
+      preferredIntermediary &&
+      this.peerTracker.isVerified(preferredIntermediary) &&
+      this.isLivePeerTarget(preferredIntermediary)
+        ? preferredIntermediary
+        : this.rumorIntermediaries.get(targetPeerId);
     if (!intermediary || !this.peerTracker.isVerified(intermediary) || !this.isLivePeerTarget(intermediary)) return;
     try {
       this.meshRelayAction.send(
@@ -4062,7 +4952,11 @@ export class GroupRoomManager {
   /**
    * Targeted Stream Dispatch strictly passing `{ target: peerId }` to eliminate transceiver leaks.
    */
-  public sendStreamToPeer(peerId: string, recovery = false, options?: { missingVideo?: boolean; missingAudio?: boolean }) {
+  public sendStreamToPeer(
+    peerId: string,
+    recovery = false,
+    options?: { missingVideo?: boolean; missingAudio?: boolean },
+  ) {
     if (!this.localStream || !this.room || !this.peerTracker.isVerified(peerId)) return;
     if (this.authority && (!this.localAdmitted || !this.isAdmittedPeer(peerId))) return;
     try {
@@ -4071,11 +4965,22 @@ export class GroupRoomManager {
       const peerObj: any = peers[peerId];
       const pc: RTCPeerConnection = peerObj?.connection || peerObj?.pc || peerObj;
       const previous = this.mediaDispatches.get(peerId);
-      if (previous && previous.room === this.room && previous.connection === pc && previous.revision === this.mediaRevision &&
-          (!recovery || Date.now() - previous.at < 1000)) return;
+      if (
+        previous &&
+        previous.room === this.room &&
+        previous.connection === pc &&
+        previous.revision === this.mediaRevision &&
+        (!recovery || Date.now() - previous.at < 1000)
+      )
+        return;
       this.clearMediaDispatch(peerId);
-      const dispatch = { room: this.room, connection: pc, revision: this.mediaRevision,
-        at: Date.now(), timers: [] as ReturnType<typeof setTimeout>[] };
+      const dispatch = {
+        room: this.room,
+        connection: pc,
+        revision: this.mediaRevision,
+        at: Date.now(),
+        timers: [] as ReturnType<typeof setTimeout>[],
+      };
       this.mediaDispatches.set(peerId, dispatch);
       this.publishMediaManifest(peerId);
 
@@ -4099,12 +5004,20 @@ export class GroupRoomManager {
       this.dispatchMediaToPeer(peerId, recovery, undefined, options);
 
       [0, 30, 80, 150, 300, 600, 1200, 2000].forEach((delay) => {
-        dispatch.timers.push(setTimeout(() => {
-          if (this.mediaDispatches.get(peerId) !== dispatch || this.room !== dispatch.room ||
-              this.mediaRevision !== dispatch.revision || !this.peerTracker.isVerified(peerId) || !pc) return;
-          this.applyMediaParameters(pc);
-          void MediaCoordinator.requestKeyFrame(pc);
-        }, delay));
+        dispatch.timers.push(
+          setTimeout(() => {
+            if (
+              this.mediaDispatches.get(peerId) !== dispatch ||
+              this.room !== dispatch.room ||
+              this.mediaRevision !== dispatch.revision ||
+              !this.peerTracker.isVerified(peerId) ||
+              !pc
+            )
+              return;
+            this.applyMediaParameters(pc);
+            void MediaCoordinator.requestKeyFrame(pc);
+          }, delay),
+        );
       });
     } catch (err) {
       this.clearMediaDispatch(peerId);
@@ -4123,7 +5036,11 @@ export class GroupRoomManager {
     }
   }
 
-  private dispatchBrowserMediaToPeer(peerId: string, entry: { descriptor: StreamDescriptor; stream: MediaStream }, recovery = false): void {
+  private dispatchBrowserMediaToPeer(
+    peerId: string,
+    entry: { descriptor: StreamDescriptor; stream: MediaStream },
+    recovery = false,
+  ): void {
     const room = this.room;
     if (!room) return;
     const peers = room.getPeers?.() || {};
@@ -4134,18 +5051,25 @@ export class GroupRoomManager {
     const operations: Promise<unknown>[] = [];
     if (typeof room.addTrack === 'function') {
       for (const track of entry.stream.getTracks()) {
-        for (const operation of room.addTrack(track, entry.stream, { target: peerId, metadata: entry.descriptor }) || []) {
-          operations.push(Promise.resolve(operation).catch(error => console.warn('[Media] Track dispatch failed:', error)));
+        for (const operation of room.addTrack(track, entry.stream, { target: peerId, metadata: entry.descriptor }) ||
+          []) {
+          operations.push(
+            Promise.resolve(operation).catch((error) => console.warn('[Media] Track dispatch failed:', error)),
+          );
         }
       }
     } else if (typeof room.addStream === 'function') {
       for (const operation of room.addStream(entry.stream, { target: peerId, metadata: entry.descriptor }) || []) {
-        operations.push(Promise.resolve(operation).then(() => {
-          if (this.room !== room || this.localMedia.get(entry.descriptor.id) !== entry) {
-            room.removeStream?.(entry.stream, { target: peerId });
-            for (const track of entry.stream.getTracks()) room.removeTrack?.(track, { target: peerId });
-          }
-        }).catch(error => console.warn('[Media] Stream dispatch failed:', error)));
+        operations.push(
+          Promise.resolve(operation)
+            .then(() => {
+              if (this.room !== room || this.localMedia.get(entry.descriptor.id) !== entry) {
+                room.removeStream?.(entry.stream, { target: peerId });
+                for (const track of entry.stream.getTracks()) room.removeTrack?.(track, { target: peerId });
+              }
+            })
+            .catch((error) => console.warn('[Media] Stream dispatch failed:', error)),
+        );
       }
     }
     if (recovery && typeof room.renegotiate === 'function') {
@@ -4204,8 +5128,13 @@ export class GroupRoomManager {
         const operations: Promise<unknown>[] = [];
         if (typeof room.addTrack === 'function') {
           for (const track of tracks) {
-            for (const operation of room.addTrack(track, entry.stream, { target: peerId, metadata: entry.descriptor }) || []) {
-              operations.push(Promise.resolve(operation).catch(error => console.warn('[Media] Track dispatch failed:', error)));
+            for (const operation of room.addTrack(track, entry.stream, {
+              target: peerId,
+              metadata: entry.descriptor,
+            }) || []) {
+              operations.push(
+                Promise.resolve(operation).catch((error) => console.warn('[Media] Track dispatch failed:', error)),
+              );
             }
           }
         }
@@ -4247,9 +5176,11 @@ export class GroupRoomManager {
 
   private publishMediaManifest(target?: string, heartbeat = false) {
     if (!this.streamStatusAction) return;
-    const payload = { ...MediaCoordinator.buildStreamStatusPayload(this.localStream, !!this.localStream, this.username),
+    const payload = {
+      ...MediaCoordinator.buildStreamStatusPayload(this.localStream, !!this.localStream, this.username),
       revision: this.mediaRevision,
-      streams: Array.from(this.localMedia.values(), (entry) => entry.descriptor) };
+      streams: Array.from(this.localMedia.values(), (entry) => entry.descriptor),
+    };
     if (target) {
       if (this.isLivePeerTarget(target)) this.streamStatusAction.send(payload, { target });
     } else if (heartbeat) {
@@ -4259,20 +5190,28 @@ export class GroupRoomManager {
     }
   }
 
-  public shareStream(stream: MediaStream, targetBitrateBps = 15000000, targetFps = 60,
-    descriptor?: StreamDescriptor) {
+  public shareStream(stream: MediaStream, targetBitrateBps = 15000000, targetFps = 60, descriptor?: StreamDescriptor) {
     const wasStreaming = this.localMedia.size > 0;
-    const entry = descriptor || { id: stream.id, kind: 'screen' as const, label: 'Tela',
-      videoTrackId: stream.getVideoTracks()[0]?.id || '', fps: targetFps, bitrate: targetBitrateBps / 1000 };
+    const entry = descriptor || {
+      id: stream.id,
+      kind: 'screen' as const,
+      label: 'Tela',
+      videoTrackId: stream.getVideoTracks()[0]?.id || '',
+      fps: targetFps,
+      bitrate: targetBitrateBps / 1000,
+    };
     this.localMedia.set(entry.id, { descriptor: entry, stream });
     this.mediaRevision++;
-    this.localStream = Array.from(this.localMedia.values()).find((item) => item.descriptor.kind === 'screen')?.stream || stream;
+    this.localStream =
+      Array.from(this.localMedia.values()).find((item) => item.descriptor.kind === 'screen')?.stream || stream;
     this.currentTargetFps = targetFps;
     this.publishMediaManifest();
     for (const peerId of this.peerTracker.directConnectedPeers) this.sendStreamToPeer(peerId);
     this.callbacks?.onStreamStarted?.('local', this.username, true);
-    if (!wasStreaming && this.room) void this.sendSystemMessage(`${this.username} iniciou uma transmissão`, 'stream-start', this.username)
-      .catch((error) => console.warn('[Chat] Failed to publish stream notice:', error));
+    if (!wasStreaming && this.room)
+      void this.sendSystemMessage(`${this.username} iniciou uma transmissão`, 'stream-start', this.username).catch(
+        (error) => console.warn('[Chat] Failed to publish stream notice:', error),
+      );
     this.notifyStreamsUpdate();
   }
 
@@ -4285,10 +5224,11 @@ export class GroupRoomManager {
     try {
       for (const peer of Object.values(peers) as any[]) {
         const pc: RTCPeerConnection = peer?.connection || peer?.pc || peer;
-        for (const sender of pc?.getSenders?.() || []) if (sender.track === old) {
-          await sender.replaceTrack(replacement);
-          replaced.push(sender);
-        }
+        for (const sender of pc?.getSenders?.() || [])
+          if (sender.track === old) {
+            await sender.replaceTrack(replacement);
+            replaced.push(sender);
+          }
       }
     } catch (error) {
       await Promise.allSettled(replaced.map((sender) => sender.replaceTrack(old)));
@@ -4320,8 +5260,13 @@ export class GroupRoomManager {
   }
 
   private applyMediaParameters(pc: RTCPeerConnection) {
-    for (const entry of this.localMedia.values()) void MediaCoordinator.applySenderBitrate(pc,
-      entry.descriptor.bitrate * 1000, entry.descriptor.fps, entry.stream.getVideoTracks()[0]?.id);
+    for (const entry of this.localMedia.values())
+      void MediaCoordinator.applySenderBitrate(
+        pc,
+        entry.descriptor.bitrate * 1000,
+        entry.descriptor.fps,
+        entry.stream.getVideoTracks()[0]?.id,
+      );
   }
 
   public boostSenders(_maxBitrateBps: number = 25000000, _maxFps: number = 60) {
@@ -4348,17 +5293,27 @@ export class GroupRoomManager {
     for (const entry of entries) {
       if (!entry) continue;
       const audio = entry.stream.getAudioTracks()[0];
-      const nextScreen = id && audio ? Array.from(this.localMedia.values()).find((other) =>
-        other.descriptor.id !== id && other.descriptor.kind === 'screen') : undefined;
+      const nextScreen =
+        id && audio
+          ? Array.from(this.localMedia.values()).find(
+              (other) => other.descriptor.id !== id && other.descriptor.kind === 'screen',
+            )
+          : undefined;
       if (audio && nextScreen) {
         const transferredAudio = audio.clone();
         nextScreen.stream.addTrack(transferredAudio);
         for (const peerId of this.peerTracker.directConnectedPeers) {
           if (this.authority && (!this.localAdmitted || !this.isAdmittedPeer(peerId))) continue;
-          for (const pending of this.room?.addTrack(transferredAudio, nextScreen.stream, { target: peerId, metadata: nextScreen.descriptor }) || []) {
-            void Promise.resolve(pending).then(() => {
-              if (!this.localMedia.has(nextScreen.descriptor.id)) this.room?.removeTrack(transferredAudio, { target: peerId });
-            }).catch((error) => console.warn('[Media] Audio transfer failed:', error));
+          for (const pending of this.room?.addTrack(transferredAudio, nextScreen.stream, {
+            target: peerId,
+            metadata: nextScreen.descriptor,
+          }) || []) {
+            void Promise.resolve(pending)
+              .then(() => {
+                if (!this.localMedia.has(nextScreen.descriptor.id))
+                  this.room?.removeTrack(transferredAudio, { target: peerId });
+              })
+              .catch((error) => console.warn('[Media] Audio transfer failed:', error));
           }
         }
       }
@@ -4372,12 +5327,16 @@ export class GroupRoomManager {
       this.cleanupStreamWatchers(streamSlotKey(selfId, entry.descriptor.id), this.username);
       this.localMedia.delete(entry.descriptor.id);
     }
-    this.localStream = Array.from(this.localMedia.values()).find((entry) => entry.descriptor.kind === 'screen')?.stream ||
-      this.localMedia.values().next().value?.stream || null;
+    this.localStream =
+      Array.from(this.localMedia.values()).find((entry) => entry.descriptor.kind === 'screen')?.stream ||
+      this.localMedia.values().next().value?.stream ||
+      null;
     this.publishMediaManifest();
     if (wasStreaming && !this.localStream) {
-      if (this.room) void this.sendSystemMessage(`${this.username} parou de transmitir`, 'stream-stop', this.username)
-        .catch((error) => console.warn('[Chat] Failed to publish stream notice:', error));
+      if (this.room)
+        void this.sendSystemMessage(`${this.username} parou de transmitir`, 'stream-stop', this.username).catch(
+          (error) => console.warn('[Chat] Failed to publish stream notice:', error),
+        );
       this.callbacks?.onStreamStopped?.('local', this.username, true);
       this.cleanupStreamWatchers('local', this.username);
     }
@@ -4385,9 +5344,14 @@ export class GroupRoomManager {
   }
 
   public getAllActiveStreams(): ActiveStreamInfo[] {
-    return this.getAllRoomSlots().filter((slot) => slot.stream).map((slot) => ({
-      peerId: slot.peerId, senderName: slot.senderName, stream: slot.stream!, isLocal: slot.isLocal,
-    }));
+    return this.getAllRoomSlots()
+      .filter((slot) => slot.stream)
+      .map((slot) => ({
+        peerId: slot.peerId,
+        senderName: slot.senderName,
+        stream: slot.stream!,
+        isLocal: slot.isLocal,
+      }));
   }
 
   public getAllRoomSlots(): RoomSlotInfo[] {
@@ -4427,28 +5391,40 @@ export class GroupRoomManager {
     });
 
     return list.flatMap((slot) => {
-      const descriptors = slot.isLocal ? Array.from(this.localMedia.values(), (entry) => entry.descriptor) : this.remoteDescriptors.get(slot.peerId);
+      const descriptors = slot.isLocal
+        ? Array.from(this.localMedia.values(), (entry) => entry.descriptor)
+        : this.remoteDescriptors.get(slot.peerId);
       if (!descriptors?.length) return [slot];
       const ordered = [...descriptors].sort((a, b) => Number(b.kind === 'screen') - Number(a.kind === 'screen'));
-      return ordered.map((entry, index) => ({ ...slot, ownerPeerId: slot.peerId,
-        peerId: streamSlotKey(slot.peerId, entry.id, index === 0), mediaId: entry.id,
-        mediaKind: entry.kind, mediaLabel: entry.label, isStreaming: true,
+      return ordered.map((entry, index) => ({
+        ...slot,
+        ownerPeerId: slot.peerId,
+        peerId: streamSlotKey(slot.peerId, entry.id, index === 0),
+        mediaId: entry.id,
+        mediaKind: entry.kind,
+        mediaLabel: entry.label,
+        isStreaming: true,
         watchers: this.getStreamWatchers(streamSlotKey(slot.peerId, entry.id)),
         pointerEligible: entry.kind === 'screen',
-        stream: slot.isLocal ? this.localMedia.get(entry.id)?.stream || null : this.remoteMedia.get(slot.peerId)?.get(entry.id) || null,
+        stream: slot.isLocal
+          ? this.localMedia.get(entry.id)?.stream || null
+          : this.remoteMedia.get(slot.peerId)?.get(entry.id) || null,
       }));
     });
-
   }
 
   public getStreamWatchers(broadcasterId: string): StreamWatcher[] {
     const target = broadcasterId.replace(/^local(?=\/|$)/, selfId);
     const keys = target.includes('/') ? [target] : this.peerTracker.getStreamKeys(target);
     const ids = new Set(keys.flatMap((key) => this.peerTracker.getWatchers(key).map((watcher) => watcher.peerId)));
-    return [...ids].filter((id) => id !== streamOwner(target) && (id === selfId || this.peerTracker.isVerified(id)))
-      .map((id) => ({ peerId: id, username: id === selfId ? this.username : this.peerTracker.getUsername(id) || 'Participante',
+    return [...ids]
+      .filter((id) => id !== streamOwner(target) && (id === selfId || this.peerTracker.isVerified(id)))
+      .map((id) => ({
+        peerId: id,
+        username: id === selfId ? this.username : this.peerTracker.getUsername(id) || 'Participante',
         nicknameStyle: id === selfId ? stateStore.nicknameStyle : this.peerNicknameStyles.get(id),
-        isSelf: id === selfId }));
+        isSelf: id === selfId,
+      }));
   }
 
   public getPeerPing(peerId: string): number | null {
@@ -4648,9 +5624,14 @@ export class GroupRoomManager {
     if (cached && Date.now() - cached.timestamp < 800) return cached.stats;
     const track = slot.stream?.getVideoTracks()[0];
     const settings = track?.getSettings?.();
-    const result: PeerStatsInfo = { pingMs: slot.isLocal ? 0 : this.getPeerPing(slot.ownerPeerId || key),
-      fps: settings?.frameRate ? Math.round(settings.frameRate) : null, width: settings?.width || null,
-      height: settings?.height || null, bitrateKbps: cached?.stats.bitrateKbps ?? null, connectionType: 'P2P Direto' };
+    const result: PeerStatsInfo = {
+      pingMs: slot.isLocal ? 0 : this.getPeerPing(slot.ownerPeerId || key),
+      fps: settings?.frameRate ? Math.round(settings.frameRate) : null,
+      width: settings?.width || null,
+      height: settings?.height || null,
+      bitrateKbps: cached?.stats.bitrateKbps ?? null,
+      connectionType: 'P2P Direto',
+    };
     let bytes = 0;
     let timestamp = 0;
     let connections = 0;
@@ -4659,9 +5640,14 @@ export class GroupRoomManager {
     try {
       for (const [owner, peer] of Object.entries(peers) as Array<[string, any]>) {
         if (!slot.isLocal && owner !== slot.ownerPeerId) continue;
-        const pc: RTCPeerConnection = (!slot.isLocal && slot.mediaId ? this.nativeVideo?.receiver(owner, slot.mediaId) : undefined) || peer?.connection || peer?.pc || peer;
-        const endpoint = slot.isLocal ? pc?.getSenders?.().find((sender) => sender.track === track) :
-          pc?.getReceivers?.().find((receiver) => receiver.track === track);
+        const pc: RTCPeerConnection =
+          (!slot.isLocal && slot.mediaId ? this.nativeVideo?.receiver(owner, slot.mediaId) : undefined) ||
+          peer?.connection ||
+          peer?.pc ||
+          peer;
+        const endpoint = slot.isLocal
+          ? pc?.getSenders?.().find((sender) => sender.track === track)
+          : pc?.getReceivers?.().find((receiver) => receiver.track === track);
         if (!endpoint?.getStats) continue;
         const reports = await endpoint.getStats();
         if (slot.isLocal) MediaCoordinator.logSenderEncoder(endpoint as RTCRtpSender, reports, slot.mediaId);
@@ -4690,24 +5676,41 @@ export class GroupRoomManager {
         if (native?.length) {
           bytes += native.reduce((total, sender) => total + sender.bytes, 0);
           nativeFrames = native.reduce((total, sender) => total + sender.frames, 0);
-          timestamp = Date.now(); connections += native.length;
+          timestamp = Date.now();
+          connections += native.length;
         }
       }
       const previous = this.mediaStatsSamples.get(key);
       if (timestamp && previous && timestamp - previous.at >= 500 && bytes >= previous.bytes) {
-        result.bitrateKbps = Math.round((bytes - previous.bytes) * 8 / (timestamp - previous.at) / Math.max(1, connections));
-        if (nativeFrames !== undefined && previous.nativeFrames !== undefined && nativeFrames >= previous.nativeFrames) {
-          result.fps = Math.round((nativeFrames - previous.nativeFrames) * 1000 / (timestamp - previous.at) / Math.max(1, connections));
+        result.bitrateKbps = Math.round(
+          ((bytes - previous.bytes) * 8) / (timestamp - previous.at) / Math.max(1, connections),
+        );
+        if (
+          nativeFrames !== undefined &&
+          previous.nativeFrames !== undefined &&
+          nativeFrames >= previous.nativeFrames
+        ) {
+          result.fps = Math.round(
+            ((nativeFrames - previous.nativeFrames) * 1000) / (timestamp - previous.at) / Math.max(1, connections),
+          );
         }
       }
-      if (timestamp && (!previous || timestamp - previous.at >= 500)) this.mediaStatsSamples.set(key, { bytes, at: timestamp, nativeFrames });
-    } catch (error) { console.warn('[Media] Could not sample transmission stats:', error); }
+      if (timestamp && (!previous || timestamp - previous.at >= 500))
+        this.mediaStatsSamples.set(key, { bytes, at: timestamp, nativeFrames });
+    } catch (error) {
+      console.warn('[Media] Could not sample transmission stats:', error);
+    }
     this.peerStatsCache.set(key, { stats: result, timestamp: Date.now() });
     return result;
   }
 
-  public async getFileTransportDiagnostics(peerId: string, requestId?: string): Promise<{
-    connectionType: string; rttMs: number | null; transport: FileTransportDiagnostics;
+  public async getFileTransportDiagnostics(
+    peerId: string,
+    requestId?: string,
+  ): Promise<{
+    connectionType: string;
+    rttMs: number | null;
+    transport: FileTransportDiagnostics;
   } | null> {
     const pc = this.room?.getPeers?.()?.[peerId] as FileOptimizedConnection | undefined;
     if (!pc || pc.connectionState !== 'connected') return null;
@@ -4715,10 +5718,16 @@ export class GroupRoomManager {
       const reports = Array.from((await pc.getStats()).values()) as IceStat[];
       const route = selectedIceRoute(reports);
       const selected = selectedIcePair(reports);
-      if (requestId ? this.fileSessions.get(requestId)?.direct :
-          [...this.fileSessions.values()].some(session => session.peerId === peerId && session.direct)) {
-        return { connectionType: route.connectionType, rttMs: route.pingMs,
-          transport: { protocol: 'TLS/TCP', channelLabel: 'chat_file_native_tls_v1' } };
+      if (
+        requestId
+          ? this.fileSessions.get(requestId)?.direct
+          : [...this.fileSessions.values()].some((session) => session.peerId === peerId && session.direct)
+      ) {
+        return {
+          connectionType: route.connectionType,
+          rttMs: route.pingMs,
+          transport: { protocol: 'TLS/TCP', channelLabel: 'chat_file_native_tls_v1' },
+        };
       }
       const channel = this.fileBulk.getChannel(peerId) ?? pc.roomDataChannel;
       return {
@@ -4750,7 +5759,13 @@ export class GroupRoomManager {
     const slots = this.getAllRoomSlots();
 
     const hash = slots
-      .map((s) => `${s.peerId}:${s.senderName}:${s.mediaKind}:${s.mediaLabel}:${s.connectionState}:${s.isStreaming}:${s.stream?.id}:${s.stream?.getTracks().map(track => `${track.id}/${track.readyState}`).join(',')}:${JSON.stringify(s.watchers || [])}`)
+      .map(
+        (s) =>
+          `${s.peerId}:${s.senderName}:${s.mediaKind}:${s.mediaLabel}:${s.connectionState}:${s.isStreaming}:${s.stream?.id}:${s.stream
+            ?.getTracks()
+            .map((track) => `${track.id}/${track.readyState}`)
+            .join(',')}:${JSON.stringify(s.watchers || [])}`,
+      )
       .join('|');
     if (hash === this.lastStreamsHash) return;
     this.lastStreamsHash = hash;
@@ -4769,9 +5784,10 @@ export class GroupRoomManager {
       authorId: selfId,
       revision: 0,
       isHost: this.isCreator,
-      replyTo: original && !original.deletedAt && !original.isSystem
-        ? { id: original.id, sender: original.sender, text: original.text.slice(0, 200) }
-        : undefined,
+      replyTo:
+        original && !original.deletedAt && !original.isSystem
+          ? { id: original.id, sender: original.sender, text: original.text.slice(0, 200) }
+          : undefined,
     };
 
     return this.publishChatMessage(msg);
@@ -4783,21 +5799,44 @@ export class GroupRoomManager {
     if (checked.hash !== file.hash || checked.size !== file.size) throw new Error('Source file changed');
     const id = crypto.randomUUID();
     this.fileSources.set(id, { file, autoAcceptUntil: autoAccept ? Date.now() + 10 * 60_000 : 0 });
-    try { const message = await this.publishChatMessage({ id, sender: this.username,
-      text: '', timestamp: Date.now(), authorId: selfId, revision: 0, isHost: this.isCreator,
-      file: { name, size: file.size, sha256: file.hash,
-        isImage: file.isImage && /\.(png|jpe?g|gif|webp|bmp)$/i.test(name) } });
-      try { await invoke('remember_chat_file_source', { roomId: this.roomId, messageId: id, sourceId: file.id }); }
-      catch (error) { console.warn('[Files] Could not remember source for a future session:', error); }
-      return message; }
-    catch (error) { this.fileSources.delete(id); throw error; }
+    try {
+      const message = await this.publishChatMessage({
+        id,
+        sender: this.username,
+        text: '',
+        timestamp: Date.now(),
+        authorId: selfId,
+        revision: 0,
+        isHost: this.isCreator,
+        file: {
+          name,
+          size: file.size,
+          sha256: file.hash,
+          isImage: file.isImage && /\.(png|jpe?g|gif|webp|bmp)$/i.test(name),
+        },
+      });
+      try {
+        await invoke('remember_chat_file_source', { roomId: this.roomId, messageId: id, sourceId: file.id });
+      } catch (error) {
+        console.warn('[Files] Could not remember source for a future session:', error);
+      }
+      return message;
+    } catch (error) {
+      this.fileSources.delete(id);
+      throw error;
+    }
   }
 
-  private async getFileSource(messageId: string): Promise<{ file: NativeChatFile; autoAcceptUntil: number } | undefined> {
+  private async getFileSource(
+    messageId: string,
+  ): Promise<{ file: NativeChatFile; autoAcceptUntil: number } | undefined> {
     let source = this.fileSources.get(messageId);
     if (!source) {
       const file = await invoke<NativeChatFile | null>('restore_chat_file_source', { roomId: this.roomId, messageId });
-      if (file) { source = { file, autoAcceptUntil: 0 }; this.fileSources.set(messageId, source); }
+      if (file) {
+        source = { file, autoAcceptUntil: 0 };
+        this.fileSources.set(messageId, source);
+      }
     }
     return source;
   }
@@ -4816,21 +5855,42 @@ export class GroupRoomManager {
 
   public async requestFile(messageId: string, saveAs: boolean): Promise<string | null> {
     const message = this.chatHistory.find((item) => item.id === messageId && !item.deletedAt);
-    const authorPeerId = message?.authorKey && this.peerTracker.getVerifiedPeers().find((peer) =>
-      this.chatAuth?.getKnownKey(peer.id) === message.authorKey)?.id;
-    if (!message?.file || !authorPeerId || message.authorKey === this.chatAuth?.publicKey ||
-        (this.authority && !this.isAdmittedPeer(authorPeerId))) {
+    const authorPeerId =
+      message?.authorKey &&
+      this.peerTracker.getVerifiedPeers().find((peer) => this.chatAuth?.getKnownKey(peer.id) === message.authorKey)?.id;
+    if (
+      !message?.file ||
+      !authorPeerId ||
+      message.authorKey === this.chatAuth?.publicKey ||
+      (this.authority && !this.isAdmittedPeer(authorPeerId))
+    ) {
       throw new Error('File author is not directly connected');
     }
     const requestId = crypto.randomUUID();
     if (this.fileSessions.size >= 8) throw new Error('Too many active transfers');
-    if (!await invoke<boolean>('choose_chat_download', { id: requestId, name: message.file.name,
-      size: message.file.size, hash: message.file.sha256, saveAs })) return null;
-    this.fileSessions.set(requestId, { messageId, peerId: authorPeerId, peerName: message.sender,
-      offset: 0, total: message.file.size, direction: 'receive', timings: newFileTimings() });
+    if (
+      !(await invoke<boolean>('choose_chat_download', {
+        id: requestId,
+        name: message.file.name,
+        size: message.file.size,
+        hash: message.file.sha256,
+        saveAs,
+      }))
+    )
+      return null;
+    this.fileSessions.set(requestId, {
+      messageId,
+      peerId: authorPeerId,
+      peerName: message.sender,
+      offset: 0,
+      total: message.file.size,
+      direction: 'receive',
+      timings: newFileTimings(),
+    });
     this.emitFileProgress(requestId, 'pending');
-    try { await this.sendFilePacket(authorPeerId, { kind: 'request', requestId, messageId }); }
-    catch (error) {
+    try {
+      await this.sendFilePacket(authorPeerId, { kind: 'request', requestId, messageId });
+    } catch (error) {
       this.fileSessions.delete(requestId);
       await invoke('cancel_chat_download', { id: requestId });
       this.emitFileProgress(requestId, 'error', 0, messageId, 'receive', message.file.size);
@@ -4841,23 +5901,42 @@ export class GroupRoomManager {
 
   public async requestFilePreview(messageId: string): Promise<void> {
     const message = this.chatHistory.find((item) => item.id === messageId && !item.deletedAt);
-    const authorPeerId = message?.authorKey && this.peerTracker.getVerifiedPeers().find((peer) =>
-      this.chatAuth?.getKnownKey(peer.id) === message.authorKey)?.id;
-    if (!message?.file?.isImage || message.file.size > MAX_IMAGE_PREVIEW_BYTES ||
-        !authorPeerId || message.authorKey === this.chatAuth?.publicKey ||
-        this.requestedImagePreviews.has(messageId) ||
-        (this.authority && !this.isAdmittedPeer(authorPeerId)) || this.fileSessions.size >= 8) {
+    const authorPeerId =
+      message?.authorKey &&
+      this.peerTracker.getVerifiedPeers().find((peer) => this.chatAuth?.getKnownKey(peer.id) === message.authorKey)?.id;
+    if (
+      !message?.file?.isImage ||
+      message.file.size > MAX_IMAGE_PREVIEW_BYTES ||
+      !authorPeerId ||
+      message.authorKey === this.chatAuth?.publicKey ||
+      this.requestedImagePreviews.has(messageId) ||
+      (this.authority && !this.isAdmittedPeer(authorPeerId)) ||
+      this.fileSessions.size >= 8
+    ) {
       throw new Error('Image preview unavailable');
     }
     this.requestedImagePreviews.add(messageId);
     const requestId = crypto.randomUUID();
-    this.fileSessions.set(requestId, { messageId, peerId: authorPeerId, peerName: message.sender,
-      offset: 0, total: message.file.size, direction: 'receive', preview: true, chunks: [],
-      timings: newFileTimings() });
+    this.fileSessions.set(requestId, {
+      messageId,
+      peerId: authorPeerId,
+      peerName: message.sender,
+      offset: 0,
+      total: message.file.size,
+      direction: 'receive',
+      preview: true,
+      chunks: [],
+      timings: newFileTimings(),
+    });
     this.emitFileProgress(requestId, 'pending');
-    try { await this.sendFilePacket(authorPeerId, { kind: 'request', requestId, messageId, preview: true }); }
-    catch (error) { this.fileSessions.delete(requestId); this.requestedImagePreviews.delete(messageId);
-      this.emitFileProgress(requestId, 'error', 0, messageId, 'receive', message.file.size); throw error; }
+    try {
+      await this.sendFilePacket(authorPeerId, { kind: 'request', requestId, messageId, preview: true });
+    } catch (error) {
+      this.fileSessions.delete(requestId);
+      this.requestedImagePreviews.delete(messageId);
+      this.emitFileProgress(requestId, 'error', 0, messageId, 'receive', message.file.size);
+      throw error;
+    }
   }
 
   private removePendingFileRequest(requestId: string): void {
@@ -4876,7 +5955,11 @@ export class GroupRoomManager {
     }
     try {
       const checked = await invoke<NativeChatFile>('inspect_chat_file', { id: source.file.id });
-      if (checked.hash !== message.file.sha256 || checked.size !== message.file.size || checked.path !== source.file.path) {
+      if (
+        checked.hash !== message.file.sha256 ||
+        checked.size !== message.file.size ||
+        checked.path !== source.file.path
+      ) {
         throw new Error('Source file changed or moved');
       }
       if (this.revokedFileMessages.has(request.messageId)) throw new Error('File offer was revoked');
@@ -4884,22 +5967,46 @@ export class GroupRoomManager {
       if (checked.size > 0 && !request.preview) {
         try {
           const pc = this.room?.getPeers?.()?.[request.peerId] as RTCPeerConnection | undefined;
-          const address = pc && (this.fileDirectRetryAfter.get(pc) ?? 0) <= Date.now()
-            ? await directFileAddress(pc, 'local', undefined, Boolean(this.snapshot?.connection)) : null;
-          if (address && typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window) direct = await invoke<DirectFileOffer>('offer_direct_chat_file', { id: requestId,
-            sourceId: source.file.id, address, size: checked.size });
-        } catch (error) { console.debug('[Files] Direct transport unavailable:', error); }
+          const address =
+            pc && (this.fileDirectRetryAfter.get(pc) ?? 0) <= Date.now()
+              ? await directFileAddress(pc, 'local', undefined, Boolean(this.snapshot?.connection))
+              : null;
+          if (address && typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window)
+            direct = await invoke<DirectFileOffer>('offer_direct_chat_file', {
+              id: requestId,
+              sourceId: source.file.id,
+              address,
+              size: checked.size,
+            });
+        } catch (error) {
+          console.debug('[Files] Direct transport unavailable:', error);
+        }
       }
       if (checked.size > 0) this.fileBulk.ensure(request.peerId);
       if (!this.peerTracker.isVerified(request.peerId) || this.revokedFileMessages.has(request.messageId)) {
         await cancelDirectFile(requestId);
         throw new Error('File request is no longer available');
       }
-      this.fileSessions.set(requestId, { messageId: request.messageId, peerId: request.peerId,
-        peerName: request.peerName, sourceId: source.file.id, offset: 0, total: checked.size,
-        direction: 'send', preview: request.preview, direct: Boolean(direct), sentOffset: direct ? checked.size : 0, timings: newFileTimings() });
+      this.fileSessions.set(requestId, {
+        messageId: request.messageId,
+        peerId: request.peerId,
+        peerName: request.peerName,
+        sourceId: source.file.id,
+        offset: 0,
+        total: checked.size,
+        direction: 'send',
+        preview: request.preview,
+        direct: Boolean(direct),
+        sentOffset: direct ? checked.size : 0,
+        timings: newFileTimings(),
+      });
       this.emitFileProgress(requestId, 'active');
-      await this.sendFilePacket(request.peerId, { kind: 'accept', requestId, messageId: request.messageId, ...(direct ? { direct } : {}) });
+      await this.sendFilePacket(request.peerId, {
+        kind: 'accept',
+        requestId,
+        messageId: request.messageId,
+        ...(direct ? { direct } : {}),
+      });
       if (checked.size === 0) {
         this.fileSessions.delete(requestId);
         this.emitFileProgress(requestId, 'complete', 0, request.messageId, 'send', 0);
@@ -4908,9 +6015,17 @@ export class GroupRoomManager {
       this.fileSessions.delete(requestId);
       await cancelDirectFile(requestId).catch(() => {});
       await this.sendFilePacket(request.peerId, { kind: 'deny', requestId, messageId: request.messageId });
-      this.callbacks?.onFileProgress?.({ requestId, messageId: request.messageId, direction: 'send',
-        bytes: 0, total: message.file.size, status: 'error', error: String(error), peerId: request.peerId,
-        previewOnly: request.preview });
+      this.callbacks?.onFileProgress?.({
+        requestId,
+        messageId: request.messageId,
+        direction: 'send',
+        bytes: 0,
+        total: message.file.size,
+        status: 'error',
+        error: String(error),
+        peerId: request.peerId,
+        previewOnly: request.preview,
+      });
     }
   }
 
@@ -4921,43 +6036,85 @@ export class GroupRoomManager {
     await cancelDirectFile(requestId).catch(() => {});
     if (session.preview && session.direction === 'receive') this.requestedImagePreviews.delete(session.messageId);
     if (session.direction === 'receive' && !session.preview) await invoke('cancel_chat_download', { id: requestId });
-    try { await this.sendFilePacket(session.peerId, { kind: 'cancel', requestId, messageId: session.messageId }); } catch {}
+    try {
+      await this.sendFilePacket(session.peerId, { kind: 'cancel', requestId, messageId: session.messageId });
+    } catch {}
     this.emitFileProgress(requestId, 'cancelled', session.offset, session.messageId, session.direction, session.total);
   }
 
-  private emitFileProgress(requestId: string, status: FileProgress['status'], bytes?: number,
-    messageId?: string, direction?: FileProgress['direction'], total?: number, preview?: string,
-    previewBytes?: Uint8Array, saved?: boolean): void {
+  private emitFileProgress(
+    requestId: string,
+    status: FileProgress['status'],
+    bytes?: number,
+    messageId?: string,
+    direction?: FileProgress['direction'],
+    total?: number,
+    preview?: string,
+    previewBytes?: Uint8Array,
+    saved?: boolean,
+  ): void {
     const session = this.fileSessions.get(requestId);
     if (!session && (!messageId || !direction || total === undefined)) return;
-    this.callbacks?.onFileProgress?.({ requestId, messageId: messageId ?? session!.messageId,
-      direction: direction ?? session!.direction, bytes: bytes ?? session!.offset,
-      total: total ?? session!.total, status, preview, previewBytes, saved,
-      peerId: session?.peerId, peerName: session?.peerName, previewOnly: session?.preview,
+    this.callbacks?.onFileProgress?.({
+      requestId,
+      messageId: messageId ?? session!.messageId,
+      direction: direction ?? session!.direction,
+      bytes: bytes ?? session!.offset,
+      total: total ?? session!.total,
+      status,
+      preview,
+      previewBytes,
+      saved,
+      peerId: session?.peerId,
+      peerName: session?.peerName,
+      previewOnly: session?.preview,
       nativeDirect: session ? Boolean(session.direct) : undefined,
-      timings: session && !session.direct ? { ...session.timings } : undefined });
+      timings: session && !session.direct ? { ...session.timings } : undefined,
+    });
   }
 
   private async sendFilePacket(peerId: string, payload: Omit<FilePacket, 'signature'>): Promise<string> {
-    if (!this.fileAction || !this.chatAuth || !this.peerTracker.isVerified(peerId) ||
-        (this.authority && !this.isAdmittedPeer(peerId))) throw new Error('Peer unavailable');
-    const signed = [payload.kind, payload.requestId, payload.messageId, payload.offset ?? null, Boolean(payload.preview), directFileSignature(payload.direct)];
+    if (
+      !this.fileAction ||
+      !this.chatAuth ||
+      !this.peerTracker.isVerified(peerId) ||
+      (this.authority && !this.isAdmittedPeer(peerId))
+    )
+      throw new Error('Peer unavailable');
+    const signed = [
+      payload.kind,
+      payload.requestId,
+      payload.messageId,
+      payload.offset ?? null,
+      Boolean(payload.preview),
+      directFileSignature(payload.direct),
+    ];
     const signature = await this.chatAuth.signControl('chat-file-control-v3', signed);
     await this.fileAction.send({ ...payload, signature }, { target: peerId });
     return signature;
   }
 
-  private async prepareFileChunk(session: FileSession, requestId: string,
-    offset: number, bytes: Uint8Array): Promise<Uint8Array> {
+  private async prepareFileChunk(
+    session: FileSession,
+    requestId: string,
+    offset: number,
+    bytes: Uint8Array,
+  ): Promise<Uint8Array> {
     const peerId = session.peerId;
-    if (!this.fileAction || !this.chatAuth || !this.peerTracker.isVerified(peerId) ||
-        (this.authority && !this.isAdmittedPeer(peerId))) throw new Error('Peer unavailable');
+    if (
+      !this.fileAction ||
+      !this.chatAuth ||
+      !this.peerTracker.isVerified(peerId) ||
+      (this.authority && !this.isAdmittedPeer(peerId))
+    )
+      throw new Error('Peer unavailable');
     const prepareStart = performance.now();
     const hash = session.sessionToken
       ? fastFileChunkTag(bytes, session.sessionToken, offset)
       : await hashFileChunk(bytes);
     const unsigned = { requestId, messageId: session.messageId, offset, hash };
-    const signature = session.sessionToken || await this.chatAuth.signControl('chat-file-chunk-v2', fileChunkSignatureData(unsigned));
+    const signature =
+      session.sessionToken || (await this.chatAuth.signControl('chat-file-chunk-v2', fileChunkSignatureData(unsigned)));
     const packet = encodeSignedFileChunk({ ...unsigned, signature }, bytes);
     session.timings.prepareMs += performance.now() - prepareStart;
     return packet;
@@ -4975,12 +6132,12 @@ export class GroupRoomManager {
         const maxWindowBytes = (fastSession ? 2048 : CHAT_FILE_IN_FLIGHT_CHUNKS) * CHAT_FILE_CHUNK_BYTES;
         if ((session.sentOffset ?? 0) - session.offset >= maxWindowBytes) break;
         const offset = session.sentOffset ?? 0;
-        const length = Math.min(ioBatchBytes, session.total - offset,
-          maxWindowBytes - (offset - session.offset));
+        const length = Math.min(ioBatchBytes, session.total - offset, maxWindowBytes - (offset - session.offset));
         const readStart = performance.now();
-        const bytes: Uint8Array = prefetched && prefetched.offset === offset && prefetched.length === length
-          ? await prefetched.promise
-          : await readChatFileBytes(session.sourceId, offset, length);
+        const bytes: Uint8Array =
+          prefetched && prefetched.offset === offset && prefetched.length === length
+            ? await prefetched.promise
+            : await readChatFileBytes(session.sourceId, offset, length);
         prefetched = null;
         session.timings.readMs += performance.now() - readStart;
         if (this.fileSessions.get(requestId) !== session) return;
@@ -4989,17 +6146,30 @@ export class GroupRoomManager {
         const nextFast = Boolean(session.sessionToken || session.ackedOnce);
         const nextBatchBytes = session.sessionToken ? 256 * CHAT_FILE_CHUNK_BYTES : CHAT_FILE_IO_BATCH_BYTES;
         const nextWindowBytes = (nextFast ? 2048 : CHAT_FILE_IN_FLIGHT_CHUNKS) * CHAT_FILE_CHUNK_BYTES;
-        const nextLength = Math.min(nextBatchBytes, session.total - nextOffset,
-          nextWindowBytes - (nextOffset - session.offset));
+        const nextLength = Math.min(
+          nextBatchBytes,
+          session.total - nextOffset,
+          nextWindowBytes - (nextOffset - session.offset),
+        );
         if (nextFast && nextLength > 0) {
-          prefetched = { offset: nextOffset, length: nextLength, promise: readChatFileBytes(session.sourceId, nextOffset, nextLength) };
+          prefetched = {
+            offset: nextOffset,
+            length: nextLength,
+            promise: readChatFileBytes(session.sourceId, nextOffset, nextLength),
+          };
         }
         // Prepare a bounded batch concurrently; never serialize a native round trip
         // and two WebCrypto round trips for every small network message.
         const preparing: Promise<Uint8Array>[] = [];
         for (let index = 0; index < bytes.length; index += CHAT_FILE_CHUNK_BYTES) {
-          preparing.push(this.prepareFileChunk(session, requestId, offset + index,
-            bytes.subarray(index, index + CHAT_FILE_CHUNK_BYTES)));
+          preparing.push(
+            this.prepareFileChunk(
+              session,
+              requestId,
+              offset + index,
+              bytes.subarray(index, index + CHAT_FILE_CHUNK_BYTES),
+            ),
+          );
         }
         const packets = await Promise.all(preparing);
         for (let index = 0; index < packets.length; index++) {
@@ -5019,45 +6189,83 @@ export class GroupRoomManager {
       session.sending = false;
       const fastSession = Boolean(session.sessionToken || session.ackedOnce);
       const maxWindowBytes = (fastSession ? 2048 : CHAT_FILE_IN_FLIGHT_CHUNKS) * CHAT_FILE_CHUNK_BYTES;
-      if (this.fileSessions.get(requestId) === session && (session.sentOffset ?? 0) < session.total &&
-          (session.sentOffset ?? 0) - session.offset < maxWindowBytes) {
+      if (
+        this.fileSessions.get(requestId) === session &&
+        (session.sentOffset ?? 0) < session.total &&
+        (session.sentOffset ?? 0) - session.offset < maxWindowBytes
+      ) {
         void this.sendNextFileChunks(requestId);
       }
     }
   }
 
   private async handleFilePacket(packet: FilePacket, peerId: string): Promise<void> {
-    if (!packet || typeof packet.requestId !== 'string' || packet.requestId.length > 80 ||
-        typeof packet.messageId !== 'string' || packet.messageId.length > 80 ||
-        !['request', 'accept', 'ready', 'deny', 'ack', 'cancel'].includes(packet.kind) ||
-        (packet.offset !== undefined && (!Number.isSafeInteger(packet.offset) || packet.offset < 0)) ||
-        'data' in packet ||
-        (packet.preview !== undefined && typeof packet.preview !== 'boolean') ||
-        (packet.direct !== undefined && (packet.kind !== 'accept' || !validDirectFileOffer(packet.direct)))) return;
+    if (
+      !packet ||
+      typeof packet.requestId !== 'string' ||
+      packet.requestId.length > 80 ||
+      typeof packet.messageId !== 'string' ||
+      packet.messageId.length > 80 ||
+      !['request', 'accept', 'ready', 'deny', 'ack', 'cancel'].includes(packet.kind) ||
+      (packet.offset !== undefined && (!Number.isSafeInteger(packet.offset) || packet.offset < 0)) ||
+      'data' in packet ||
+      (packet.preview !== undefined && typeof packet.preview !== 'boolean') ||
+      (packet.direct !== undefined && (packet.kind !== 'accept' || !validDirectFileOffer(packet.direct)))
+    )
+      return;
     const key = this.chatAuth?.getKnownKey(peerId);
-    if (!key || !await this.chatAuth!.verifyControl('chat-file-control-v3',
-      [packet.kind, packet.requestId, packet.messageId, packet.offset ?? null, Boolean(packet.preview), directFileSignature(packet.direct)], packet.signature, key)) return;
+    if (
+      !key ||
+      !(await this.chatAuth!.verifyControl(
+        'chat-file-control-v3',
+        [
+          packet.kind,
+          packet.requestId,
+          packet.messageId,
+          packet.offset ?? null,
+          Boolean(packet.preview),
+          directFileSignature(packet.direct),
+        ],
+        packet.signature,
+        key,
+      ))
+    )
+      return;
     const message = this.chatHistory.find((item) => item.id === packet.messageId);
     if (!message?.file) return;
     if (packet.kind === 'request') {
-      if (message.authorKey === this.chatAuth?.publicKey &&
-          (message.deletedAt || this.revokedFileMessages.has(message.id))) {
+      if (
+        message.authorKey === this.chatAuth?.publicKey &&
+        (message.deletedAt || this.revokedFileMessages.has(message.id))
+      ) {
         await this.sendFilePacket(peerId, { kind: 'deny', requestId: packet.requestId, messageId: message.id });
         return;
       }
-      if (message.authorKey !== this.chatAuth?.publicKey ||
-          this.pendingFileRequests.size >= 8 || this.fileSessions.size >= 8 ||
-          this.pendingFileRequests.has(packet.requestId) ||
-          this.fileSessions.has(packet.requestId)) return;
+      if (
+        message.authorKey !== this.chatAuth?.publicKey ||
+        this.pendingFileRequests.size >= 8 ||
+        this.fileSessions.size >= 8 ||
+        this.pendingFileRequests.has(packet.requestId) ||
+        this.fileSessions.has(packet.requestId)
+      )
+        return;
       let source: Awaited<ReturnType<GroupRoomManager['getFileSource']>>;
-      try { source = await this.getFileSource(message.id); } catch {}
+      try {
+        source = await this.getFileSource(message.id);
+      } catch {}
       if (!source) {
         await this.sendFilePacket(peerId, { kind: 'deny', requestId: packet.requestId, messageId: message.id });
         return;
       }
-      const request: FileRequest = { requestId: packet.requestId, messageId: message.id, peerId,
-        peerName: this.peerTracker.getUsername(peerId) || 'Participante', path: source.file.path,
-        name: message.file.name, preview: Boolean(packet.preview && message.file.isImage && message.file.size <= MAX_IMAGE_PREVIEW_BYTES) };
+      const request: FileRequest = {
+        requestId: packet.requestId,
+        messageId: message.id,
+        peerId,
+        peerName: this.peerTracker.getUsername(peerId) || 'Participante',
+        path: source.file.path,
+        name: message.file.name,
+        preview: Boolean(packet.preview && message.file.isImage && message.file.size <= MAX_IMAGE_PREVIEW_BYTES),
+      };
       this.pendingFileRequests.set(packet.requestId, request);
       if (Date.now() < source.autoAcceptUntil) void this.answerFileRequest(packet.requestId, true);
       else this.callbacks?.onFileRequest?.(request);
@@ -5076,8 +6284,16 @@ export class GroupRoomManager {
       this.fileSessions.delete(packet.requestId);
       await cancelDirectFile(packet.requestId).catch(() => {});
       if (session.preview && session.direction === 'receive') this.requestedImagePreviews.delete(session.messageId);
-      if (session.direction === 'receive' && !session.preview) await invoke('cancel_chat_download', { id: packet.requestId });
-      this.emitFileProgress(packet.requestId, 'cancelled', session.offset, session.messageId, session.direction, session.total);
+      if (session.direction === 'receive' && !session.preview)
+        await invoke('cancel_chat_download', { id: packet.requestId });
+      this.emitFileProgress(
+        packet.requestId,
+        'cancelled',
+        session.offset,
+        session.messageId,
+        session.direction,
+        session.total,
+      );
       return;
     }
     if (session.direction === 'receive' && message.authorKey === this.chatAuth?.getKnownKey(peerId)) {
@@ -5088,13 +6304,21 @@ export class GroupRoomManager {
         else {
           this.emitFileProgress(packet.requestId, 'active');
           try {
-            if (packet.direct && !session.preview && await this.tryReceiveDirectFile(packet.requestId, session, message, packet.direct)) return;
+            if (
+              packet.direct &&
+              !session.preview &&
+              (await this.tryReceiveDirectFile(packet.requestId, session, message, packet.direct))
+            )
+              return;
             if (this.fileSessions.get(packet.requestId) !== session) return;
             this.fileBulk.ensure(peerId);
             await this.fileBulk.ready(peerId);
             if (this.fileSessions.get(packet.requestId) === session) {
-              const sig = await this.sendFilePacket(peerId, { kind: 'ready', requestId: packet.requestId,
-                messageId: packet.messageId });
+              const sig = await this.sendFilePacket(peerId, {
+                kind: 'ready',
+                requestId: packet.requestId,
+                messageId: packet.messageId,
+              });
               if (typeof sig === 'string' && sig.length === 128) session.sessionToken = sig;
             }
           } catch (error) {
@@ -5121,8 +6345,13 @@ export class GroupRoomManager {
         console.warn('[Files] Bulk channel failed to open:', error);
         await this.cancelFileTransfer(packet.requestId);
       }
-    } else if (session.direction === 'send' && packet.kind === 'ack' && packet.offset !== undefined &&
-               packet.offset > session.offset && packet.offset <= (session.sentOffset ?? 0)) {
+    } else if (
+      session.direction === 'send' &&
+      packet.kind === 'ack' &&
+      packet.offset !== undefined &&
+      packet.offset > session.offset &&
+      packet.offset <= (session.sentOffset ?? 0)
+    ) {
       session.offset = packet.offset;
       session.ackedOnce = true;
       this.emitFileProgress(packet.requestId, 'active');
@@ -5133,10 +6362,18 @@ export class GroupRoomManager {
     }
   }
 
-  private async tryReceiveDirectFile(requestId: string, session: FileSession, message: ChatMessage,
-    offer: DirectFileOffer): Promise<boolean> {
-    const address = await directFileAddress(this.room?.getPeers?.()?.[session.peerId] as RTCPeerConnection | undefined,
-      'remote', offer.address, Boolean(this.snapshot?.connection));
+  private async tryReceiveDirectFile(
+    requestId: string,
+    session: FileSession,
+    message: ChatMessage,
+    offer: DirectFileOffer,
+  ): Promise<boolean> {
+    const address = await directFileAddress(
+      this.room?.getPeers?.()?.[session.peerId] as RTCPeerConnection | undefined,
+      'remote',
+      offer.address,
+      Boolean(this.snapshot?.connection),
+    );
     if (!address) return false;
     session.direct = true;
     try {
@@ -5145,16 +6382,25 @@ export class GroupRoomManager {
         session.offset = bytes;
         this.emitFileProgress(requestId, 'active');
         // Completion is acknowledged only after the existing whole-file digest check.
-        if (bytes < session.total) void this.sendFilePacket(session.peerId,
-          { kind: 'ack', requestId, messageId: session.messageId, offset: bytes }).catch(() => {});
+        if (bytes < session.total)
+          void this.sendFilePacket(session.peerId, {
+            kind: 'ack',
+            requestId,
+            messageId: session.messageId,
+            offset: bytes,
+          }).catch(() => {});
       });
       if (this.fileSessions.get(requestId) !== session) return true;
       session.offset = result.bytes;
       if (result.error) throw new Error(result.error);
       if (result.bytes !== session.total) throw new Error('Incomplete direct file transfer');
       await this.finishReceivedFile(requestId, session, message);
-      await this.sendFilePacket(session.peerId, { kind: 'ack', requestId,
-        messageId: session.messageId, offset: session.total });
+      await this.sendFilePacket(session.peerId, {
+        kind: 'ack',
+        requestId,
+        messageId: session.messageId,
+        offset: session.total,
+      });
       return true;
     } catch (error) {
       if (this.fileSessions.get(requestId) !== session) return true;
@@ -5167,39 +6413,61 @@ export class GroupRoomManager {
 
   private async handleFileChunkWire(packet: Uint8Array, peerId: string): Promise<void> {
     const decoded = decodeSignedFileChunk(packet);
-    if (!decoded || !this.peerTracker.isVerified(peerId) ||
-        (this.authority && !this.isAdmittedPeer(peerId))) return;
+    if (!decoded || !this.peerTracker.isVerified(peerId) || (this.authority && !this.isAdmittedPeer(peerId))) return;
     const { header, bytes } = decoded;
     const session = this.fileSessions.get(header.requestId);
     const message = this.chatHistory.find((item) => item.id === header.messageId);
     const key = this.chatAuth?.getKnownKey(peerId);
     const maxInFlightChunks = session?.sessionToken ? 2048 : CHAT_FILE_IN_FLIGHT_CHUNKS;
-    if (!session || !message?.file || !key || message.authorKey !== key ||
-        session.direction !== 'receive' || session.direct || session.peerId !== peerId || session.messageId !== header.messageId ||
-        header.offset < (session.writingUntil ?? session.offset) || header.offset >= session.total ||
-        header.offset - session.offset > maxInFlightChunks * CHAT_FILE_CHUNK_BYTES ||
-        header.offset + bytes.length > session.total ||
-        session.pendingChunks?.has(header.offset) ||
-        (session.pendingChunks?.size ?? 0) >= maxInFlightChunks + 1) return;
+    if (
+      !session ||
+      !message?.file ||
+      !key ||
+      message.authorKey !== key ||
+      session.direction !== 'receive' ||
+      session.direct ||
+      session.peerId !== peerId ||
+      session.messageId !== header.messageId ||
+      header.offset < (session.writingUntil ?? session.offset) ||
+      header.offset >= session.total ||
+      header.offset - session.offset > maxInFlightChunks * CHAT_FILE_CHUNK_BYTES ||
+      header.offset + bytes.length > session.total ||
+      session.pendingChunks?.has(header.offset) ||
+      (session.pendingChunks?.size ?? 0) >= maxInFlightChunks + 1
+    )
+      return;
     const verifyStart = performance.now();
     const fastTokenMatch = Boolean(session.sessionToken) && header.signature === session.sessionToken;
-    const valid = fastTokenMatch && fastFileChunkTag(bytes, session.sessionToken!, header.offset) === header.hash
-      ? true
-      : await hashFileChunk(bytes) === header.hash &&
-        (fastTokenMatch ||
-          await this.chatAuth!.verifyControl('chat-file-chunk-v2',
-            fileChunkSignatureData(header), header.signature, key));
+    const valid =
+      fastTokenMatch && fastFileChunkTag(bytes, session.sessionToken!, header.offset) === header.hash
+        ? true
+        : (await hashFileChunk(bytes)) === header.hash &&
+          (fastTokenMatch ||
+            (await this.chatAuth!.verifyControl(
+              'chat-file-chunk-v2',
+              fileChunkSignatureData(header),
+              header.signature,
+              key,
+            )));
     session.timings.verifyMs += performance.now() - verifyStart;
     if (!valid) return;
-    if (this.fileSessions.get(header.requestId) !== session || header.offset < (session.writingUntil ?? session.offset) ||
-        session.pendingChunks?.has(header.offset) ||
-        (session.pendingChunks?.size ?? 0) >= maxInFlightChunks + 1) return;
+    if (
+      this.fileSessions.get(header.requestId) !== session ||
+      header.offset < (session.writingUntil ?? session.offset) ||
+      session.pendingChunks?.has(header.offset) ||
+      (session.pendingChunks?.size ?? 0) >= maxInFlightChunks + 1
+    )
+      return;
     session.pendingChunks ??= new Map();
     session.pendingChunks.set(header.offset, bytes);
     await this.processReceivedFileChunks(header.requestId, session, message);
   }
 
-  private async processReceivedFileChunks(requestId: string, session: FileSession, message: ChatMessage): Promise<void> {
+  private async processReceivedFileChunks(
+    requestId: string,
+    session: FileSession,
+    message: ChatMessage,
+  ): Promise<void> {
     if (session.receiving) return;
     session.receiving = true;
     try {
@@ -5215,7 +6483,11 @@ export class GroupRoomManager {
         let length = 0;
         while (session.pendingChunks.has(offset + length)) {
           const bytes = session.pendingChunks.get(offset + length)!;
-          if (bytes.length === 0 || bytes.length > CHAT_FILE_CHUNK_BYTES || offset + length + bytes.length > session.total)
+          if (
+            bytes.length === 0 ||
+            bytes.length > CHAT_FILE_CHUNK_BYTES ||
+            offset + length + bytes.length > session.total
+          )
             throw new Error('Invalid file chunk');
           if (length + bytes.length > maxWriteBatch) break;
           session.pendingChunks.delete(offset + length);
@@ -5230,7 +6502,10 @@ export class GroupRoomManager {
         } else {
           const bytes = new Uint8Array(length);
           let index = 0;
-          for (const chunk of batch) { bytes.set(chunk, index); index += chunk.length; }
+          for (const chunk of batch) {
+            bytes.set(chunk, index);
+            index += chunk.length;
+          }
           const written = await writeChatDownloadBytes(requestId, offset, bytes);
           if (this.fileSessions.get(requestId) !== session) return;
           if (written !== offset + length) throw new Error('Invalid download write offset');
@@ -5240,14 +6515,20 @@ export class GroupRoomManager {
         session.timings.writeMs += performance.now() - writeStart;
         this.emitFileProgress(requestId, 'active');
         if (session.offset === session.total) await this.finishReceivedFile(requestId, session, message);
-        const shouldAck = !session.sessionToken || session.offset === session.total ||
+        const shouldAck =
+          !session.sessionToken ||
+          session.offset === session.total ||
           !session.pendingChunks?.has(session.offset) ||
           session.offset - (session.lastAckOffset ?? 0) >= maxWriteBatch;
         if (shouldAck) {
           session.lastAckOffset = session.offset;
           const ackStart = performance.now();
-          await this.sendFilePacket(session.peerId, { kind: 'ack', requestId,
-            messageId: session.messageId, offset: session.offset });
+          await this.sendFilePacket(session.peerId, {
+            kind: 'ack',
+            requestId,
+            messageId: session.messageId,
+            offset: session.offset,
+          });
           session.timings.ackMs += performance.now() - ackStart;
         }
       }
@@ -5270,18 +6551,38 @@ export class GroupRoomManager {
     if (session.preview) {
       const bytes = new Uint8Array(session.total);
       let offset = 0;
-      for (const chunk of session.chunks ?? []) { bytes.set(chunk, offset); offset += chunk.length; }
+      for (const chunk of session.chunks ?? []) {
+        bytes.set(chunk, offset);
+        offset += chunk.length;
+      }
       if (offset !== session.total) throw new Error('Incomplete image preview');
-      const hash = Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256', bytes)),
-        (value) => value.toString(16).padStart(2, '0')).join('');
+      const hash = Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256', bytes)), (value) =>
+        value.toString(16).padStart(2, '0'),
+      ).join('');
       if (hash !== message.file?.sha256) throw new Error('Image signature mismatch');
       const extension = message.file.name.split('.').pop()?.toLowerCase();
-      const mime = extension === 'jpg' || extension === 'jpeg' ? 'image/jpeg' :
-        extension === 'png' ? 'image/png' : extension === 'webp' ? 'image/webp' :
-        extension === 'gif' ? 'image/gif' : 'image/bmp';
+      const mime =
+        extension === 'jpg' || extension === 'jpeg'
+          ? 'image/jpeg'
+          : extension === 'png'
+            ? 'image/png'
+            : extension === 'webp'
+              ? 'image/webp'
+              : extension === 'gif'
+                ? 'image/gif'
+                : 'image/bmp';
       const preview = URL.createObjectURL(new Blob([bytes], { type: mime }));
       this.fileSessions.delete(requestId);
-      this.emitFileProgress(requestId, 'complete', session.total, session.messageId, 'receive', session.total, preview, bytes);
+      this.emitFileProgress(
+        requestId,
+        'complete',
+        session.total,
+        session.messageId,
+        'receive',
+        session.total,
+        preview,
+        bytes,
+      );
       return;
     }
     await invoke<string>('finish_chat_download', { id: requestId });
@@ -5291,17 +6592,45 @@ export class GroupRoomManager {
       try {
         const data = await invoke<string>('read_chat_image_preview', { id: requestId });
         const ext = message.file.name.split('.').pop()?.toLowerCase();
-        const mime = ext === 'jpg' ? 'image/jpeg' : ext === 'jpeg' ? 'image/jpeg' :
-          ext === 'png' ? 'image/png' : ext === 'webp' ? 'image/webp' : ext === 'gif' ? 'image/gif' : 'image/bmp';
+        const mime =
+          ext === 'jpg'
+            ? 'image/jpeg'
+            : ext === 'jpeg'
+              ? 'image/jpeg'
+              : ext === 'png'
+                ? 'image/png'
+                : ext === 'webp'
+                  ? 'image/webp'
+                  : ext === 'gif'
+                    ? 'image/gif'
+                    : 'image/bmp';
         preview = `data:${mime};base64,${data}`;
       } catch {}
     }
-    this.emitFileProgress(requestId, 'complete', session.total, session.messageId, 'receive', session.total, preview, undefined, true);
+    this.emitFileProgress(
+      requestId,
+      'complete',
+      session.total,
+      session.messageId,
+      'receive',
+      session.total,
+      preview,
+      undefined,
+      true,
+    );
   }
 
   public async editChatMessage(id: string, text: string): Promise<boolean> {
     const current = this.chatHistory.find((message) => message.id === id);
-    if (!current || current.authorId !== selfId || current.isSystem || current.file || current.deletedAt || !text.trim()) return false;
+    if (
+      !current ||
+      current.authorId !== selfId ||
+      current.isSystem ||
+      current.file ||
+      current.deletedAt ||
+      !text.trim()
+    )
+      return false;
     await this.publishChatMessage({
       ...current,
       text: text.trim(),
@@ -5322,7 +6651,9 @@ export class GroupRoomManager {
       for (const [requestId, request] of this.pendingFileRequests) {
         if (request.messageId === id) {
           this.removePendingFileRequest(requestId);
-          try { await this.sendFilePacket(request.peerId, { kind: 'deny', requestId, messageId: id }); } catch {}
+          try {
+            await this.sendFilePacket(request.peerId, { kind: 'deny', requestId, messageId: id });
+          } catch {}
         }
       }
       this.fileSources.delete(id);
@@ -5344,18 +6675,32 @@ export class GroupRoomManager {
     systemAppKind?: string,
   ): Promise<ChatMessage> {
     return this.publishChatMessage({
-      id: crypto.randomUUID(), sender: 'Sistema', text,
-      timestamp: Date.now(), authorId: selfId, revision: 0,
-      isSystem: true, systemType, systemActor, systemRoom, systemAppKind,
+      id: crypto.randomUUID(),
+      sender: 'Sistema',
+      text,
+      timestamp: Date.now(),
+      authorId: selfId,
+      revision: 0,
+      isSystem: true,
+      systemType,
+      systemActor,
+      systemRoom,
+      systemAppKind,
     });
   }
 
   public sendAppLifecycleNotice(action: 'start' | 'stop', kind: string): Promise<ChatMessage> {
     const app = getRoomApp(kind);
     if (!app) return Promise.reject(new Error('Unknown room app'));
-    return this.sendSystemMessage(action === 'start' ? `${this.username} iniciou ${app.protocolLabel ?? app.label}` :
-      `${this.username} encerrou ${app.protocolLabel ?? app.label}`, action === 'start' ? 'app-start' : 'app-stop',
-    this.username, undefined, kind);
+    return this.sendSystemMessage(
+      action === 'start'
+        ? `${this.username} iniciou ${app.protocolLabel ?? app.label}`
+        : `${this.username} encerrou ${app.protocolLabel ?? app.label}`,
+      action === 'start' ? 'app-start' : 'app-stop',
+      this.username,
+      undefined,
+      kind,
+    );
   }
 
   private async publishChatMessage(msg: ChatMessage): Promise<ChatMessage> {
@@ -5368,7 +6713,9 @@ export class GroupRoomManager {
     this.seenChatRevisions.add(chatRevisionKey(signed));
     this.chatHistory = mergeChatHistory(this.chatHistory, [signed]);
     this.callbacks?.onChat(signed);
-    try { this.sendRoomAction(this.chatAction, signed); } catch {}
+    try {
+      this.sendRoomAction(this.chatAction, signed);
+    } catch {}
     return signed;
   }
 
@@ -5378,15 +6725,20 @@ export class GroupRoomManager {
     const report = this.indirectPeerReports.get(peerId);
     if (!report || now - report.seenAt > 15_000) return null;
     if (this.peerTracker.isVerified(peerId)) {
-      if (!report.wasIndirectBeforeJoin || this.announcedPeerNames.has(peerId) ||
-          report.directHandshakingUntil === undefined || now >= report.directHandshakingUntil) {
+      if (
+        !report.wasIndirectBeforeJoin ||
+        this.announcedPeerNames.has(peerId) ||
+        report.directHandshakingUntil === undefined ||
+        now >= report.directHandshakingUntil
+      ) {
         return null;
       }
     }
     if (this.authority) {
       const candidateKey = report.publicKey ?? this.chatAuth?.getKnownKey(peerId);
       if (candidateKey && this.bannedKeys.has(candidateKey)) return null;
-      const admittedKey = this.admittedPeers.get(peerId) ??
+      const admittedKey =
+        this.admittedPeers.get(peerId) ??
         this.adminAdmissions.get(peerId)?.targetKey ??
         (candidateKey && (candidateKey === this.authority.currentKey || this.hasAdminGrant(candidateKey))
           ? candidateKey
@@ -5494,8 +6846,9 @@ export class GroupRoomManager {
     if (this.callbacks?.onPasswordChange) {
       this.callbacks.onPasswordChange(this.password, this.username);
     }
-    void this.sendSystemMessage(`Senha alterada por ${this.username}`, 'info', this.username)
-      .catch((error) => console.warn('[Chat] Failed to publish password notice:', error));
+    void this.sendSystemMessage(`Senha alterada por ${this.username}`, 'info', this.username).catch((error) =>
+      console.warn('[Chat] Failed to publish password notice:', error),
+    );
     return true;
   }
 
@@ -5513,8 +6866,10 @@ export class GroupRoomManager {
     const key = this.chatAuth.getKnownKey(peerId);
     if (!key || this.admittedPeers.get(peerId) !== key || this.hasAdminGrant(key) === enabled) return false;
     if (enabled && this.activeAdminKeys().length >= 32) return false;
-    const command = await this.authority.makeCommand(enabled ? 'admin' : 'revoke-admin',
-      { targetPeerId: peerId, targetKey: key });
+    const command = await this.authority.makeCommand(enabled ? 'admin' : 'revoke-admin', {
+      targetPeerId: peerId,
+      targetKey: key,
+    });
     await this.acceptHostCommand(command);
     await this.admissionAction?.send({ kind: 'command', command });
     await this.publishSnapshot(this.roomName);
@@ -5529,8 +6884,9 @@ export class GroupRoomManager {
     this.admissionHistory.push(command);
     this.admissionHistory = this.admissionHistory.slice(-200);
     await this.persistHostCommands();
-    const rotatedPassword = Array.from(crypto.getRandomValues(new Uint8Array(16)),
-      (byte) => byte.toString(16).padStart(2, '0')).join('');
+    const rotatedPassword = Array.from(crypto.getRandomValues(new Uint8Array(16)), (byte) =>
+      byte.toString(16).padStart(2, '0'),
+    ).join('');
     this.password = rotatedPassword;
     if (this.invite) {
       const record = await savedRooms.get(this.roomId);
@@ -5571,7 +6927,12 @@ export class GroupRoomManager {
       if (missingVideo || missingAudio) {
         this.requestStreamFromPeer(owner, { missingVideo, missingAudio });
       }
-    } else if (!this.remoteStreams.get(owner)?.getVideoTracks().some((track) => track.readyState === 'live')) {
+    } else if (
+      !this.remoteStreams
+        .get(owner)
+        ?.getVideoTracks()
+        .some((track) => track.readyState === 'live')
+    ) {
       this.requestStreamFromPeer(owner);
     }
     this.watchStream(peerId);
@@ -5587,8 +6948,10 @@ export class GroupRoomManager {
   }
 
   private async leaveNow(): Promise<void> {
-    this.unsubscribeProfileStats?.(); this.unsubscribeProfileStats = undefined;
-    clearTimeout(this.profileStatsTimer); this.profileStatsTimer = undefined;
+    this.unsubscribeProfileStats?.();
+    this.unsubscribeProfileStats = undefined;
+    clearTimeout(this.profileStatsTimer);
+    this.profileStatsTimer = undefined;
     if (!this.previewOnly) profileStats.clearPeers();
     this.previewRequests.clear();
     this.admissionRequests.clear();
@@ -5644,7 +7007,8 @@ export class GroupRoomManager {
     this.nativeVideo?.close();
     this.nativeVideo = null;
     this.fileBulk.closeAll();
-    this.payloadChannels.closeAll(); this.binaryPeers.clear();
+    this.payloadChannels.closeAll();
+    this.binaryPeers.clear();
     this.remoteControlFastPeers.clear();
     this.remoteControlLowLatencyPeers.clear();
     this.remoteControlRxSeq.clear();
@@ -5685,10 +7049,12 @@ export class GroupRoomManager {
     this.chatHistory = [];
     this.reservedChatOrder = 0;
     this.fileSources.clear();
-    await Promise.allSettled([...this.fileSessions.keys()].map(id => cancelDirectFile(id)));
-    await Promise.allSettled([...this.fileSessions].filter(([, session]) =>
-      session.direction === 'receive' && !session.preview).map(([id]) =>
-      invoke('cancel_chat_download', { id })));
+    await Promise.allSettled([...this.fileSessions.keys()].map((id) => cancelDirectFile(id)));
+    await Promise.allSettled(
+      [...this.fileSessions]
+        .filter(([, session]) => session.direction === 'receive' && !session.preview)
+        .map(([id]) => invoke('cancel_chat_download', { id })),
+    );
     this.fileSessions.clear();
     this.pendingFileRequests.clear();
     this.requestedImagePreviews.clear();

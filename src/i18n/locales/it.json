@@ -1136,6 +1136,7 @@
   "join.online": "Partecipanti online: {{count}}",
   "join.participants": "Persone nella stanza",
   "join.timeout": "Impossibile confermare la connessione. Controlla la password o riprova.",
+  "join.passwordRequired": "Inserisci la password della stanza",
   "join.waiting": "In attesa dei partecipanti e dell’ammissione in sala…",
   "join.hostOfflineNotice": "L’host e gli amministratori di questa stanza sono attualmente offline. L’ingresso verrà completato automaticamente appena uno di loro si connetterà.",
   "room.waitingHostBanner": "L’host e gli amministratori di questa stanza sono offline al momento, quindi i nuovi partecipanti non possono ancora essere ammessi. Attendi la loro connessione o crea una nuova stanza.",

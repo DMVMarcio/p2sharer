@@ -26,18 +26,23 @@ export function JoinRoomModal() {
   const [showPassword, setShowPassword] = useState(false);
   const retryError = useRef(roomService.pendingJoinError);
   const [requiresPassword, setRequiresPassword] = useState(() => retryError.current.startsWith('Senha incorreta'));
-  const [phase, setPhase] = useState<'code' | 'trust' | 'searching' | 'preview' | 'joining'>(() => retryError.current ? 'preview' : 'code');
+  const [phase, setPhase] = useState<'code' | 'trust' | 'searching' | 'preview' | 'joining'>(() =>
+    retryError.current ? 'preview' : 'code',
+  );
   const [canEnter, setCanEnter] = useState(() => Boolean(retryError.current));
   const [preview, setPreview] = useState<RoomPreview | null>(null);
-  const [roomName, setRoomName] = useState(() => retryError.current ? stateStore.currentRoomName : '');
+  const [roomName, setRoomName] = useState(() => (retryError.current ? stateStore.currentRoomName : ''));
   const [isSavedRoom, setIsSavedRoom] = useState(() => Boolean(roomService.pendingJoinAsOwner));
   const [saveRoomOnJoin, setSaveRoomOnJoin] = useState(false);
-  const [trustSummary, setTrustSummary] = useState<{ roomName?: string; roomCode: string; isShort: boolean } | null>(null);
+  const [trustSummary, setTrustSummary] = useState<{ roomName?: string; roomCode: string; isShort: boolean } | null>(
+    null,
+  );
   const [admitterOffline, setAdmitterOffline] = useState(false);
   const [error, setError] = useState(() => localizeText(retryError.current));
   const owner = useRef(roomService.pendingJoinAsOwner);
   const ownedRoomRecord = useRef(Boolean(roomService.pendingJoinAsOwner));
   const session = useRef<{ manager: GroupRoomManager; ready: Promise<void>; release?: Promise<void> } | null>(null);
+  const passwordInputRef = useRef<HTMLInputElement | null>(null);
   const mounted = useRef(true);
   const joining = useRef(Boolean(retryError.current));
   const attempt = useRef(new AbortController());
@@ -50,7 +55,10 @@ export function JoinRoomModal() {
   };
   useEffect(() => {
     mounted.current = true;
-    return () => { mounted.current = false; void release(); };
+    return () => {
+      mounted.current = false;
+      void release();
+    };
   }, []);
   useEffect(() => {
     if (!joining.current) return;
@@ -74,7 +82,7 @@ export function JoinRoomModal() {
       if (!mgr || !mounted.current) return;
       if (!owner.current && !ownedRoomRecord.current && mgr.hasVerifiedIdentityPeers() && !mgr.hasAdmitterOnline()) {
         setAdmitterOffline(true);
-        if (canEnter) setPhase(current => current === 'searching' ? 'preview' : current);
+        if (canEnter) setPhase((current) => (current === 'searching' ? 'preview' : current));
       } else if (mgr.hasAdmitterOnline()) {
         setAdmitterOffline(false);
       }
@@ -83,18 +91,25 @@ export function JoinRoomModal() {
       session.current?.manager.requestPreview();
       syncAdmitterState();
     }, 2500);
-    const timeout = setTimeout(() => {
-      if (!mounted.current) return;
-      syncAdmitterState();
-      if (canEnter) setPhase(current => current === 'searching' ? 'preview' : current);
-      else {
-        void release().then(() => {
-          if (!mounted.current) return;
-          setError(t('invite.shortUnavailable')); setPhase('code');
-        });
-      }
-    }, canEnter ? 1500 : 20000);
-    return () => { clearInterval(interval); clearTimeout(timeout); };
+    const timeout = setTimeout(
+      () => {
+        if (!mounted.current) return;
+        syncAdmitterState();
+        if (canEnter) setPhase((current) => (current === 'searching' ? 'preview' : current));
+        else {
+          void release().then(() => {
+            if (!mounted.current) return;
+            setError(t('invite.shortUnavailable'));
+            setPhase('code');
+          });
+        }
+      },
+      canEnter ? 1500 : 20000,
+    );
+    return () => {
+      clearInterval(interval);
+      clearTimeout(timeout);
+    };
   }, [phase, canEnter]);
 
   const discover = async (trustConfirmed = false) => {
@@ -114,7 +129,10 @@ export function JoinRoomModal() {
       const alreadySaved = Boolean(known?.saved);
       ownedRoomRecord.current = Boolean(known?.owned && known?.identity);
       setAdmitterOffline(false);
-      const resolvedName = known?.customName ?? known?.name ?? (invite ? invite.version === 3 ? invite.roomId.slice(0, 8) : invite.name : '');
+      const resolvedName =
+        known?.customName ??
+        known?.name ??
+        (invite ? (invite.version === 3 ? invite.roomId.slice(0, 8) : invite.name) : '');
       setIsSavedRoom(alreadySaved);
       if (alreadySaved) setSaveRoomOnJoin(false);
       setRoomName(resolvedName);
@@ -132,34 +150,58 @@ export function JoinRoomModal() {
       setTrustSummary(null);
       setPhase('searching');
       setCanEnter(!short || Boolean(invite));
-      const manager = new GroupRoomManager(stateStore.username, resolved, '', owner.current, stateStore.getTurnConfig(), short);
+      const manager = new GroupRoomManager(
+        stateStore.username,
+        resolved,
+        '',
+        owner.current,
+        stateStore.getTurnConfig(),
+        short,
+      );
       const current = { manager, ready: Promise.resolve() };
       session.current = current;
-      current.ready = roomService.startRoomPreview(manager, {
-        onPreview: summary => {
-          if (!mounted.current || joining.current || session.current !== current) return;
-          if (short) {
-            const verifiedInvite = manager.getInvite();
-            if (!verifiedInvite) return;
-            setCode(verifiedInvite);
-            roomService.pendingJoinInvite = verifiedInvite;
-            setCanEnter(true);
-          }
-          setPreview(previous => stabilizeRoomPreview(previous, summary));
-          setAdmitterOffline(!manager.hasAdmitterOnline() && !owner.current && !ownedRoomRecord.current);
-          setRequiresPassword(summary.protected); setPhase('preview');
+      current.ready = roomService.startRoomPreview(
+        manager,
+        {
+          onPreview: (summary) => {
+            if (!mounted.current || joining.current || session.current !== current) return;
+            if (short) {
+              const verifiedInvite = manager.getInvite();
+              if (!verifiedInvite) return;
+              setCode(verifiedInvite);
+              roomService.pendingJoinInvite = verifiedInvite;
+              setCanEnter(true);
+            }
+            setPreview((previous) => stabilizeRoomPreview(previous, summary));
+            setAdmitterOffline(!manager.hasAdmitterOnline() && !owner.current && !ownedRoomRecord.current);
+            setRequiresPassword(summary.protected && !manager.isRoomHost?.());
+            setPhase('preview');
+          },
+          onStreamsUpdate: () => {},
+          onSlotsUpdate: () => {},
+          onChat: () => {},
+          onChatHistory: () => {},
+          onPeersUpdate: () => {},
+          onStatusChange: (status) => {
+            if (
+              mounted.current &&
+              session.current === current &&
+              (status.startsWith('Erro') || status === t('lan.connectFailed'))
+            ) {
+              setError(localizeText(status));
+              setPhase('preview');
+            }
+          },
         },
-        onStreamsUpdate: () => {}, onSlotsUpdate: () => {}, onChat: () => {},
-        onChatHistory: () => {}, onPeersUpdate: () => {},
-        onStatusChange: status => {
-          if (mounted.current && session.current === current && (status.startsWith('Erro') || status === t('lan.connectFailed'))) {
-            setError(localizeText(status)); setPhase('preview');
-          }
-        },
-      }, attempt.current.signal);
+        attempt.current.signal,
+      );
       await current.ready;
     } catch (cause) {
-      if (mounted.current) { setCanEnter(false); setError(cause instanceof Error ? cause.message : t('error.unknown')); setPhase('code'); }
+      if (mounted.current) {
+        setCanEnter(false);
+        setError(cause instanceof Error ? cause.message : t('error.unknown'));
+        setPhase('code');
+      }
     }
   };
   useEffect(() => {
@@ -168,21 +210,31 @@ export function JoinRoomModal() {
     } else if (retryError.current) {
       const normalized = extractRoomInvite(code) ?? extractWebRoomCode(code) ?? code.trim();
       const parsedId = parseRoomInvite(normalized)?.roomId ?? normalized;
-      void savedRooms.get(parsedId).then((known) => {
-        if (!mounted.current) return;
-        if (known?.saved) setIsSavedRoom(true);
-        if (known?.owned && known?.identity) ownedRoomRecord.current = true;
-      }).catch(() => {});
+      void savedRooms
+        .get(parsedId)
+        .then((known) => {
+          if (!mounted.current) return;
+          if (known?.saved) setIsSavedRoom(true);
+          if (known?.owned && known?.identity) ownedRoomRecord.current = true;
+        })
+        .catch(() => {});
     }
   }, []);
 
   const enter = async () => {
     if (!canEnter) return;
     if (joining.current && phase === 'joining') return;
+    if (requiresPassword && !password.trim()) {
+      setError(t('join.passwordRequired'));
+      passwordInputRef.current?.focus();
+      return;
+    }
     const waitForAdmission = Boolean(preview || error || retryError.current);
     roomService.joinOutcome = 'connecting';
     roomService.joinError = '';
-    joining.current = true; setError(''); setPhase('joining');
+    joining.current = true;
+    setError('');
+    setPhase('joining');
     try {
       const current = session.current;
       await current?.ready;
@@ -204,7 +256,10 @@ export function JoinRoomModal() {
         ...(saveRoomOnJoin && !isSavedRoom ? { saveOnJoin: true } : {}),
       });
     } catch {
-      if (mounted.current) { setError(t('error.unknown')); setPhase('preview'); }
+      if (mounted.current) {
+        setError(t('error.unknown'));
+        setPhase('preview');
+      }
     }
   };
   const cancelConnection = () => {
@@ -214,72 +269,167 @@ export function JoinRoomModal() {
     if (joining.current) void roomService.leaveRoom();
   };
   const cancel = () => {
-    roomService.pendingJoinInvite = ''; roomService.pendingJoinPassword = ''; roomService.pendingJoinAsOwner = false;
+    roomService.pendingJoinInvite = '';
+    roomService.pendingJoinPassword = '';
+    roomService.pendingJoinAsOwner = false;
     roomService.pendingJoinError = '';
     closeModal();
   };
   const busy = (phase === 'searching' && !canEnter) || phase === 'joining';
   const showSaveCheckbox = !isSavedRoom && (phase === 'preview' || (phase === 'searching' && canEnter));
-  return <ModalDialog title={phase === 'trust' ? (trustSummary?.roomName || t('join.trustTitle')) : (preview?.name || roomName || t('message.3b24015dc709'))}
-    icon={phase === 'trust' ? <ShieldCheck size={20} /> : <LogIn size={20} />}
-    onCloseStart={cancelConnection} onClose={cancel} footer={close => <>
-      <button type="button" className="btn btn-secondary" onClick={close}>{t('message.bb9dbb406dcb')}</button>
-      <button type="submit" form="join-room-form" className="btn btn-primary" disabled={busy || ((phase !== 'code' && phase !== 'trust') && !canEnter)}>
-        {t(phase === 'code' ? 'join.inspect' : phase === 'trust' ? 'join.trustConfirm' : 'message.ad207d12bdc1')}
-      </button>
-    </>}>
-    <form id="join-room-form" autoComplete="off" aria-busy={busy}
-      onSubmit={event => {
-        event.preventDefault();
-        if (busy) return;
-        if (phase === 'code') void discover(false);
-        else if (phase === 'trust') void discover(true);
-        else void enter();
-      }}>
-      {phase === 'code' ? <div className="form-group">
-        <label className="form-label" htmlFor="join-room-code">{t('message.68737d8e5d2e')}</label>
-        <input autoComplete="off" data-autofocus id="join-room-code" className="text-input" value={code}
-          onChange={event => setCode(event.target.value)} />
-      </div> : phase === 'trust' ? <div className="join-room-trust">
-        <div className="join-room-trust-target">
-          <span className="join-room-trust-label">{t(trustSummary?.isShort ? 'join.trustShortLabel' : 'join.trustRoomLabel')}</span>
-          <strong>{trustSummary?.roomName || trustSummary?.roomCode}</strong>
-          {trustSummary?.roomName && <span className="saved-room-id">{trustSummary.roomCode}</span>}
-        </div>
-        <StatusNotice>{t('join.trustIpNotice')}</StatusNotice>
-        <p className="modal-subtitle">{t('join.trustQuestion')}</p>
-      </div> : <>
-        {phase === 'preview' && !preview ? <StatusNotice>{t('join.noResponse')}</StatusNotice> :
-        <p className="modal-subtitle" role="status" aria-live="polite">
-          {phase === 'joining' ? localizeText(roomStatusText) : phase === 'searching' ? t('join.searching') :
-            preview ? t('join.online', { count: preview.participants.length }) : t('join.noResponse')}
-        </p>}
-        {admitterOffline && phase !== 'joining' && <StatusNotice>{t('join.hostOfflineNotice')}</StatusNotice>}
-        {(phase === 'searching' || phase === 'joining') && <div className="join-room-loading"><div className="connecting-spinner" /></div>}
-        {preview && <ul className="join-room-participants" aria-label={t('join.participants')}>
-          {preview.participants.map(person => <li key={person.id}>
-            <ProfileAvatar peerId={person.id} name={person.name} color={person.color} imageUrl={person.avatar} />
-            <span>{person.name}</span>
-          </li>)}
-        </ul>}
-        {requiresPassword && <div className="form-group">
-          <label className="form-label" htmlFor="join-room-password">{t('message.4c92bf162674')}</label>
-          <div className="input-with-action">
-            <input autoComplete="off" id="join-room-password" className="text-input" type={showPassword ? 'text' : 'password'}
-              maxLength={128} disabled={busy} value={password} onChange={event => setPassword(event.target.value)} />
-            <button type="button" className="btn btn-sm btn-outline btn-inline-action" disabled={busy}
-              aria-label={t('message.d7d229c67924')} onClick={() => setShowPassword(value => !value)}>
-              {showPassword ? <EyeOff size={14} /> : <Eye size={14} />}
-            </button>
+  return (
+    <ModalDialog
+      title={
+        phase === 'trust'
+          ? trustSummary?.roomName || t('join.trustTitle')
+          : preview?.name || roomName || t('message.3b24015dc709')
+      }
+      icon={phase === 'trust' ? <ShieldCheck size={20} /> : <LogIn size={20} />}
+      onCloseStart={cancelConnection}
+      onClose={cancel}
+      footer={(close) => (
+        <>
+          <button type="button" className="btn btn-secondary" onClick={close}>
+            {t('message.bb9dbb406dcb')}
+          </button>
+          <button
+            type="submit"
+            form="join-room-form"
+            className="btn btn-primary"
+            disabled={busy || (phase !== 'code' && phase !== 'trust' && !canEnter)}
+          >
+            {t(phase === 'code' ? 'join.inspect' : phase === 'trust' ? 'join.trustConfirm' : 'message.ad207d12bdc1')}
+          </button>
+        </>
+      )}
+    >
+      <form
+        id="join-room-form"
+        autoComplete="off"
+        aria-busy={busy}
+        onSubmit={(event) => {
+          event.preventDefault();
+          if (busy) return;
+          if (phase === 'code') void discover(false);
+          else if (phase === 'trust') void discover(true);
+          else void enter();
+        }}
+      >
+        {phase === 'code' ? (
+          <div className="form-group">
+            <label className="form-label" htmlFor="join-room-code">
+              {t('message.68737d8e5d2e')}
+            </label>
+            <input
+              autoComplete="off"
+              data-autofocus
+              id="join-room-code"
+              className="text-input"
+              value={code}
+              onChange={(event) => setCode(event.target.value)}
+            />
           </div>
-        </div>}
-        {showSaveCheckbox && <label className="join-save-room-option" htmlFor="join-save-room">
-          <input autoComplete="off" type="checkbox" id="join-save-room" checked={saveRoomOnJoin} disabled={busy}
-            onChange={event => setSaveRoomOnJoin(event.target.checked)} />
-          <span>{t('join.saveRoom')}</span>
-        </label>}
-      </>}
-      {error && <p className="join-room-error" role="alert">{error}</p>}
-    </form>
-  </ModalDialog>;
+        ) : phase === 'trust' ? (
+          <div className="join-room-trust">
+            <div className="join-room-trust-target">
+              <span className="join-room-trust-label">
+                {t(trustSummary?.isShort ? 'join.trustShortLabel' : 'join.trustRoomLabel')}
+              </span>
+              <strong>{trustSummary?.roomName || trustSummary?.roomCode}</strong>
+              {trustSummary?.roomName && <span className="saved-room-id">{trustSummary.roomCode}</span>}
+            </div>
+            <StatusNotice>{t('join.trustIpNotice')}</StatusNotice>
+            <p className="modal-subtitle">{t('join.trustQuestion')}</p>
+          </div>
+        ) : (
+          <>
+            {phase === 'preview' && !preview ? (
+              <StatusNotice>{t('join.noResponse')}</StatusNotice>
+            ) : (
+              <p className="modal-subtitle" role="status" aria-live="polite">
+                {phase === 'joining'
+                  ? localizeText(roomStatusText)
+                  : phase === 'searching'
+                    ? t('join.searching')
+                    : preview
+                      ? t('join.online', { count: preview.participants.length })
+                      : t('join.noResponse')}
+              </p>
+            )}
+            {admitterOffline && phase !== 'joining' && <StatusNotice>{t('join.hostOfflineNotice')}</StatusNotice>}
+            {(phase === 'searching' || phase === 'joining') && (
+              <div className="join-room-loading">
+                <div className="connecting-spinner" />
+              </div>
+            )}
+            {preview && (
+              <ul className="join-room-participants" aria-label={t('join.participants')}>
+                {preview.participants.map((person) => (
+                  <li key={person.id}>
+                    <ProfileAvatar
+                      peerId={person.id}
+                      name={person.name}
+                      color={person.color}
+                      imageUrl={person.avatar}
+                    />
+                    <span>{person.name}</span>
+                  </li>
+                ))}
+              </ul>
+            )}
+            {requiresPassword && (
+              <div className="form-group">
+                <label className="form-label" htmlFor="join-room-password">
+                  {t('message.4c92bf162674')}
+                </label>
+                <div className="input-with-action">
+                  <input
+                    ref={passwordInputRef}
+                    autoComplete="off"
+                    id="join-room-password"
+                    className="text-input"
+                    type={showPassword ? 'text' : 'password'}
+                    maxLength={128}
+                    disabled={busy}
+                    value={password}
+                    onChange={(event) => {
+                      setPassword(event.target.value);
+                      if (error) setError('');
+                    }}
+                  />
+                  <button
+                    type="button"
+                    className="btn btn-sm btn-outline btn-inline-action"
+                    disabled={busy}
+                    aria-label={t('message.d7d229c67924')}
+                    onClick={() => setShowPassword((value) => !value)}
+                  >
+                    {showPassword ? <EyeOff size={14} /> : <Eye size={14} />}
+                  </button>
+                </div>
+              </div>
+            )}
+            {showSaveCheckbox && (
+              <label className="join-save-room-option" htmlFor="join-save-room">
+                <input
+                  autoComplete="off"
+                  type="checkbox"
+                  id="join-save-room"
+                  checked={saveRoomOnJoin}
+                  disabled={busy}
+                  onChange={(event) => setSaveRoomOnJoin(event.target.checked)}
+                />
+                <span>{t('join.saveRoom')}</span>
+              </label>
+            )}
+          </>
+        )}
+        {error && (
+          <p className="join-room-error" role="alert">
+            {error}
+          </p>
+        )}
+      </form>
+    </ModalDialog>
+  );
 }

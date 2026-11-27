@@ -1136,6 +1136,7 @@
   "join.online": "Online-osallistujat: {{count}}",
   "join.participants": "Ihmisiä huoneessa",
   "join.timeout": "Yhteyttä ei voitu vahvistaa. Tarkista salasana tai yritä uudelleen.",
+  "join.passwordRequired": "Anna huoneen salasana",
   "join.waiting": "Odotetaan osallistujia ja sisäänpääsyä huoneisiin…",
   "join.hostOfflineNotice": "Tämän huoneen isäntä ja ylläpitäjät ovat tällä hetkellä offline-tilassa. Sisäänpääsy vahvistetaan automaattisesti heti, kun joku heistä yhdistää.",
   "room.waitingHostBanner": "Tämän huoneen isäntä ja ylläpitäjät ovat juuri nyt offline-tilassa, joten uusia osallistujia ei voida vielä hyväksyä sisään. Odota heidän yhdistämistään tai luo oma huone.",

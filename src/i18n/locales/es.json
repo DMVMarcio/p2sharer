@@ -1136,6 +1136,7 @@
   "join.online": "Participantes en línea: {{count}}",
   "join.participants": "gente en la habitacion",
   "join.timeout": "No se pudo confirmar la conexión. Verifique la contraseña o inténtelo nuevamente.",
+  "join.passwordRequired": "Ingresa la contraseña de la sala",
   "join.waiting": "Esperando participantes y admisión de salas…",
   "join.hostOfflineNotice": "El anfitrión y los administradores de esta sala están desconectados en este momento. La entrada se completará automáticamente en cuanto uno se conecte.",
   "room.waitingHostBanner": "El anfitrión y los administradores de esta sala están desconectados ahora mismo, por lo que aún no se puede admitir a nuevos participantes. Espera a que se conecten o crea tu propia sala.",

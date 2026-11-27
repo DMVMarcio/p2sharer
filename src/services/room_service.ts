@@ -1,10 +1,21 @@
 import { isMobileDevice } from '../core/platform.ts';
 import { logDiagnostic } from '../core/logger.ts';
 import { localizeError, t } from '../i18n/index.ts';
-import { reconcilePinnedRoomSlot, streamOwner, streamSlotKey, type MediaKind, type StreamDescriptor } from "../core/media_streams.ts";
+import {
+  reconcilePinnedRoomSlot,
+  streamOwner,
+  streamSlotKey,
+  type MediaKind,
+  type StreamDescriptor,
+} from '../core/media_streams.ts';
 import { StreamPointerReceiver } from './stream_pointer_receiver.ts';
 import { generateUserColor } from '../p2p/group_room.ts';
-import { validStreamPointer, validStreamPointerState, type StreamPointerState, type StreamPointerPacket } from '../core/stream_pointer.ts';
+import {
+  validStreamPointer,
+  validStreamPointerState,
+  type StreamPointerState,
+  type StreamPointerPacket,
+} from '../core/stream_pointer.ts';
 import { RemoteControlHostManager } from './remote_control_receiver.ts';
 import { profileImages } from '../core/profile_image.ts';
 import {
@@ -43,7 +54,14 @@ import { compareRoomInvites, parseRoomInvite } from '../core/room_invite.ts';
 import { verifyRoomInvite } from '../core/room_invite_validation.ts';
 import { savedRooms } from '../core/saved_rooms.ts';
 import type { ChatMessage, PeerInfo, RoomSlotInfo } from '../core/types.ts';
-import { generateRandomRoomSlug, GroupRoomManager, type RoomCallbacks, type FileProgress, type FileRequest, type NativeChatFile } from '../p2p/group_room.ts';
+import {
+  generateRandomRoomSlug,
+  GroupRoomManager,
+  type RoomCallbacks,
+  type FileProgress,
+  type FileRequest,
+  type NativeChatFile,
+} from '../p2p/group_room.ts';
 import { soundEffects } from '../ui/sound_effects.ts';
 import { NativeVideoBridge } from '../video/native_video_bridge.ts';
 import { MediaCoordinator } from '../p2p/media_coordinator.ts';
@@ -75,8 +93,20 @@ export class RoomService {
   public joinError = '';
   public nativeVideoBridge = new NativeVideoBridge();
   public audioBridge = new AudioBridge();
-  public localCaptures = new Map<string, { sourceId: string; kind: MediaKind; stream: MediaStream;
-    bridge?: NativeVideoBridge; fps: number; resolution: { width: number; height: number }; mouse: boolean; quality: number; bitrate: number }>();
+  public localCaptures = new Map<
+    string,
+    {
+      sourceId: string;
+      kind: MediaKind;
+      stream: MediaStream;
+      bridge?: NativeVideoBridge;
+      fps: number;
+      resolution: { width: number; height: number };
+      mouse: boolean;
+      quality: number;
+      bitrate: number;
+    }
+  >();
   private captureTransition: Promise<void> = Promise.resolve();
 
   public chatMessages: ChatMessage[] = [];
@@ -123,12 +153,14 @@ export class RoomService {
   >();
   private peerSeenCursorImageIds = new Map<string, Set<string>>();
   public readonly remoteControlActivity = new RemoteControlActivityTracker();
-  public roomStatusText: string = t("message.e56841de8c6f");
+  public roomStatusText: string = t('message.e56841de8c6f');
   public connectingOverlay: ConnectingOverlayState = {
     visible: false,
     roomCode: '',
-    get title() { return t("message.ecec62501ea4"); },
-    subtitle: t("message.4077d30835d4"),
+    get title() {
+      return t('message.ecec62501ea4');
+    },
+    subtitle: t('message.4077d30835d4'),
   };
 
   private listeners: Set<Listener> = new Set();
@@ -210,12 +242,18 @@ export class RoomService {
   }
 
   private initFallbackHandler(): void {
-    if (typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window && !new URLSearchParams(window.location.search).has('pip') && !new URLSearchParams(window.location.search).has('pointerOverlay')) {
+    if (
+      typeof window !== 'undefined' &&
+      '__TAURI_INTERNALS__' in window &&
+      !new URLSearchParams(window.location.search).has('pip') &&
+      !new URLSearchParams(window.location.search).has('pointerOverlay')
+    ) {
       void listen<{ peerId: string; packet: StreamPointerPacket }>('stream-pointer-send', ({ payload }) => {
         if (payload && typeof payload.peerId === 'string') this.sendStreamPointer(payload.packet, payload.peerId);
       }).catch(console.warn);
       void listen<{ peerId: string }>('stream-pointer-ready', ({ payload }) => {
-        if (payload && (payload.peerId === 'local' || stateStore.subscribedStreams.has(payload.peerId))) this.publishPointerView(payload.peerId, streamPointerView.state(payload.peerId));
+        if (payload && (payload.peerId === 'local' || stateStore.subscribedStreams.has(payload.peerId)))
+          this.publishPointerView(payload.peerId, streamPointerView.state(payload.peerId));
       }).catch(console.warn);
       void listen<{
         hostBusy?: boolean;
@@ -225,7 +263,10 @@ export class RoomService {
       }>('remote-control-host-priority', ({ payload }) => {
         if (!payload) return;
         let dirty = false;
-        if (typeof payload.hostPriorityEnabled === 'boolean' && payload.hostPriorityEnabled !== this.remoteControlHostPriorityEnabled) {
+        if (
+          typeof payload.hostPriorityEnabled === 'boolean' &&
+          payload.hostPriorityEnabled !== this.remoteControlHostPriorityEnabled
+        ) {
           this.remoteControlHostPriorityEnabled = payload.hostPriorityEnabled;
           dirty = true;
         }
@@ -253,23 +294,15 @@ export class RoomService {
           this.notify();
         },
       ).catch(console.warn);
-      void listen<{ stage?: string }>(
-        'remote-control-gamepad-driver-install',
-        ({ payload }) => {
-          const stage = payload?.stage;
-          if (
-            stage === 'idle' ||
-            stage === 'downloading' ||
-            stage === 'verifying' ||
-            stage === 'installing'
-          ) {
-            if (this.remoteControlGamepadDriverInstallStage !== stage) {
-              this.remoteControlGamepadDriverInstallStage = stage;
-              this.notify();
-            }
+      void listen<{ stage?: string }>('remote-control-gamepad-driver-install', ({ payload }) => {
+        const stage = payload?.stage;
+        if (stage === 'idle' || stage === 'downloading' || stage === 'verifying' || stage === 'installing') {
+          if (this.remoteControlGamepadDriverInstallStage !== stage) {
+            this.remoteControlGamepadDriverInstallStage = stage;
+            this.notify();
           }
-        },
-      ).catch(console.warn);
+        }
+      }).catch(console.warn);
       void listen('remote-control-gamepad-driver-needed', () => {
         if (!this.remoteControlGamepadDriverAvailable && this.remoteControlGamepadDriverInstallStage === 'idle') {
           showToast(t('remoteControl.vigemNeededToast'), 9000, 'warning', {
@@ -383,10 +416,8 @@ export class RoomService {
     }
     this.nativeVideoBridge.onFallbackNeeded = (reason: string, fallbackStream?: MediaStream) => {
       if (fallbackStream) {
-        showToast(t("message.fdd8098529f7", { v0: localizeError(reason) }));
-        const isLive =
-          fallbackStream.active ??
-          fallbackStream.getVideoTracks().some((t) => t.readyState === 'live');
+        showToast(t('message.fdd8098529f7', { v0: localizeError(reason) }));
+        const isLive = fallbackStream.active ?? fallbackStream.getVideoTracks().some((t) => t.readyState === 'live');
         if (isLive) {
           stateStore.set((s) => {
             s.isSharingScreen = true;
@@ -400,7 +431,7 @@ export class RoomService {
             this.roomManager.shareStream(
               fallbackStream,
               stateStore.currentBitrate * 1000,
-              this.nativeVideoBridge.getCurrentFps()
+              this.nativeVideoBridge.getCurrentFps(),
             );
           }
           const videoTrack = fallbackStream.getVideoTracks()[0];
@@ -411,18 +442,22 @@ export class RoomService {
         }
       } else {
         if (reason === 'window_minimized') {
-          showToast(t("message.da9fa69dcc5d"));
+          showToast(t('message.da9fa69dcc5d'));
         } else if (reason === 'window_not_found') {
-          showToast(t("message.52272f3cb20b"));
+          showToast(t('message.52272f3cb20b'));
           this.stopScreenSharing();
         } else {
-          showToast(t("message.c74fa38e13bf", { v0: localizeError(reason) }));
+          showToast(t('message.c74fa38e13bf', { v0: localizeError(reason) }));
         }
       }
     };
   }
 
-  public showConnecting(roomCode: string, title = t("message.ecec62501ea4"), subtitle = t("message.4077d30835d4")): void {
+  public showConnecting(
+    roomCode: string,
+    title = t('message.ecec62501ea4'),
+    subtitle = t('message.4077d30835d4'),
+  ): void {
     this.connectingOverlay = {
       visible: true,
       roomCode,
@@ -443,10 +478,30 @@ export class RoomService {
     }
   }
 
-  public async joinRoom(code: string, pass: string, isCreator: boolean,
-    options: { waitForAdmission?: boolean; preview?: GroupRoomManager; signal?: AbortSignal; saveOnJoin?: boolean } = {}): Promise<void> {
-    const transition = this.roomTransition.then(() => options.signal?.aborted ? undefined :
-      this.joinRoomNow(code, pass, isCreator, options.waitForAdmission !== false, options.preview, options.signal, options.saveOnJoin === true));
+  public async joinRoom(
+    code: string,
+    pass: string,
+    isCreator: boolean,
+    options: {
+      waitForAdmission?: boolean;
+      preview?: GroupRoomManager;
+      signal?: AbortSignal;
+      saveOnJoin?: boolean;
+    } = {},
+  ): Promise<void> {
+    const transition = this.roomTransition.then(() =>
+      options.signal?.aborted
+        ? undefined
+        : this.joinRoomNow(
+            code,
+            pass,
+            isCreator,
+            options.waitForAdmission !== false,
+            options.preview,
+            options.signal,
+            options.saveOnJoin === true,
+          ),
+    );
     this.roomTransition = transition.catch((err) => {
       console.error('[RoomService] Room transition failed:', err);
     });
@@ -467,7 +522,7 @@ export class RoomService {
       this.roomPreview = manager;
       await manager.join(callbacks, true);
     });
-    this.roomTransition = transition.catch(error => console.warn('[Rooms] Discovery failed:', error));
+    this.roomTransition = transition.catch((error) => console.warn('[Rooms] Discovery failed:', error));
     return transition;
   }
 
@@ -476,12 +531,19 @@ export class RoomService {
       await manager.leave();
       if (this.roomPreview === manager) this.roomPreview = null;
     });
-    this.roomTransition = transition.catch(error => console.warn('[Rooms] Discovery cleanup failed:', error));
+    this.roomTransition = transition.catch((error) => console.warn('[Rooms] Discovery cleanup failed:', error));
     return transition;
   }
 
-  private async joinRoomNow(code: string, pass: string, isCreator: boolean, waitForAdmission: boolean,
-    preview?: GroupRoomManager, signal?: AbortSignal, saveOnJoin = false): Promise<void> {
+  private async joinRoomNow(
+    code: string,
+    pass: string,
+    isCreator: boolean,
+    waitForAdmission: boolean,
+    preview?: GroupRoomManager,
+    signal?: AbortSignal,
+    saveOnJoin = false,
+  ): Promise<void> {
     await Promise.allSettled([...this.beforeRoomJoinHooks].map((hook) => hook()));
     if (signal?.aborted) return;
     this.joinOutcome = 'connecting';
@@ -498,19 +560,19 @@ export class RoomService {
     const parsed = await verifyRoomInvite(code);
     if (signal?.aborted) return;
     if (!parsed) {
-      throw new Error(t("message.a07036fbd08c"));
+      throw new Error(t('message.a07036fbd08c'));
     }
     if (!isTauri() && 'connection' in parsed && parsed.connection) throw new Error(t('web.desktopOnly'));
     stateStore.set((s) => {
       s.currentRoomCode = parsed ? parsed.roomId.slice(0, 8) : code;
       s.currentRoomInvite = parsed ? code : '';
-      s.currentRoomName = parsed && parsed.version !== 3 ? parsed.name : parsed?.roomId.slice(0, 8) ?? code;
+      s.currentRoomName = parsed && parsed.version !== 3 ? parsed.name : (parsed?.roomId.slice(0, 8) ?? code);
       s.currentRoomPassword = pass;
       s.isCreator = isCreator;
       s.roomSlots = [
         {
           peerId: 'local',
-          senderName: s.username || t("message.f53bbaa05fae"),
+          senderName: s.username || t('message.f53bbaa05fae'),
           stream: null,
           isStreaming: false,
           isLocal: true,
@@ -537,33 +599,44 @@ export class RoomService {
     this.savedDownloads = {};
     this.localFilePreviews = {};
     this.peers = [];
-    stateStore.set(s => { s.peerNicknameStyles = {}; });
-    this.roomStatusText = t("message.93b8343c85ed");
+    stateStore.set((s) => {
+      s.peerNicknameStyles = {};
+    });
+    this.roomStatusText = t('message.93b8343c85ed');
 
-    this.showConnecting(parsed ? parsed.roomId.slice(0, 8) : code,
-      isCreator ? t("message.5cdbf83a7ecb") : t("message.ecec62501ea4"));
+    this.showConnecting(
+      parsed ? parsed.roomId.slice(0, 8) : code,
+      isCreator ? t('message.5cdbf83a7ecb') : t('message.ecec62501ea4'),
+    );
 
     if (this.roomConnectingTimeout) {
       clearTimeout(this.roomConnectingTimeout);
     }
     // Dismiss the overlay, but keep searching and describe the actual state.
-    this.roomConnectingTimeout = setTimeout(() => {
-      if (!isCreator && this.joinOutcome === 'connecting') {
-        if (this.roomManager && !this.roomManager.hasAdmission() && !this.roomManager.isAdmissionDenied?.()) {
-          this.joinOutcome = 'waiting';
-          this.roomStatusText = t('join.waiting');
-        } else {
-          this.roomStatusText = t("message.5ea38d33d5af");
-          this.joinOutcome = 'error';
-          this.joinError = t('join.timeout');
+    this.roomConnectingTimeout = setTimeout(
+      () => {
+        if (!isCreator && this.joinOutcome === 'connecting') {
+          if (this.roomManager && !this.roomManager.hasAdmission() && !this.roomManager.isAdmissionDenied?.()) {
+            this.joinOutcome = 'waiting';
+            this.roomStatusText = t('join.waiting');
+          } else {
+            this.roomStatusText = t('message.5ea38d33d5af');
+            this.joinOutcome = 'error';
+            this.joinError = t('join.timeout');
+          }
         }
-      }
-      this.hideConnecting();
-      this.notify();
-    }, isCreator ? 3000 : 12000);
+        this.hideConnecting();
+        this.notify();
+      },
+      isCreator ? 3000 : 12000,
+    );
 
-    const reusable = preview && this.roomPreview === preview ? preview :
-      this.roomManager?.canResumeRoom(code) ? this.roomManager : undefined;
+    const reusable =
+      preview && this.roomPreview === preview
+        ? preview
+        : this.roomManager?.canResumeRoom(code)
+          ? this.roomManager
+          : undefined;
     if (this.roomManager && this.roomManager !== reusable) {
       profileStats.setInCall(false);
       const oldManager = this.roomManager;
@@ -576,29 +649,44 @@ export class RoomService {
       }
     }
 
-    const manager = reusable ?? new GroupRoomManager(
-      stateStore.username || t("message.f53bbaa05fae"),
-      code,
-      pass,
-      isCreator,
-      stateStore.getTurnConfig()
-    );
+    const manager =
+      reusable ??
+      new GroupRoomManager(
+        stateStore.username || t('message.f53bbaa05fae'),
+        code,
+        pass,
+        isCreator,
+        stateStore.getTurnConfig(),
+      );
     if (this.roomPreview === manager) this.roomPreview = null;
-    if (signal?.aborted) { await manager.leave(); return; }
+    if (signal?.aborted) {
+      await manager.leave();
+      return;
+    }
     this.roomManager = manager;
     voiceManager.enterRoomMuted();
     manager.setLocalVoiceState({ inVoice: true, muted: true, deafened: false }, null);
     this.syncVoiceSnapshot();
-    roomAppsService.attach((event, target) => manager.sendAppEvent(event, target), manager.getLocalPeerId(),
+    roomAppsService.attach(
+      (event, target) => manager.sendAppEvent(event, target),
+      manager.getLocalPeerId(),
       (action, instance) => {
-        void manager.sendAppLifecycleNotice(action, instance.kind).catch((error) =>
-          console.warn('[Chat] Failed to publish app notice:', error));
-      }, action => {
+        void manager
+          .sendAppLifecycleNotice(action, instance.kind)
+          .catch((error) => console.warn('[Chat] Failed to publish app notice:', error));
+      },
+      (action) => {
         if (action === 'start') soundEffects.playAppStart();
         else soundEffects.playAppStop();
-      }, () => manager.getRtcConfiguration(), actor => manager.canManageRoomApps(actor));
+      },
+      () => manager.getRtcConfiguration(),
+      (actor) => manager.canManageRoomApps(actor),
+    );
 
-    const abort = () => { this.hideConnecting(); void manager.leave(); };
+    const abort = () => {
+      this.hideConnecting();
+      void manager.leave();
+    };
     signal?.addEventListener('abort', abort, { once: true });
     let pendingSaveOnAdmit = saveOnJoin;
     const persistSavedOnAdmission = () => {
@@ -618,7 +706,8 @@ export class RoomService {
           ...existing,
           roomId: currentParsed.roomId,
           invite: resolvedInviteText,
-          name: resolvedParsed.version !== 3 ? resolvedParsed.name : existing?.name ?? currentParsed.roomId.slice(0, 8),
+          name:
+            resolvedParsed.version !== 3 ? resolvedParsed.name : (existing?.name ?? currentParsed.roomId.slice(0, 8)),
           customName: existing?.customName,
           saved: true,
           owned: isCreator || Boolean(existing?.owned),
@@ -627,322 +716,414 @@ export class RoomService {
         });
       })().catch((error) => console.warn('[Rooms] Failed to save room on entry:', error));
     };
-    await manager.join({
-      onFileRequestCancelled: (requestId) => {
-        if (this.roomManager !== manager) return;
-        this.fileRequests = this.fileRequests.filter((request) => request.requestId !== requestId);
-        this.notify();
-      },
-      onFileRequest: (request) => {
-        if (this.roomManager !== manager) return;
-        this.fileRequests = [...this.fileRequests, request];
-        this.notify();
-      },
-      onFileProgress: (progress) => {
-        if (this.roomManager !== manager) return;
-        this.recordFileProgress(progress);
-        if (progress.status === 'error') showToast(t("message.fd2175809652"), 3500, 'error');
-      },
-      onSenderConsumerChange: (mediaId: string, consumerId: string, active: boolean) => {
-        if (this.roomManager === manager) this.setCaptureConsumer(mediaId, consumerId, active);
-      },
-      onStreamPointerState: (snapshot, broadcasterId) => {
-        const slot = stateStore.roomSlots.find((slot) => (slot.ownerPeerId || slot.peerId) === broadcasterId && slot.pointerEligible !== false && (!snapshot.mediaId || slot.mediaId === snapshot.mediaId));
-        if (this.roomManager === manager && slot && stateStore.subscribedStreams.has(slot.peerId)) this.publishPointerView(slot.peerId, snapshot);
-      },
-      onStreamPointer: (packet, peerId) => {
-        if (this.roomManager !== manager) return;
-        const peer = this.peers.find((p) => p.id === peerId);
-        if (peer) this.getPointerReceiver(packet.mediaId).receive(packet, peerId, peer.username, generateUserColor(peer.username));
-      },
-      onRemoteControlClient: (packet, peerId) => {
-        if (this.roomManager !== manager) return;
-        this.remoteControlHost.receiveClientPacket(packet, peerId);
-      },
-      onRemoteControlHost: (packet, broadcasterId) => {
-        if (this.roomManager !== manager) return;
-        this.handleRemoteControlHostPacket(packet, broadcasterId);
-      },
-      onAppEvent: (event, peerId) => {
-        if (this.roomManager === manager) roomAppsService.receive(event, peerId);
-      },
-      onStreamsUpdate: () => {
-        // Handled via onSlotsUpdate to prevent double notification cascades
-      },
-      onSlotsUpdate: (slots: RoomSlotInfo[]) => {
-        if (this.roomManager !== manager) return;
-        const now = Date.now();
-        const currentKeys = new Set(slots.map((slot) => slot.peerId));
-        const previousSlots = stateStore.roomSlots;
-        for (const key of stateStore.subscribedStreams) {
-          if (!currentKeys.has(key)) {
-            audioContextManager.detachPeerAudio(key);
-            const prevSlot = previousSlots.find((slot) => slot.peerId === key);
-            if (prevSlot && !prevSlot.isLocal) {
-              const ownerPeerId = prevSlot.ownerPeerId ?? streamOwner(prevSlot.peerId);
-              // Remember active watch selection briefly so a transient WebRTC hiccup
-              // auto-resumes watching when the peer reconnects seconds later.
-              if (!slots.some((slot) => !slot.isLocal && (slot.ownerPeerId ?? streamOwner(slot.peerId)) === ownerPeerId)) {
-                this.reconnectWatchMemory.set(key, {
-                  ownerPeerId,
-                  mediaKind: prevSlot.mediaKind,
-                  expiresAt: now + 15_000,
-                });
-              }
-            }
-          }
-        }
-        for (const [memKey, mem] of this.reconnectWatchMemory) {
-          if (mem.expiresAt <= now) this.reconnectWatchMemory.delete(memKey);
-        }
-        const restoredWatchKeys: string[] = [];
-        for (const key of stateStore.activePipPeers) if (!currentKeys.has(key)) void pipService.restoreFromPip(key);
-        let viewerStatePruned = false;
-        const nextViewerStates = { ...this.remoteControlViewerStates };
-        for (const key of Object.keys(nextViewerStates)) {
-          const matching = slots.find((slot) => slot.peerId === key);
-          if (!matching || matching.pointerEligible === false || !matching.isStreaming) {
-            delete nextViewerStates[key];
-            viewerStatePruned = true;
-          }
-        }
-        if (viewerStatePruned) this.remoteControlViewerStates = nextViewerStates;
-        stateStore.set((s) => {
-          s.pinnedPeerId = reconcilePinnedRoomSlot(s.pinnedPeerId, s.roomSlots, slots);
-          s.roomSlots = slots;
-          s.localPreviewStreams = Object.fromEntries(Object.entries(s.localPreviewStreams)
-            .filter(([key]) => slots.some((slot) => slot.isLocal && slot.isStreaming && slot.peerId === key)));
-          const nextSubscribed = new Set([...s.subscribedStreams].filter((key) => currentKeys.has(key)));
-          if (this.reconnectWatchMemory.size > 0) {
-            for (const slot of slots) {
-              if (slot.isLocal || !slot.isStreaming || nextSubscribed.has(slot.peerId)) continue;
-              const ownerPeerId = slot.ownerPeerId ?? streamOwner(slot.peerId);
-              let matchedKey: string | null = null;
-              if (this.reconnectWatchMemory.has(slot.peerId)) {
-                matchedKey = slot.peerId;
-              } else {
-                for (const [memKey, mem] of this.reconnectWatchMemory) {
-                  if (mem.ownerPeerId === ownerPeerId && (!mem.mediaKind || mem.mediaKind === slot.mediaKind)) {
-                    matchedKey = memKey;
-                    break;
-                  }
+    await manager.join(
+      {
+        onFileRequestCancelled: (requestId) => {
+          if (this.roomManager !== manager) return;
+          this.fileRequests = this.fileRequests.filter((request) => request.requestId !== requestId);
+          this.notify();
+        },
+        onFileRequest: (request) => {
+          if (this.roomManager !== manager) return;
+          this.fileRequests = [...this.fileRequests, request];
+          this.notify();
+        },
+        onFileProgress: (progress) => {
+          if (this.roomManager !== manager) return;
+          this.recordFileProgress(progress);
+          if (progress.status === 'error') showToast(t('message.fd2175809652'), 3500, 'error');
+        },
+        onSenderConsumerChange: (mediaId: string, consumerId: string, active: boolean) => {
+          if (this.roomManager === manager) this.setCaptureConsumer(mediaId, consumerId, active);
+        },
+        onStreamPointerState: (snapshot, broadcasterId) => {
+          const slot = stateStore.roomSlots.find(
+            (slot) =>
+              (slot.ownerPeerId || slot.peerId) === broadcasterId &&
+              slot.pointerEligible !== false &&
+              (!snapshot.mediaId || slot.mediaId === snapshot.mediaId),
+          );
+          if (this.roomManager === manager && slot && stateStore.subscribedStreams.has(slot.peerId))
+            this.publishPointerView(slot.peerId, snapshot);
+        },
+        onStreamPointer: (packet, peerId) => {
+          if (this.roomManager !== manager) return;
+          const peer = this.peers.find((p) => p.id === peerId);
+          if (peer)
+            this.getPointerReceiver(packet.mediaId).receive(
+              packet,
+              peerId,
+              peer.username,
+              generateUserColor(peer.username),
+            );
+        },
+        onRemoteControlClient: (packet, peerId) => {
+          if (this.roomManager !== manager) return;
+          this.remoteControlHost.receiveClientPacket(packet, peerId);
+        },
+        onRemoteControlHost: (packet, broadcasterId) => {
+          if (this.roomManager !== manager) return;
+          this.handleRemoteControlHostPacket(packet, broadcasterId);
+        },
+        onAppEvent: (event, peerId) => {
+          if (this.roomManager === manager) roomAppsService.receive(event, peerId);
+        },
+        onStreamsUpdate: () => {
+          // Handled via onSlotsUpdate to prevent double notification cascades
+        },
+        onSlotsUpdate: (slots: RoomSlotInfo[]) => {
+          if (this.roomManager !== manager) return;
+          const now = Date.now();
+          const currentKeys = new Set(slots.map((slot) => slot.peerId));
+          const previousSlots = stateStore.roomSlots;
+          for (const key of stateStore.subscribedStreams) {
+            if (!currentKeys.has(key)) {
+              audioContextManager.detachPeerAudio(key);
+              const prevSlot = previousSlots.find((slot) => slot.peerId === key);
+              if (prevSlot && !prevSlot.isLocal) {
+                const ownerPeerId = prevSlot.ownerPeerId ?? streamOwner(prevSlot.peerId);
+                // Remember active watch selection briefly so a transient WebRTC hiccup
+                // auto-resumes watching when the peer reconnects seconds later.
+                if (
+                  !slots.some((slot) => !slot.isLocal && (slot.ownerPeerId ?? streamOwner(slot.peerId)) === ownerPeerId)
+                ) {
+                  this.reconnectWatchMemory.set(key, {
+                    ownerPeerId,
+                    mediaKind: prevSlot.mediaKind,
+                    expiresAt: now + 15_000,
+                  });
                 }
               }
-              if (matchedKey) {
-                this.reconnectWatchMemory.delete(matchedKey);
-                nextSubscribed.add(slot.peerId);
-                restoredWatchKeys.push(slot.peerId);
-              }
             }
           }
-          s.subscribedStreams = nextSubscribed;
-          s.streamOverlays = Object.fromEntries(Object.entries(s.streamOverlays).filter(([target]) => currentKeys.has(target))
-            .map(([target, keys]) => [target, keys.filter((key) => currentKeys.has(key))]));
-        });
-        for (const key of restoredWatchKeys) {
-          manager.watchStream(key);
-        }
-        if (manager.hasAdmission() && (isCreator || slots.some((slot) => !slot.isLocal))) this.hideConnecting();
-      },
-      onChat: (msg: ChatMessage) => {
-        if (this.roomManager !== manager) return;
-        if (shouldNotifyChat(msg, this.chatMessages, manager.getLocalPeerId())) {
-          if (shouldPlayChatSound(document.hasFocus() && !document.hidden, stateStore.isSidebarCollapsed, stateStore.sidebarTab)) {
-            soundEffects.playMessage();
-          }
-          if (stateStore.isSidebarCollapsed || stateStore.sidebarTab !== 'chat') {
-            stateStore.set((state) => { state.unreadChatMessages += 1; });
-          }
-        }
-        this.chatMessages = mergeChatHistory(this.chatMessages, [msg]);
-        if (msg.deletedAt && msg.file) {
-          this.fileRequests = this.fileRequests.filter((request) => request.messageId !== msg.id);
-          const preview = this.imagePreviews[msg.id];
-          if (preview?.startsWith('blob:')) URL.revokeObjectURL(preview);
-          delete this.imagePreviews[msg.id];
-          delete this.imagePreviewBytes[msg.id];
-        }
-        this.notify();
-      },
-      onChatHistory: (messages: ChatMessage[]) => {
-        if (this.roomManager !== manager) return;
-        this.chatMessages = mergeChatHistory(this.chatMessages, messages);
-        this.notify();
-      },
-      onPeersUpdate: (peers: PeerInfo[]) => {
-        if (this.roomManager !== manager) return;
-        profileStats.setInCall(manager.hasAdmission());
-        this.peers = peers;
-        for (const peer of peers) {
-          if (peer.publicKey) {
-            voiceManager.refreshRemotePeerIdentity(peer.id, peer.publicKey, peer.username);
-          }
-        }
-        stateStore.set(s => { s.peerNicknameStyles = Object.fromEntries(peers.filter(peer => peer.nicknameStyle).map(peer => [peer.id, peer.nicknameStyle!])); });
-        if (manager.hasAdmission()) {
-          persistSavedOnAdmission();
-          if (isCreator || peers.some((peer) => peer.connectionState === 'connected')) this.hideConnecting();
-        }
-        this.notify();
-      },
-      onVoiceStateUpdate: (states) => {
-        if (this.roomManager !== manager) return;
-        this.remoteVoiceStates = states;
-        this.syncVoiceSnapshot();
-        this.notify();
-      },
-      onRemoteVoiceStream: (peerId, stream) => {
-        if (this.roomManager !== manager) return;
-        if (!stream || !voiceManager.inVoice) {
-          voiceManager.detachRemoteVoice(peerId);
-          return;
-        }
-        const peer = this.peers.find((p) => p.id === peerId);
-        voiceManager.attachRemoteVoice(peerId, stream, peer?.publicKey, peer?.username);
-      },
-      onPeerJoined: (peer, isInitial) => {
-        if (this.roomManager !== manager) return;
-        roomAppsService.sendSync(peer.id);
-        roomAppsService.requestSync(peer.id);
-        const name = peer.username.trim();
-        if (!isInitial && name) {
-          soundEffects.playUserJoin();
-        }
-      },
-      onPeerLeft: (_peerId, username) => {
-        if (this.roomManager !== manager) return;
-        voiceManager.detachRemoteVoice(_peerId);
-        if (this.remoteVoiceStates[_peerId]) {
-          const next = { ...this.remoteVoiceStates };
-          delete next[_peerId];
-          this.remoteVoiceStates = next;
-          this.syncVoiceSnapshot();
-        }
-        this.fileRequests = this.fileRequests.filter((request) => request.peerId !== _peerId);
-        this.remoteControlHost.forgetPeer(_peerId);
-        this.peerSeenCursorImageIds.delete(_peerId);
-        this.pruneRemoteControlViewerByOwner(_peerId);
-        this.notify();
-        roomAppsService.forgetPeer(_peerId);
-        this.pointerReceiver.forget(_peerId);
-        for (const receiver of this.pointerReceivers.values()) receiver.forget(_peerId);
-        const name = username.trim();
-        if (!name) return;
-        soundEffects.playUserLeave();
-      },
-      onStreamStarted: () => soundEffects.playScreenShareStart(),
-      onStreamStopped: (peerId, _uname, isLocal) => {
-        soundEffects.playScreenShareStop();
-        if (!isLocal) {
-          const owner = streamOwner(peerId);
           for (const [memKey, mem] of this.reconnectWatchMemory) {
-            if (memKey === peerId || mem.ownerPeerId === owner) this.reconnectWatchMemory.delete(memKey);
+            if (mem.expiresAt <= now) this.reconnectWatchMemory.delete(memKey);
           }
-          this.stopRemoteControlViewer(peerId);
-          if (stateStore.subscribedStreams.has(peerId)) {
-            stateStore.set((s) => {
-              s.subscribedStreams.delete(peerId);
-            });
-            this.notify();
+          const restoredWatchKeys: string[] = [];
+          for (const key of stateStore.activePipPeers) if (!currentKeys.has(key)) void pipService.restoreFromPip(key);
+          let viewerStatePruned = false;
+          const nextViewerStates = { ...this.remoteControlViewerStates };
+          for (const key of Object.keys(nextViewerStates)) {
+            const matching = slots.find((slot) => slot.peerId === key);
+            if (!matching || matching.pointerEligible === false || !matching.isStreaming) {
+              delete nextViewerStates[key];
+              viewerStatePruned = true;
+            }
           }
-        }
+          if (viewerStatePruned) this.remoteControlViewerStates = nextViewerStates;
+          stateStore.set((s) => {
+            s.pinnedPeerId = reconcilePinnedRoomSlot(s.pinnedPeerId, s.roomSlots, slots);
+            s.roomSlots = slots;
+            s.localPreviewStreams = Object.fromEntries(
+              Object.entries(s.localPreviewStreams).filter(([key]) =>
+                slots.some((slot) => slot.isLocal && slot.isStreaming && slot.peerId === key),
+              ),
+            );
+            const nextSubscribed = new Set([...s.subscribedStreams].filter((key) => currentKeys.has(key)));
+            if (this.reconnectWatchMemory.size > 0) {
+              for (const slot of slots) {
+                if (slot.isLocal || !slot.isStreaming || nextSubscribed.has(slot.peerId)) continue;
+                const ownerPeerId = slot.ownerPeerId ?? streamOwner(slot.peerId);
+                let matchedKey: string | null = null;
+                if (this.reconnectWatchMemory.has(slot.peerId)) {
+                  matchedKey = slot.peerId;
+                } else {
+                  for (const [memKey, mem] of this.reconnectWatchMemory) {
+                    if (mem.ownerPeerId === ownerPeerId && (!mem.mediaKind || mem.mediaKind === slot.mediaKind)) {
+                      matchedKey = memKey;
+                      break;
+                    }
+                  }
+                }
+                if (matchedKey) {
+                  this.reconnectWatchMemory.delete(matchedKey);
+                  nextSubscribed.add(slot.peerId);
+                  restoredWatchKeys.push(slot.peerId);
+                }
+              }
+            }
+            s.subscribedStreams = nextSubscribed;
+            s.streamOverlays = Object.fromEntries(
+              Object.entries(s.streamOverlays)
+                .filter(([target]) => currentKeys.has(target))
+                .map(([target, keys]) => [target, keys.filter((key) => currentKeys.has(key))]),
+            );
+          });
+          for (const key of restoredWatchKeys) {
+            manager.watchStream(key);
+          }
+          if (manager.hasAdmission() && (isCreator || slots.some((slot) => !slot.isLocal))) this.hideConnecting();
+        },
+        onChat: (msg: ChatMessage) => {
+          if (this.roomManager !== manager) return;
+          if (shouldNotifyChat(msg, this.chatMessages, manager.getLocalPeerId())) {
+            if (
+              shouldPlayChatSound(
+                document.hasFocus() && !document.hidden,
+                stateStore.isSidebarCollapsed,
+                stateStore.sidebarTab,
+              )
+            ) {
+              soundEffects.playMessage();
+            }
+            if (stateStore.isSidebarCollapsed || stateStore.sidebarTab !== 'chat') {
+              stateStore.set((state) => {
+                state.unreadChatMessages += 1;
+              });
+            }
+          }
+          this.chatMessages = mergeChatHistory(this.chatMessages, [msg]);
+          if (msg.deletedAt && msg.file) {
+            this.fileRequests = this.fileRequests.filter((request) => request.messageId !== msg.id);
+            const preview = this.imagePreviews[msg.id];
+            if (preview?.startsWith('blob:')) URL.revokeObjectURL(preview);
+            delete this.imagePreviews[msg.id];
+            delete this.imagePreviewBytes[msg.id];
+          }
+          this.notify();
+        },
+        onChatHistory: (messages: ChatMessage[]) => {
+          if (this.roomManager !== manager) return;
+          this.chatMessages = mergeChatHistory(this.chatMessages, messages);
+          this.notify();
+        },
+        onPeersUpdate: (peers: PeerInfo[]) => {
+          if (this.roomManager !== manager) return;
+          profileStats.setInCall(manager.hasAdmission());
+          this.peers = peers;
+          for (const peer of peers) {
+            if (peer.publicKey) {
+              voiceManager.refreshRemotePeerIdentity(peer.id, peer.publicKey, peer.username);
+            }
+          }
+          stateStore.set((s) => {
+            s.peerNicknameStyles = Object.fromEntries(
+              peers.filter((peer) => peer.nicknameStyle).map((peer) => [peer.id, peer.nicknameStyle!]),
+            );
+          });
+          if (manager.hasAdmission()) {
+            persistSavedOnAdmission();
+            if (isCreator || peers.some((peer) => peer.connectionState === 'connected')) this.hideConnecting();
+          }
+          this.notify();
+        },
+        onVoiceStateUpdate: (states) => {
+          if (this.roomManager !== manager) return;
+          this.remoteVoiceStates = states;
+          this.syncVoiceSnapshot();
+          this.notify();
+        },
+        onRemoteVoiceStream: (peerId, stream) => {
+          if (this.roomManager !== manager) return;
+          if (!stream || !voiceManager.inVoice) {
+            voiceManager.detachRemoteVoice(peerId);
+            return;
+          }
+          const peer = this.peers.find((p) => p.id === peerId);
+          voiceManager.attachRemoteVoice(peerId, stream, peer?.publicKey, peer?.username);
+        },
+        onPeerJoined: (peer, isInitial) => {
+          if (this.roomManager !== manager) return;
+          roomAppsService.sendSync(peer.id);
+          roomAppsService.requestSync(peer.id);
+          const name = peer.username.trim();
+          if (!isInitial && name) {
+            soundEffects.playUserJoin();
+          }
+        },
+        onPeerLeft: (_peerId, username) => {
+          if (this.roomManager !== manager) return;
+          voiceManager.detachRemoteVoice(_peerId);
+          if (this.remoteVoiceStates[_peerId]) {
+            const next = { ...this.remoteVoiceStates };
+            delete next[_peerId];
+            this.remoteVoiceStates = next;
+            this.syncVoiceSnapshot();
+          }
+          this.fileRequests = this.fileRequests.filter((request) => request.peerId !== _peerId);
+          this.remoteControlHost.forgetPeer(_peerId);
+          this.peerSeenCursorImageIds.delete(_peerId);
+          this.pruneRemoteControlViewerByOwner(_peerId);
+          this.notify();
+          roomAppsService.forgetPeer(_peerId);
+          this.pointerReceiver.forget(_peerId);
+          for (const receiver of this.pointerReceivers.values()) receiver.forget(_peerId);
+          const name = username.trim();
+          if (!name) return;
+          soundEffects.playUserLeave();
+        },
+        onStreamStarted: () => soundEffects.playScreenShareStart(),
+        onStreamStopped: (peerId, _uname, isLocal) => {
+          soundEffects.playScreenShareStop();
+          if (!isLocal) {
+            const owner = streamOwner(peerId);
+            for (const [memKey, mem] of this.reconnectWatchMemory) {
+              if (memKey === peerId || mem.ownerPeerId === owner) this.reconnectWatchMemory.delete(memKey);
+            }
+            this.stopRemoteControlViewer(peerId);
+            if (stateStore.subscribedStreams.has(peerId)) {
+              stateStore.set((s) => {
+                s.subscribedStreams.delete(peerId);
+              });
+              this.notify();
+            }
+          }
+        },
+        onWatchStarted: () => {
+          soundEffects.playWatchStreamStart();
+          this.refreshStreamPointerPermissions();
+        },
+        onWatchStopped: (watcherPeerId, _name, broadcasterPeerId) => {
+          if (broadcasterPeerId === 'local' || broadcasterPeerId === manager.getLocalPeerId())
+            this.pointerReceiver.forget(watcherPeerId);
+          if (broadcasterPeerId === 'local' || broadcasterPeerId === manager.getLocalPeerId()) {
+            for (const receiver of this.pointerReceivers.values()) receiver.forget(watcherPeerId);
+          }
+          const owner = streamOwner(broadcasterPeerId);
+          if (owner === 'local' || owner === manager.getLocalPeerId()) {
+            this.peerSeenCursorImageIds.delete(watcherPeerId);
+            const slashIdx = broadcasterPeerId.indexOf('/');
+            if (slashIdx >= 0)
+              this.remoteControlHost.revokeController(watcherPeerId, broadcasterPeerId.slice(slashIdx + 1), 'revoked');
+            else this.remoteControlHost.forgetPeer(watcherPeerId);
+          }
+          soundEffects.playWatchStreamStop();
+        },
+        onStatusChange: (status) => {
+          if (this.roomManager !== manager || signal?.aborted) return;
+          const admitted = manager.hasAdmission();
+          profileStats.setInCall(admitted);
+          const wasWaiting = this.joinOutcome === 'waiting';
+          this.roomStatusText = status;
+          if (admitted) {
+            this.joinOutcome = 'admitted';
+            const effectivePassword = manager.getPassword();
+            if (stateStore.currentRoomPassword !== effectivePassword) {
+              stateStore.set((s) => {
+                s.currentRoomPassword = effectivePassword;
+              });
+            }
+            persistSavedOnAdmission();
+          }
+          if (
+            admitted &&
+            (status.includes('Conectado') ||
+              status === 'Sala Ativa' ||
+              status === 'Ao Vivo' ||
+              status.includes('P2P') ||
+              status.includes('Participante'))
+          ) {
+            this.hideConnecting();
+          } else if (status.startsWith('Senha incorreta')) {
+            if (admitted) {
+              this.notify();
+              return;
+            }
+            const alreadyDenied = this.joinOutcome === 'error' && this.joinError === status;
+            this.joinOutcome = 'error';
+            this.joinError = status;
+            this.hideConnecting();
+            if (wasWaiting && (!modalManager.getActive() || modalManager.getActive() === 'joinRoom')) {
+              this.pendingJoinInvite = code;
+              this.pendingJoinPassword = pass;
+              this.pendingJoinAsOwner = isCreator;
+              this.pendingJoinError = status;
+              this.joinDialogRevision++;
+              modalManager.open('joinRoom');
+            } else if (this.pendingJoinInvite === '' && !alreadyDenied) showToast(status, 5000);
+          } else if (status.startsWith('Erro') || status === t('lan.connectFailed')) {
+            this.joinOutcome = 'error';
+            this.joinError = status;
+            this.hideConnecting();
+            if (wasWaiting && (!modalManager.getActive() || modalManager.getActive() === 'joinRoom')) {
+              this.pendingJoinInvite = code;
+              this.pendingJoinPassword = pass;
+              this.pendingJoinAsOwner = isCreator;
+              this.pendingJoinError = status;
+              this.joinDialogRevision++;
+              modalManager.open('joinRoom');
+            } else if (this.pendingJoinInvite === '') showToast(status, 5000);
+          }
+          this.notify();
+        },
+        onPasswordChange: (newPassword, updatedBy) => {
+          if (this.roomManager !== manager) return;
+          stateStore.set((s) => {
+            s.currentRoomPassword = newPassword;
+          });
+          showToast(t('message.6fef198fc542', { v0: updatedBy }), 3500, 'success');
+          if (parsed) {
+            const nextPassword = newPassword || undefined;
+            void savedRooms
+              .get(parsed.roomId)
+              .then((record) => {
+                if (record)
+                  return savedRooms.put({
+                    ...record,
+                    protected: Boolean(nextPassword),
+                    password: record.owned || record.password !== undefined ? nextPassword : undefined,
+                  });
+              })
+              .catch((error) => console.warn('[Rooms] Failed to refresh saved password:', error));
+          }
+          this.notify();
+        },
+        onHostChange: (isLocalHost) => {
+          if (this.roomManager !== manager) return;
+          stateStore.set((s) => {
+            s.isCreator = isLocalHost;
+          });
+          this.notify();
+        },
+        onInviteChange: (invite, name) => {
+          if (this.roomManager !== manager) return;
+          stateStore.set((s) => {
+            s.currentRoomInvite = invite;
+            s.currentRoomName = name;
+          });
+        },
       },
-      onWatchStarted: () => {
-        soundEffects.playWatchStreamStart();
-        this.refreshStreamPointerPermissions();
-      },
-      onWatchStopped: (watcherPeerId, _name, broadcasterPeerId) => {
-        if (broadcasterPeerId === 'local' || broadcasterPeerId === manager.getLocalPeerId()) this.pointerReceiver.forget(watcherPeerId);
-        if (broadcasterPeerId === 'local' || broadcasterPeerId === manager.getLocalPeerId()) {
-          for (const receiver of this.pointerReceivers.values()) receiver.forget(watcherPeerId);
-        }
-        const owner = streamOwner(broadcasterPeerId);
-        if (owner === 'local' || owner === manager.getLocalPeerId()) {
-          this.peerSeenCursorImageIds.delete(watcherPeerId);
-          const slashIdx = broadcasterPeerId.indexOf('/');
-          if (slashIdx >= 0) this.remoteControlHost.revokeController(watcherPeerId, broadcasterPeerId.slice(slashIdx + 1), 'revoked');
-          else this.remoteControlHost.forgetPeer(watcherPeerId);
-        }
-        soundEffects.playWatchStreamStop();
-      },
-      onStatusChange: (status) => {
-        if (this.roomManager !== manager || signal?.aborted) return;
-        profileStats.setInCall(manager.hasAdmission());
-        const wasWaiting = this.joinOutcome === 'waiting';
-        this.roomStatusText = status;
-        if (manager.hasAdmission()) {
-          this.joinOutcome = 'admitted';
-          persistSavedOnAdmission();
-        }
-        if (manager.hasAdmission() && (
-          status.includes('Conectado') ||
-          status === 'Sala Ativa' ||
-          status === 'Ao Vivo' ||
-          status.includes('P2P') ||
-          status.includes('Participante')
-        )) {
-          this.hideConnecting();
-        } else if (status.startsWith('Erro') || status.startsWith('Senha incorreta') || status === t('lan.connectFailed')) {
-          this.joinOutcome = 'error';
-          this.joinError = status;
-          this.hideConnecting();
-          if (wasWaiting && (!modalManager.getActive() || modalManager.getActive() === 'joinRoom')) {
-            this.pendingJoinInvite = code;
-            this.pendingJoinPassword = pass;
-            this.pendingJoinAsOwner = isCreator;
-            this.pendingJoinError = status;
-            this.joinDialogRevision++;
-            modalManager.open('joinRoom');
-          } else if (this.pendingJoinInvite === '') showToast(status, 5000);
-        }
-        this.notify();
-      },
-      onPasswordChange: (newPassword, updatedBy) => {
-        if (this.roomManager !== manager) return;
-        stateStore.set((s) => {
-          s.currentRoomPassword = newPassword;
-        });
-        showToast(t("message.6fef198fc542", { v0: updatedBy }), 3500, 'success');
-        if (parsed) {
-          void savedRooms.get(parsed.roomId).then((record) => {
-            if (record) return savedRooms.put({ ...record, protected: Boolean(newPassword),
-              password: record.password !== undefined ? newPassword : undefined });
-          }).catch((error) => console.warn('[Rooms] Failed to refresh saved password:', error));
-        }
-        this.notify();
-      },
-      onHostChange: (isLocalHost) => {
-        if (this.roomManager !== manager) return;
-        stateStore.set((s) => { s.isCreator = isLocalHost; });
-        this.notify();
-      },
-      onInviteChange: (invite, name) => {
-        if (this.roomManager !== manager) return;
-        stateStore.set((s) => {
-          s.currentRoomInvite = invite;
-          s.currentRoomName = name;
-        });
-      },
-    }, false, pass);
+      false,
+      pass,
+    );
     signal?.removeEventListener('abort', abort);
     if (signal?.aborted) return;
 
     if (this.roomManager === manager) {
       profileStats.setInCall(manager.hasAdmission());
-      if (manager.hasAdmission()) persistSavedOnAdmission();
+      if (manager.hasAdmission()) {
+        const effectivePassword = manager.getPassword();
+        if (stateStore.currentRoomPassword !== effectivePassword) {
+          stateStore.set((s) => {
+            s.currentRoomPassword = effectivePassword;
+          });
+        }
+        persistSavedOnAdmission();
+      }
     }
 
     if (!waitForAdmission && this.roomManager === manager && this.joinOutcome === 'connecting') {
       this.joinOutcome = 'waiting';
       this.roomStatusText = t('join.waiting');
       this.hideConnecting();
-    } else if (waitForAdmission && !isCreator && this.roomManager === manager && this.joinOutcome === 'connecting' &&
-        !manager.hasAdmission() && !manager.isAdmissionDenied?.() &&
-        manager.hasVerifiedPreviewMembers?.() && !manager.hasAdmitterOnline?.()) {
+    } else if (
+      waitForAdmission &&
+      !isCreator &&
+      this.roomManager === manager &&
+      this.joinOutcome === 'connecting' &&
+      !manager.hasAdmission() &&
+      !manager.isAdmissionDenied?.() &&
+      manager.hasVerifiedPreviewMembers?.() &&
+      !manager.hasAdmitterOnline?.()
+    ) {
       if (this.roomConnectingTimeout) clearTimeout(this.roomConnectingTimeout);
       this.roomConnectingTimeout = setTimeout(() => {
-        if (this.roomManager === manager && this.joinOutcome === 'connecting' &&
-            !manager.hasAdmission() && !manager.isAdmissionDenied?.()) {
+        if (
+          this.roomManager === manager &&
+          this.joinOutcome === 'connecting' &&
+          !manager.hasAdmission() &&
+          !manager.isAdmissionDenied?.()
+        ) {
           this.joinOutcome = 'waiting';
           this.roomStatusText = t('join.waiting');
           this.hideConnecting();
@@ -965,15 +1146,19 @@ export class RoomService {
     if (!mediaId) return this.pointerReceiver;
     let receiver = this.pointerReceivers.get(mediaId);
     if (!receiver) {
-      receiver = new StreamPointerReceiver((snapshot) => {
-        const state = { ...snapshot, mediaId };
-        this.roomManager?.sendStreamPointerState(state);
-        const slot = stateStore.roomSlots.find(slot => slot.isLocal && slot.mediaId === mediaId);
-        if (slot) this.publishPointerView(slot.peerId, state);
-      }, async (visuals, drawingsIncluded) => {
-        const sessionId = this.localCaptures.get(mediaId)?.bridge?.sessionId;
-        if (isTauri() && sessionId) await invoke('update_stream_pointer_overlay', { visuals, sessionId, drawingsIncluded });
-      });
+      receiver = new StreamPointerReceiver(
+        (snapshot) => {
+          const state = { ...snapshot, mediaId };
+          this.roomManager?.sendStreamPointerState(state);
+          const slot = stateStore.roomSlots.find((slot) => slot.isLocal && slot.mediaId === mediaId);
+          if (slot) this.publishPointerView(slot.peerId, state);
+        },
+        async (visuals, drawingsIncluded) => {
+          const sessionId = this.localCaptures.get(mediaId)?.bridge?.sessionId;
+          if (isTauri() && sessionId)
+            await invoke('update_stream_pointer_overlay', { visuals, sessionId, drawingsIncluded });
+        },
+      );
       this.pointerReceivers.set(mediaId, receiver);
     }
     return receiver;
@@ -982,8 +1167,11 @@ export class RoomService {
   private remoteControlHost = new RemoteControlHostManager({
     isHostSupported: () => isTauri() && !isMobileDevice(),
     getScreenStream: (mediaId) => {
-      const entry = this.localCaptures.get(mediaId) ??
-        (mediaId === 'default' ? Array.from(this.localCaptures.values()).find((capture) => capture.kind === 'screen') : undefined);
+      const entry =
+        this.localCaptures.get(mediaId) ??
+        (mediaId === 'default'
+          ? Array.from(this.localCaptures.values()).find((capture) => capture.kind === 'screen')
+          : undefined);
       if (!entry || entry.kind !== 'screen') return null;
       return { sessionId: entry.bridge?.sessionId, cursorCaptured: entry.mouse };
     },
@@ -1097,11 +1285,14 @@ export class RoomService {
       ) {
         slot.pending = null;
       }
-      return invoke<{ accepted: boolean; hostBusy: boolean; elevationBlocked?: boolean }>('apply_remote_control_input', {
-        controllerId,
-        sessionId,
-        event,
-      }).catch((err) => {
+      return invoke<{ accepted: boolean; hostBusy: boolean; elevationBlocked?: boolean }>(
+        'apply_remote_control_input',
+        {
+          controllerId,
+          sessionId,
+          event,
+        },
+      ).catch((err) => {
         console.warn('[RemoteControl] apply_remote_control_input failed:', err);
         return { accepted: false, hostBusy: false, elevationBlocked: false };
       });
@@ -1128,11 +1319,14 @@ export class RoomService {
       nextEvent: RemoteInputEvent,
     ): Promise<{ accepted: boolean; hostBusy: boolean; elevationBlocked?: boolean }> => {
       slot!.inFlight = true;
-      const req = invoke<{ accepted: boolean; hostBusy: boolean; elevationBlocked?: boolean }>('apply_remote_control_input', {
-        controllerId,
-        sessionId: nextSessionId,
-        event: nextEvent,
-      })
+      const req = invoke<{ accepted: boolean; hostBusy: boolean; elevationBlocked?: boolean }>(
+        'apply_remote_control_input',
+        {
+          controllerId,
+          sessionId: nextSessionId,
+          event: nextEvent,
+        },
+      )
         .catch((err) => {
           console.warn('[RemoteControl] apply_remote_control_input move failed:', err);
           return { accepted: false, hostBusy: false, elevationBlocked: false };
@@ -1275,7 +1469,8 @@ export class RoomService {
           imageId: packet.imageId ?? '',
           mouseLocked: Boolean(packet.mouseLocked),
           hostBusy: packet.hostBusy,
-          elevationBlocked: Boolean(packet.elevationBlocked) && !this.remoteControlViewerStates[targetKey]?.adminEnabled,
+          elevationBlocked:
+            Boolean(packet.elevationBlocked) && !this.remoteControlViewerStates[targetKey]?.adminEnabled,
           actorPeerId: packet.actorPeerId,
           embeddedInVideo: packet.embeddedInVideo,
           updatedAt: Date.now(),
@@ -1286,7 +1481,7 @@ export class RoomService {
     }
 
     const existingEntry = slot
-      ? [slot.peerId, this.remoteControlViewerStates[slot.peerId]] as const
+      ? ([slot.peerId, this.remoteControlViewerStates[slot.peerId]] as const)
       : Object.entries(this.remoteControlViewerStates).find(
           ([, value]) => value.hostPeerId === broadcasterId && value.mediaId === packet.mediaId,
         );
@@ -1390,7 +1585,8 @@ export class RoomService {
 
   public toggleRemoteControlRequest(slotPeerId: string): void {
     const slot = stateStore.roomSlots.find((candidate) => candidate.peerId === slotPeerId);
-    if (!slot || slot.isLocal || slot.pointerEligible === false || !stateStore.subscribedStreams.has(slotPeerId)) return;
+    if (!slot || slot.isLocal || slot.pointerEligible === false || !stateStore.subscribedStreams.has(slotPeerId))
+      return;
     const current = this.remoteControlViewerStates[slotPeerId];
     const mediaId = slot.mediaId || 'default';
     const hostPeerId = streamOwner(slotPeerId);
@@ -1479,7 +1675,10 @@ export class RoomService {
         adminRequestPending: true,
       },
     };
-    this.roomManager?.sendRemoteControlClient({ type: 'requestElevation', mediaId: current.mediaId }, current.hostPeerId);
+    this.roomManager?.sendRemoteControlClient(
+      { type: 'requestElevation', mediaId: current.mediaId },
+      current.hostPeerId,
+    );
     this.notify();
   }
 
@@ -1493,7 +1692,10 @@ export class RoomService {
         adminRequestPending: false,
       },
     };
-    this.roomManager?.sendRemoteControlClient({ type: 'cancelElevation', mediaId: current.mediaId }, current.hostPeerId);
+    this.roomManager?.sendRemoteControlClient(
+      { type: 'cancelElevation', mediaId: current.mediaId },
+      current.hostPeerId,
+    );
     this.notify();
   }
 
@@ -1509,11 +1711,7 @@ export class RoomService {
     return this.remoteControlHost.answerElevationRequest(requestId, accept);
   }
 
-  public async setRemoteControllerAdminPermission(
-    peerId: string,
-    mediaId: string,
-    enabled: boolean,
-  ): Promise<boolean> {
+  public async setRemoteControllerAdminPermission(peerId: string, mediaId: string, enabled: boolean): Promise<boolean> {
     return this.remoteControlHost.setControllerAdminPermission(peerId, mediaId, enabled);
   }
 
@@ -1675,20 +1873,30 @@ export class RoomService {
 
   public refreshStreamPointerPermissions(): void {
     this.pointerReceiver.refreshPermissions();
-    for (const [id, entry] of this.localCaptures) if (entry.kind === 'screen') this.getPointerReceiver(id).refreshPermissions();
+    for (const [id, entry] of this.localCaptures)
+      if (entry.kind === 'screen') this.getPointerReceiver(id).refreshPermissions();
   }
 
   public refreshStreamPointerView(peerId: string): void {
-    if (peerId !== 'local' && stateStore.subscribedStreams.has(peerId)) this.sendStreamPointer({ kind: 'sync' }, peerId);
+    if (peerId !== 'local' && stateStore.subscribedStreams.has(peerId))
+      this.sendStreamPointer({ kind: 'sync' }, peerId);
     this.publishPointerView(peerId, streamPointerView.state(peerId));
   }
 
   private publishPointerView(peerId: string, snapshot: StreamPointerState): void {
     if (!validStreamPointerState(snapshot)) return;
-    const identity = { localPeerId: this.roomManager?.getLocalPeerId() ?? '', name: stateStore.username, color: generateUserColor(stateStore.username) };
+    const identity = {
+      localPeerId: this.roomManager?.getLocalPeerId() ?? '',
+      name: stateStore.username,
+      color: generateUserColor(stateStore.username),
+    };
     streamPointerView.set(peerId, snapshot, identity);
     if (stateStore.activePipPeers.has(peerId)) {
-      void emitTo(`pip-${peerId.replace(/[^a-zA-Z0-9_-]/g, '_')}`, 'stream-pointer-view', { peerId, snapshot, identity }).catch(console.warn);
+      void emitTo(`pip-${peerId.replace(/[^a-zA-Z0-9_-]/g, '_')}`, 'stream-pointer-view', {
+        peerId,
+        snapshot,
+        identity,
+      }).catch(console.warn);
     }
   }
 
@@ -1711,75 +1919,148 @@ export class RoomService {
     this.audioBridge.stop();
   }
 
-  public startCapture(sourceId: string, fps: number, res: { width: number; height: number },
-    mouse: boolean, quality = 90, label?: string,
+  public startCapture(
+    sourceId: string,
+    fps: number,
+    res: { width: number; height: number },
+    mouse: boolean,
+    quality = 90,
+    label?: string,
     prepared?: { sourceId: string; stream: MediaStream; bridge?: NativeVideoBridge },
-    bitrate = stateStore.currentBitrate): Promise<void> {
+    bitrate = stateStore.currentBitrate,
+  ): Promise<void> {
     const editingId = stateStore.editingStreamId;
     const captureStarted = performance.now();
-    console.info('[RoomService] Capture transition requested', { sourceId, editingId, fps, resolution: res, bitrate,
-      prepared: !!prepared, nativeSession: prepared?.bridge?.sessionId });
+    console.info('[RoomService] Capture transition requested', {
+      sourceId,
+      editingId,
+      fps,
+      resolution: res,
+      bitrate,
+      prepared: !!prepared,
+      nativeSession: prepared?.bridge?.sessionId,
+    });
     const manager = this.roomManager;
     const task = this.captureTransition.then(async () => {
-      if (!manager || manager !== this.roomManager) throw new Error(t("message.bf66db69d5a4"));
-      if (prepared && prepared.sourceId !== sourceId) throw new Error(t("message.fd5594ea5b0a"));
+      if (!manager || manager !== this.roomManager) throw new Error(t('message.bf66db69d5a4'));
+      if (prepared && prepared.sourceId !== sourceId) throw new Error(t('message.fd5594ea5b0a'));
       const previous = editingId ? this.localCaptures.get(editingId) : undefined;
-      if (editingId && !previous) throw new Error(t("message.114345ccaf14"));
-      if (!previous && this.localCaptures.size >= 16) throw new Error(t("message.00499022bcb0"));
+      if (editingId && !previous) throw new Error(t('message.114345ccaf14'));
+      if (!previous && this.localCaptures.size >= 16) throw new Error(t('message.00499022bcb0'));
       const kind: MediaKind = sourceId.startsWith('camera:') ? 'camera' : 'screen';
-      if (previous && kind !== previous.kind) throw new Error(t("message.eae4d3abfdf0"));
+      if (previous && kind !== previous.kind) throw new Error(t('message.eae4d3abfdf0'));
       if (previous && kind === 'camera' && sourceId === previous.sourceId && !prepared) {
-        await previous.stream.getVideoTracks()[0].applyConstraints({ width: { ideal: res.width }, height: { ideal: res.height },
-          frameRate: { ideal: fps, max: fps } });
+        await previous.stream.getVideoTracks()[0].applyConstraints({
+          width: { ideal: res.width },
+          height: { ideal: res.height },
+          frameRate: { ideal: fps, max: fps },
+        });
         manager.updateMediaSettings(editingId!, fps, bitrate);
         Object.assign(previous, { fps, bitrate, resolution: res, quality, mouse });
         this.syncCaptureState();
-        console.info('[RoomService] Camera edit applied', { sourceId, mediaId: editingId, settings: previous.stream.getVideoTracks()[0].getSettings(), elapsedMs: Math.round(performance.now() - captureStarted) });
-        showToast(t("message.d1943a972148"), 3500, 'success');
+        console.info('[RoomService] Camera edit applied', {
+          sourceId,
+          mediaId: editingId,
+          settings: previous.stream.getVideoTracks()[0].getSettings(),
+          elapsedMs: Math.round(performance.now() - captureStarted),
+        });
+        showToast(t('message.d1943a972148'), 3500, 'success');
         return;
       }
       const id = editingId || crypto.randomUUID();
-      const bridge = prepared?.bridge || (isTauri() && kind === 'screen' ? new NativeVideoBridge(crypto.randomUUID()) : undefined);
+      const bridge =
+        prepared?.bridge || (isTauri() && kind === 'screen' ? new NativeVideoBridge(crypto.randomUUID()) : undefined);
       let stream: MediaStream | undefined;
       let acquiredAudio: MediaStreamTrack | null = null;
       try {
-        if (!this.localCaptures.size) await MediaCoordinator.prepareCodecPreferences(res.width, res.height, fps, bitrate * 1000);
-        stream = prepared?.stream || (bridge ? await bridge.startCapture(sourceId, fps, res, mouse, quality) :
-          await navigator.mediaDevices.getUserMedia({ audio: false, video: {
-            ...(sourceId.slice(7) ? { deviceId: { exact: sourceId.slice(7) } } : {}),
-            width: { ideal: res.width }, height: { ideal: res.height }, frameRate: { ideal: fps, max: fps },
-          } }));
-        if (manager !== this.roomManager) throw new Error(t("message.bf66db69d5a4"));
+        if (!this.localCaptures.size)
+          await MediaCoordinator.prepareCodecPreferences(res.width, res.height, fps, bitrate * 1000);
+        stream =
+          prepared?.stream ||
+          (bridge
+            ? await bridge.startCapture(sourceId, fps, res, mouse, quality)
+            : await navigator.mediaDevices.getUserMedia({
+                audio: false,
+                video: {
+                  ...(sourceId.slice(7) ? { deviceId: { exact: sourceId.slice(7) } } : {}),
+                  width: { ideal: res.width },
+                  height: { ideal: res.height },
+                  frameRate: { ideal: fps, max: fps },
+                },
+              }));
+        if (manager !== this.roomManager) throw new Error(t('message.bf66db69d5a4'));
         const track = stream.getVideoTracks()[0];
-        if (!track || track.readyState === 'ended') throw new Error(t("message.06ca1dffe31a"));
+        if (!track || track.readyState === 'ended') throw new Error(t('message.06ca1dffe31a'));
         // Keep the capture bridge's track container separate from the broadcast container.
         // Live replacement mutates only the latter; disposing the old bridge must not stop the new track.
         if (!previous) stream = new MediaStream(stream.getTracks());
         track.contentHint = kind === 'camera' ? 'motion' : 'detail';
-        const hasAudioTrack = kind === 'screen' && isTauri() &&
+        const hasAudioTrack =
+          kind === 'screen' &&
+          isTauri() &&
           !Array.from(this.localCaptures.values()).some((entry) => entry.kind === 'screen');
         if (!previous && hasAudioTrack) {
-          acquiredAudio = await this.audioBridge.startCapture(stateStore.isAudioFilterFullAudio ? 'full' : stateStore.selectedFilterMode,
+          acquiredAudio = await this.audioBridge.startCapture(
+            stateStore.isAudioFilterFullAudio ? 'full' : stateStore.selectedFilterMode,
             stateStore.isAudioFilterFullAudio ? [] : stateStore.getActiveFilterPids(),
             stateStore.isAudioFilterFullAudio ? [] : stateStore.getActiveFilterNames(),
-            stateStore.isAudioFilterFullAudio ? [] : stateStore.getActiveFilterSubKeys());
+            stateStore.isAudioFilterFullAudio ? [] : stateStore.getActiveFilterSubKeys(),
+          );
           if (acquiredAudio) stream.addTrack(acquiredAudio);
         }
-        const descriptor: StreamDescriptor = { id, kind, get label() { return (label || (kind === 'camera' ? t("message.dafb61aca12d") :
-          sourceId.startsWith('window:') ? t("message.28014ef35252") : t("message.2d31efc9c2ed"))).slice(0, 200); }, videoTrackId: track.id, fps, bitrate,
-          hasAudio: previous ? previous.stream.getAudioTracks().length > 0 : Boolean(acquiredAudio || stream.getAudioTracks().length > 0) };
+        const descriptor: StreamDescriptor = {
+          id,
+          kind,
+          get label() {
+            return (
+              label ||
+              (kind === 'camera'
+                ? t('message.dafb61aca12d')
+                : sourceId.startsWith('window:')
+                  ? t('message.28014ef35252')
+                  : t('message.2d31efc9c2ed'))
+            ).slice(0, 200);
+          },
+          videoTrackId: track.id,
+          fps,
+          bitrate,
+          hasAudio: previous
+            ? previous.stream.getAudioTracks().length > 0
+            : Boolean(acquiredAudio || stream.getAudioTracks().length > 0),
+        };
         const slotPreviewKey = streamSlotKey('local', id);
         const initialPreview = Boolean(
           stateStore.localPreviewStreams[slotPreviewKey] ??
           stateStore.localPreviewStreams[id] ??
           stateStore.localPreviewStreams['local'] ??
-          (kind === 'camera')
+          kind === 'camera',
         );
-        let capture: { sourceId: string; kind: MediaKind; stream: MediaStream;
-          bridge?: NativeVideoBridge; fps: number; resolution: { width: number; height: number }; mouse: boolean; quality: number; bitrate: number } | undefined;
+        let capture:
+          | {
+              sourceId: string;
+              kind: MediaKind;
+              stream: MediaStream;
+              bridge?: NativeVideoBridge;
+              fps: number;
+              resolution: { width: number; height: number };
+              mouse: boolean;
+              quality: number;
+              bitrate: number;
+            }
+          | undefined;
         try {
           if (previous) {
-            capture = { sourceId, kind, stream: previous.stream, bridge, fps, resolution: res, mouse, quality, bitrate };
+            capture = {
+              sourceId,
+              kind,
+              stream: previous.stream,
+              bridge,
+              fps,
+              resolution: res,
+              mouse,
+              quality,
+              bitrate,
+            };
             this.localCaptures.set(id, capture);
             bridge?.setConsumerActive('local-preview', initialPreview);
             await manager.replaceMediaTrack(id, track, descriptor);
@@ -1799,16 +2080,32 @@ export class RoomService {
             if (prepared?.bridge) prepared.bridge.setConsumerActive('modal-preview', false);
             bridge?.requestKeyframe();
           }
-          track.onended = () => { if (this.localCaptures.get(id) === capture) this.stopTransmission(id); };
-          if (bridge) bridge.onFallbackNeeded = () => {
-            if (this.localCaptures.get(id) === capture) { showToast(t("message.e018f7492e19")); this.stopTransmission(id); }
+          track.onended = () => {
+            if (this.localCaptures.get(id) === capture) this.stopTransmission(id);
           };
+          if (bridge)
+            bridge.onFallbackNeeded = () => {
+              if (this.localCaptures.get(id) === capture) {
+                showToast(t('message.e018f7492e19'));
+                this.stopTransmission(id);
+              }
+            };
           if (previous?.bridge) await previous.bridge.stopCapture();
-          if (previous && !previous.bridge) previous.stream.getVideoTracks().filter((item) => item !== track).forEach((item) => item.stop());
+          if (previous && !previous.bridge)
+            previous.stream
+              .getVideoTracks()
+              .filter((item) => item !== track)
+              .forEach((item) => item.stop());
           this.syncCaptureState();
-          console.info('[RoomService] Capture published', { sourceId, mediaId: id, kind,
-            nativeSession: bridge?.sessionId, settings: track.getSettings(), elapsedMs: Math.round(performance.now() - captureStarted) });
-          showToast(previous ? t("message.d1943a972148") : t("message.3c3d7ea79d61"));
+          console.info('[RoomService] Capture published', {
+            sourceId,
+            mediaId: id,
+            kind,
+            nativeSession: bridge?.sessionId,
+            settings: track.getSettings(),
+            elapsedMs: Math.round(performance.now() - captureStarted),
+          });
+          showToast(previous ? t('message.d1943a972148') : t('message.3c3d7ea79d61'));
         } catch (innerError) {
           if (previous && this.localCaptures.get(id) === capture) {
             this.localCaptures.set(id, previous);
@@ -1826,13 +2123,21 @@ export class RoomService {
         }
         if (bridge) await bridge.stopCapture();
         else if (stream && stream !== previous?.stream) stream.getTracks().forEach((track) => track.stop());
-        showToast(t("message.5a1156df731c", { v0: localizeError(error) }), 3500, 'error');
+        showToast(t('message.5a1156df731c', { v0: localizeError(error) }), 3500, 'error');
         throw error;
       }
     });
     this.captureTransition = task.catch(async (error) => {
-      console.error('[RoomService] Capture transition failed', { sourceId, editingId, fps, resolution: res, bitrate,
-        nativeSession: prepared?.bridge?.sessionId, elapsedMs: Math.round(performance.now() - captureStarted), error });
+      console.error('[RoomService] Capture transition failed', {
+        sourceId,
+        editingId,
+        fps,
+        resolution: res,
+        bitrate,
+        nativeSession: prepared?.bridge?.sessionId,
+        elapsedMs: Math.round(performance.now() - captureStarted),
+        error,
+      });
       if (prepared?.bridge) await prepared.bridge.stopCapture();
       else prepared?.stream.getTracks().forEach((track) => track.stop());
     });
@@ -1847,7 +2152,8 @@ export class RoomService {
       }
     });
     const screen = Array.from(this.localCaptures.values()).find((entry) => entry.kind === 'screen');
-    if (isTauri()) void invoke('select_pointer_capture', { sessionId: screen?.bridge?.sessionId || null }).catch(console.warn);
+    if (isTauri())
+      void invoke('select_pointer_capture', { sessionId: screen?.bridge?.sessionId || null }).catch(console.warn);
     for (const [id, entry] of this.localCaptures) {
       if (entry.kind === 'screen') this.remoteControlHost.notifyStreamUpdated(id);
     }
@@ -1883,7 +2189,9 @@ export class RoomService {
   }
 
   public editTransmission(id: string) {
-    stateStore.set((state) => { state.editingStreamId = id; });
+    stateStore.set((state) => {
+      state.editingStreamId = id;
+    });
   }
 
   public setCaptureConsumer(key: string | MediaStream, consumerId: string, active: boolean): void {
@@ -1899,14 +2207,24 @@ export class RoomService {
     if (stateStore.layoutMode !== 'spotlight' || !target || target === key) return;
     if (!stateStore.roomSlots.find((slot) => slot.peerId === target)?.isStreaming) return;
     if (!stateStore.roomSlots.find((slot) => slot.peerId === key)?.isLocal) this.requestStream(key);
-    stateStore.set((state) => { state.streamOverlays = { ...state.streamOverlays,
-      [target]: [...new Set([...(state.streamOverlays[target] || []), key])] }; });
+    stateStore.set((state) => {
+      state.streamOverlays = {
+        ...state.streamOverlays,
+        [target]: [...new Set([...(state.streamOverlays[target] || []), key])],
+      };
+    });
   }
 
   public removeOverlay(target: string, key: string) {
     stateStore.set((state) => {
-      state.streamOverlays = { ...state.streamOverlays, [target]: (state.streamOverlays[target] || []).filter((id) => id !== key) };
-      state.dismissedAutoOverlays = { ...state.dismissedAutoOverlays, [target]: [...new Set([...(state.dismissedAutoOverlays[target] || []), key])] };
+      state.streamOverlays = {
+        ...state.streamOverlays,
+        [target]: (state.streamOverlays[target] || []).filter((id) => id !== key),
+      };
+      state.dismissedAutoOverlays = {
+        ...state.dismissedAutoOverlays,
+        [target]: [...new Set([...(state.dismissedAutoOverlays[target] || []), key])],
+      };
     });
   }
 
@@ -2001,16 +2319,20 @@ export class RoomService {
     this.localSaveIds.clear();
     this.cancelledLocalSaves.clear();
     this.peers = [];
-    stateStore.set(s => { s.peerNicknameStyles = {}; });
+    stateStore.set((s) => {
+      s.peerNicknameStyles = {};
+    });
     this.hideConnecting();
-    showToast(t("message.b520e8324025"));
+    showToast(t('message.b520e8324025'));
     this.notify();
   }
 
   public sendChatMessage(text: string, replyToId?: string): void {
     if (!text.trim() || !this.roomManager) return;
-    void this.roomManager.sendChatMessage(text.trim(), replyToId).then(() => profileStats.messageSent()).catch((error) =>
-      console.warn('[Chat] Failed to sign or send message:', error));
+    void this.roomManager
+      .sendChatMessage(text.trim(), replyToId)
+      .then(() => profileStats.messageSent())
+      .catch((error) => console.warn('[Chat] Failed to sign or send message:', error));
   }
 
   public async offerFile(file: NativeChatFile, name: string, autoAccept: boolean): Promise<void> {
@@ -2020,9 +2342,16 @@ export class RoomService {
       try {
         const data = await invoke<string>('read_chat_image_preview', { id: file.id });
         const extension = file.name.split('.').pop()?.toLowerCase();
-        const mime = extension === 'jpg' || extension === 'jpeg' ? 'image/jpeg' :
-          extension === 'png' ? 'image/png' : extension === 'gif' ? 'image/gif' :
-          extension === 'webp' ? 'image/webp' : 'image/bmp';
+        const mime =
+          extension === 'jpg' || extension === 'jpeg'
+            ? 'image/jpeg'
+            : extension === 'png'
+              ? 'image/png'
+              : extension === 'gif'
+                ? 'image/gif'
+                : extension === 'webp'
+                  ? 'image/webp'
+                  : 'image/bmp';
         this.localFilePreviews = { ...this.localFilePreviews, [message.id]: `data:${mime};base64,${data}` };
         this.notify();
       } catch {}
@@ -2053,7 +2382,7 @@ export class RoomService {
       const sample = this.transferRates.get(progress.requestId);
       if (!sample) this.transferRates.set(progress.requestId, { at: now, bytes: progress.bytes, speed: 0 });
       else if (now - sample.at >= 100 && progress.bytes >= sample.bytes) {
-        const instant = (progress.bytes - sample.bytes) * 1000 / (now - sample.at);
+        const instant = ((progress.bytes - sample.bytes) * 1000) / (now - sample.at);
         bytesPerSecond = sample.speed ? sample.speed * 0.65 + instant * 0.35 : instant;
         this.transferRates.set(progress.requestId, { at: now, bytes: progress.bytes, speed: bytesPerSecond });
       }
@@ -2062,18 +2391,23 @@ export class RoomService {
     const transportChanged = nativeDirect !== previous?.nativeDirect;
     if (transportChanged) this.transferRouteChecks.delete(progress.requestId);
     const entry: FileProgress = {
-      ...previous, ...reported,
+      ...previous,
+      ...reported,
       nativeDirect,
-      transport: transportChanged ? undefined : progress.transport ?? previous?.transport,
-      fileName: progress.fileName ?? previous?.fileName ?? message?.file?.name ?? t("message.ba8a452f2f83"),
-      peerName: progress.peerName ?? previous?.peerName ?? peer?.username ??
-        (progress.direction === 'receive' ? message?.sender : undefined) ?? t("message.1e97ddf60a0f"),
+      transport: transportChanged ? undefined : (progress.transport ?? previous?.transport),
+      fileName: progress.fileName ?? previous?.fileName ?? message?.file?.name ?? t('message.ba8a452f2f83'),
+      peerName:
+        progress.peerName ??
+        previous?.peerName ??
+        peer?.username ??
+        (progress.direction === 'receive' ? message?.sender : undefined) ??
+        t('message.1e97ddf60a0f'),
       peerId: progress.peerId ?? previous?.peerId,
       previewOnly: progress.previewOnly ?? previous?.previewOnly,
       startedAt: previous?.startedAt ?? Date.now(),
       isImage: progress.isImage ?? previous?.isImage ?? message?.file?.isImage ?? false,
       bytesPerSecond,
-      timings: nativeDirect ? undefined : progress.timings ?? previous?.timings,
+      timings: nativeDirect ? undefined : (progress.timings ?? previous?.timings),
     };
     this.fileProgress = { ...this.fileProgress, [entry.requestId]: entry };
     if (entry.status === 'complete' && previous?.status !== 'complete' && !this.localSaveIds.has(entry.requestId)) {
@@ -2086,19 +2420,39 @@ export class RoomService {
         this.transferRouteChecks.set(entry.requestId, now);
         void this.roomManager.getFileTransportDiagnostics(entry.peerId, entry.requestId).then((stats) => {
           const current = this.fileProgress[entry.requestId];
-          if (!stats || !current || current.status !== 'active' || current.peerId !== entry.peerId ||
-              current.nativeDirect !== entry.nativeDirect) return;
+          if (
+            !stats ||
+            !current ||
+            current.status !== 'active' ||
+            current.peerId !== entry.peerId ||
+            current.nativeDirect !== entry.nativeDirect
+          )
+            return;
           const previous = current.transport;
           const transport = { ...stats.transport };
           const currentBytes = current.direction === 'send' ? transport.pairBytesSent : transport.pairBytesReceived;
           const previousBytes = current.direction === 'send' ? previous?.pairBytesSent : previous?.pairBytesReceived;
-          const elapsedMs = transport.pairTimestamp !== undefined && previous?.pairTimestamp !== undefined ?
-            transport.pairTimestamp - previous.pairTimestamp : 0;
-          if (currentBytes !== undefined && previousBytes !== undefined && currentBytes >= previousBytes && elapsedMs > 0) {
-            transport.pairBytesPerSecond = (currentBytes - previousBytes) * 1000 / elapsedMs;
+          const elapsedMs =
+            transport.pairTimestamp !== undefined && previous?.pairTimestamp !== undefined
+              ? transport.pairTimestamp - previous.pairTimestamp
+              : 0;
+          if (
+            currentBytes !== undefined &&
+            previousBytes !== undefined &&
+            currentBytes >= previousBytes &&
+            elapsedMs > 0
+          ) {
+            transport.pairBytesPerSecond = ((currentBytes - previousBytes) * 1000) / elapsedMs;
           }
-          this.fileProgress = { ...this.fileProgress, [entry.requestId]: {
-            ...current, connectionType: stats.connectionType, rttMs: stats.rttMs, transport } };
+          this.fileProgress = {
+            ...this.fileProgress,
+            [entry.requestId]: {
+              ...current,
+              connectionType: stats.connectionType,
+              rttMs: stats.rttMs,
+              transport,
+            },
+          };
           this.notify();
         });
       }
@@ -2134,21 +2488,37 @@ export class RoomService {
     const bytes = this.imagePreviewBytes[messageId];
     if (!message?.file?.isImage || (!bytes && !source)) throw new Error('Image source unavailable');
     const requestId = crypto.randomUUID();
-    const selected = await invoke<boolean>('choose_chat_download', { id: requestId,
-      name: message.file.name, size: message.file.size, hash: message.file.sha256, saveAs });
+    const selected = await invoke<boolean>('choose_chat_download', {
+      id: requestId,
+      name: message.file.name,
+      size: message.file.size,
+      hash: message.file.sha256,
+      saveAs,
+    });
     if (!selected) return null;
     this.localSaveIds.add(requestId);
     let written = 0;
-    this.recordFileProgress({ requestId, messageId, direction: 'receive', bytes: 0,
-      total: message.file.size, status: 'active', fileName: message.file.name,
-      peerName: message.sender });
+    this.recordFileProgress({
+      requestId,
+      messageId,
+      direction: 'receive',
+      bytes: 0,
+      total: message.file.size,
+      status: 'active',
+      fileName: message.file.name,
+      peerName: message.sender,
+    });
     try {
       if (!source && bytes.length !== message.file.size) throw new Error('Preview size mismatch');
       for (let offset = 0; offset < message.file.size; offset += CHAT_FILE_CHUNK_BYTES) {
         if (this.cancelledLocalSaves.has(requestId)) throw new Error('Download cancelled');
         let data: string;
-        if (source) data = await invoke<string>('read_chat_file_chunk', { id: source.id,
-          offset, length: Math.min(CHAT_FILE_CHUNK_BYTES, message.file.size - offset) });
+        if (source)
+          data = await invoke<string>('read_chat_file_chunk', {
+            id: source.id,
+            offset,
+            length: Math.min(CHAT_FILE_CHUNK_BYTES, message.file.size - offset),
+          });
         else {
           const chunk = bytes.subarray(offset, offset + CHAT_FILE_CHUNK_BYTES);
           let binary = '';
@@ -2156,21 +2526,39 @@ export class RoomService {
           data = btoa(binary);
         }
         if (this.cancelledLocalSaves.has(requestId)) throw new Error('Download cancelled');
-        written = await invoke<number>('write_chat_download_chunk', { id: requestId,
-          offset, data });
-        this.recordFileProgress({ requestId, messageId, direction: 'receive', bytes: written,
-          total: message.file.size, status: 'active' });
+        written = await invoke<number>('write_chat_download_chunk', { id: requestId, offset, data });
+        this.recordFileProgress({
+          requestId,
+          messageId,
+          direction: 'receive',
+          bytes: written,
+          total: message.file.size,
+          status: 'active',
+        });
       }
       if (this.cancelledLocalSaves.has(requestId)) throw new Error('Download cancelled');
       await invoke('finish_chat_download', { id: requestId });
-      this.recordFileProgress({ requestId, messageId, direction: 'receive', bytes: message.file.size,
-        total: message.file.size, status: 'complete', saved: true });
+      this.recordFileProgress({
+        requestId,
+        messageId,
+        direction: 'receive',
+        bytes: message.file.size,
+        total: message.file.size,
+        status: 'complete',
+        saved: true,
+      });
       return requestId;
     } catch (error) {
       await invoke('cancel_chat_download', { id: requestId });
       const cancelled = this.cancelledLocalSaves.has(requestId);
-      this.recordFileProgress({ requestId, messageId, direction: 'receive', bytes: written,
-        total: message.file.size, status: cancelled ? 'cancelled' : 'error' });
+      this.recordFileProgress({
+        requestId,
+        messageId,
+        direction: 'receive',
+        bytes: written,
+        total: message.file.size,
+        status: cancelled ? 'cancelled' : 'error',
+      });
       if (cancelled) return null;
       throw error;
     } finally {
@@ -2194,8 +2582,9 @@ export class RoomService {
   }
 
   public async revealSavedFile(messageId: string, requestId: string): Promise<void> {
-    try { await invoke('reveal_chat_download', { id: requestId }); }
-    catch (error) {
+    try {
+      await invoke('reveal_chat_download', { id: requestId });
+    } catch (error) {
       if (this.savedDownloads[messageId] === requestId) {
         const next = { ...this.savedDownloads };
         delete next[messageId];
@@ -2216,15 +2605,16 @@ export class RoomService {
 
   public addSystemChatMessage(text: string, systemType: 'join' | 'leave' | 'info' | 'generic' = 'generic'): void {
     if (this.roomManager) {
-      void this.roomManager.sendSystemMessage(text, systemType).catch((error) =>
-        console.warn('[Chat] Failed to sign or send system notice:', error));
+      void this.roomManager
+        .sendSystemMessage(text, systemType)
+        .catch((error) => console.warn('[Chat] Failed to sign or send system notice:', error));
       return;
     }
     const timestamp = Date.now();
     const msg: ChatMessage = {
       id: `sys_${timestamp}_${Math.random().toString(36).substring(2, 7)}`,
       logicalOrder: nextChatOrder(this.chatMessages, 0, timestamp),
-      sender: t("message.f150afd3c599"),
+      sender: t('message.f150afd3c599'),
       text,
       timestamp,
       isSystem: true,
@@ -2235,7 +2625,7 @@ export class RoomService {
   }
 
   public async updateRoomPassword(newPassword: string): Promise<boolean> {
-    if (!this.roomManager || !await this.roomManager.updateRoomPassword(newPassword)) return false;
+    if (!this.roomManager || !(await this.roomManager.updateRoomPassword(newPassword))) return false;
     stateStore.set((s) => {
       s.currentRoomPassword = newPassword;
     });
@@ -2247,7 +2637,9 @@ export class RoomService {
     return this.roomManager?.isRoomHost() ?? false;
   }
 
-  public getCurrentInvite(): string { return this.roomManager?.getInvite() ?? ''; }
+  public getCurrentInvite(): string {
+    return this.roomManager?.getInvite() ?? '';
+  }
 
   public updateRoomName(name: string): Promise<boolean> {
     return this.roomManager?.updateRoomName(name) ?? Promise.resolve(false);
@@ -2261,7 +2653,9 @@ export class RoomService {
     return this.roomManager?.setAdministrator(peerId, enabled) ?? Promise.resolve(false);
   }
 
-  public isRoomAdmin(): boolean { return this.roomManager?.isRoomAdmin() ?? false; }
+  public isRoomAdmin(): boolean {
+    return this.roomManager?.isRoomAdmin() ?? false;
+  }
 
   public isWaitingForAdmission(): boolean {
     if (!this.roomManager || stateStore.roomSlots.length === 0 || !stateStore.currentRoomCode) return false;
@@ -2299,10 +2693,14 @@ export class RoomService {
     audioContextManager.detachPeerAudio(peerId);
     stateStore.set((s) => {
       s.subscribedStreams.delete(peerId);
-      for (const target of Object.keys(s.streamOverlays)) s.streamOverlays[target] = s.streamOverlays[target].filter((key) => key !== peerId);
-      for (const slot of s.roomSlots) if (slot.mediaKind === 'screen') {
-        s.dismissedAutoOverlays[slot.peerId] = [...new Set([...(s.dismissedAutoOverlays[slot.peerId] || []), peerId])];
-      }
+      for (const target of Object.keys(s.streamOverlays))
+        s.streamOverlays[target] = s.streamOverlays[target].filter((key) => key !== peerId);
+      for (const slot of s.roomSlots)
+        if (slot.mediaKind === 'screen') {
+          s.dismissedAutoOverlays[slot.peerId] = [
+            ...new Set([...(s.dismissedAutoOverlays[slot.peerId] || []), peerId]),
+          ];
+        }
     });
     if (this.roomManager) {
       this.roomManager.stopWatching(peerId);
@@ -2363,15 +2761,13 @@ export class RoomService {
         } else {
           soundEffects.playVoiceUnmute();
         }
-        manager?.setLocalVoiceState(
-          { inVoice: true, muted: res.micMuted, deafened: res.deafened },
-          res.stream,
-        );
+        manager?.setLocalVoiceState({ inVoice: true, muted: res.micMuted, deafened: res.deafened }, res.stream);
       } catch (err) {
         const name = err instanceof DOMException ? err.name : '';
-        const msg = name === 'NotAllowedError' || name === 'PermissionDeniedError'
-          ? t('voice.micPermissionError')
-          : t('voice.micUnavailableError');
+        const msg =
+          name === 'NotAllowedError' || name === 'PermissionDeniedError'
+            ? t('voice.micPermissionError')
+            : t('voice.micUnavailableError');
         showToast(msg, 4500, 'error');
         logDiagnostic('ERROR', 'voice.mic', 'Failed to activate microphone on unmute', {
           error: err instanceof Error ? err.message : String(err),
@@ -2415,9 +2811,10 @@ export class RoomService {
     } catch (err) {
       voiceManager.stopMicTest();
       const name = err instanceof DOMException ? err.name : '';
-      const msg = name === 'NotAllowedError' || name === 'PermissionDeniedError'
-        ? t('voice.micPermissionError')
-        : t('voice.micUnavailableError');
+      const msg =
+        name === 'NotAllowedError' || name === 'PermissionDeniedError'
+          ? t('voice.micPermissionError')
+          : t('voice.micUnavailableError');
       showToast(msg, 4500, 'error');
       logDiagnostic('ERROR', 'voice.mic', 'Failed to start microphone test', {
         error: err instanceof Error ? err.message : String(err),
@@ -2454,17 +2851,9 @@ export class RoomService {
     return saved;
   }
 
-  public getPeerVoiceVolume(
-    peerId: string,
-    publicKey?: string,
-    username?: string,
-  ): UserVoiceVolumePreference {
+  public getPeerVoiceVolume(peerId: string, publicKey?: string, username?: string): UserVoiceVolumePreference {
     const peer = this.peers.find((p) => p.id === peerId);
-    return voiceManager.getRemotePeerVolume(
-      peerId,
-      publicKey ?? peer?.publicKey,
-      username ?? peer?.username,
-    );
+    return voiceManager.getRemotePeerVolume(peerId, publicKey ?? peer?.publicKey, username ?? peer?.username);
   }
 }
 

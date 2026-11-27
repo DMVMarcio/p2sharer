@@ -7,7 +7,8 @@ import { JSDOM } from 'jsdom';
 import React, { act } from 'react';
 
 const dom = new JSDOM('<div id="root"></div>', { url: 'http://localhost', pretendToBeVisual: true });
-for (const key of ['window', 'document', 'HTMLElement', 'Element', 'Node', 'Event', 'localStorage']) globalThis[key] = dom.window[key];
+for (const key of ['window', 'document', 'HTMLElement', 'Element', 'Node', 'Event', 'localStorage'])
+  globalThis[key] = dom.window[key];
 globalThis.requestAnimationFrame = dom.window.requestAnimationFrame.bind(dom.window);
 globalThis.cancelAnimationFrame = dom.window.cancelAnimationFrame.bind(dom.window);
 globalThis.IS_REACT_ACT_ENVIRONMENT = true;
@@ -20,73 +21,147 @@ const joined = [];
 let discovery;
 let ready = Promise.resolve();
 globalThis.previewUi = {
-  roomService: { pendingJoinInvite: 'saved-fixture', pendingJoinPassword: 'remembered-fixture', pendingJoinAsOwner: true,
+  roomService: {
+    pendingJoinInvite: 'saved-fixture',
+    pendingJoinPassword: 'remembered-fixture',
+    pendingJoinAsOwner: true,
     pendingJoinError: '',
-    joinOutcome: 'admitted', joinError: '', roomStatusText: 'Connecting',
-    async startRoomPreview(manager, callbacks) { await manager.join(callbacks); },
-    async stopRoomPreview(manager) { await ready.catch(() => {}); await manager.leave(); },
+    joinOutcome: 'admitted',
+    joinError: '',
+    roomStatusText: 'Connecting',
+    async startRoomPreview(manager, callbacks) {
+      await manager.join(callbacks);
+    },
+    async stopRoomPreview(manager) {
+      await ready.catch(() => {});
+      await manager.leave();
+    },
     async joinRoom(...args) {
       const { preview, signal, ...options } = args[3];
       joined.push([...args.slice(0, 3), options]);
       previewUi.adopted = preview;
       previewUi.signal = signal;
-    }, async leaveRoom() { left++; } },
+    },
+    async leaveRoom() {
+      left++;
+    },
+  },
   store: { username: 'Viewer', getTurnConfig: () => undefined },
   savedRooms: { fixture: { roomId: 'fixture', saved: true, invite: 'saved-fixture', name: 'Fixture room' } },
-  subscribe: fn => { listeners.add(fn); return () => listeners.delete(fn); }, snapshot: () => revision,
+  subscribe: (fn) => {
+    listeners.add(fn);
+    return () => listeners.delete(fn);
+  },
+  snapshot: () => revision,
   close: () => closed++,
-  discover: callbacks => { discovery = callbacks; return ready; }, release: () => left++,
+  discover: (callbacks) => {
+    discovery = callbacks;
+    return ready;
+  },
+  release: () => left++,
 };
-const bundle = await build({ stdin: { contents: "export { JoinRoomModal } from './src/components/modals/JoinRoomModal.tsx';", resolveDir: process.cwd() },
-  bundle: true, write: false, format: 'esm', platform: 'node', jsx: 'automatic',
-  plugins: [{ name: 'preview-fixture', setup(builder) {
-    builder.onResolve({ filter: /useModal$|useRoom$|room_service$|state_store$|group_room$|room_invite_validation$|saved_rooms$/ }, args => ({ path: args.path, namespace: 'fixture' }));
-    builder.onLoad({ filter: /.*/, namespace: 'fixture' }, args => ({ contents:
-      args.path.endsWith('useModal') ? 'export const useModal = () => ({ closeModal: globalThis.previewUi.close });' :
-      args.path.endsWith('useRoom') ? "import { useSyncExternalStore } from 'react'; export const useRoom = () => { useSyncExternalStore(globalThis.previewUi.subscribe, globalThis.previewUi.snapshot); return globalThis.previewUi.roomService; };" :
-      args.path.endsWith('room_service') ? 'export const roomService = globalThis.previewUi.roomService;' :
-      args.path.endsWith('state_store') ? 'export const stateStore = globalThis.previewUi.store;' :
-      args.path.endsWith('group_room') ? 'export class GroupRoomManager { join(callbacks) { return globalThis.previewUi.discover(callbacks); } getInvite() { return globalThis.previewUi.resolvedInvite; } requestPreview() {} hasAdmitterOnline() { return globalThis.previewUi.admitterOnline ?? true; } hasVerifiedIdentityPeers() { return globalThis.previewUi.verifiedIdentityPeers ?? true; } async leave() { globalThis.previewUi.release(); } }' :
-      args.path.endsWith('saved_rooms') ? 'export const savedRooms = { get: async (id) => globalThis.previewUi.savedRooms?.[id] };' :
-      "export const verifyRoomInvite = async (code) => code.startsWith('unsaved-') ? { version: 4, roomId: code, name: 'Signed Unsaved Room' } : { version: 4, roomId: 'fixture', name: 'Fixture room' };",
-    }));
-    builder.onResolve({ filter: /^[^./]/ }, args => ({ path: pathToFileURL(require.resolve(args.path)).href, external: true }));
-  } }],
+const bundle = await build({
+  stdin: {
+    contents: "export { JoinRoomModal } from './src/components/modals/JoinRoomModal.tsx';",
+    resolveDir: process.cwd(),
+  },
+  bundle: true,
+  write: false,
+  format: 'esm',
+  platform: 'node',
+  jsx: 'automatic',
+  plugins: [
+    {
+      name: 'preview-fixture',
+      setup(builder) {
+        builder.onResolve(
+          { filter: /useModal$|useRoom$|room_service$|state_store$|group_room$|room_invite_validation$|saved_rooms$/ },
+          (args) => ({ path: args.path, namespace: 'fixture' }),
+        );
+        builder.onLoad({ filter: /.*/, namespace: 'fixture' }, (args) => ({
+          contents: args.path.endsWith('useModal')
+            ? 'export const useModal = () => ({ closeModal: globalThis.previewUi.close });'
+            : args.path.endsWith('useRoom')
+              ? "import { useSyncExternalStore } from 'react'; export const useRoom = () => { useSyncExternalStore(globalThis.previewUi.subscribe, globalThis.previewUi.snapshot); return globalThis.previewUi.roomService; };"
+              : args.path.endsWith('room_service')
+                ? 'export const roomService = globalThis.previewUi.roomService;'
+                : args.path.endsWith('state_store')
+                  ? 'export const stateStore = globalThis.previewUi.store;'
+                  : args.path.endsWith('group_room')
+                    ? 'export class GroupRoomManager { join(callbacks) { return globalThis.previewUi.discover(callbacks); } getInvite() { return globalThis.previewUi.resolvedInvite; } requestPreview() {} hasAdmitterOnline() { return globalThis.previewUi.admitterOnline ?? true; } hasVerifiedIdentityPeers() { return globalThis.previewUi.verifiedIdentityPeers ?? true; } isRoomHost() { return globalThis.previewUi.isHost ?? false; } async leave() { globalThis.previewUi.release(); } }'
+                    : args.path.endsWith('saved_rooms')
+                      ? 'export const savedRooms = { get: async (id) => globalThis.previewUi.savedRooms?.[id] };'
+                      : "export const verifyRoomInvite = async (code) => code.startsWith('unsaved-') ? { version: 4, roomId: code, name: 'Signed Unsaved Room' } : { version: 4, roomId: 'fixture', name: 'Fixture room' };",
+        }));
+        builder.onResolve({ filter: /^[^./]/ }, (args) => ({
+          path: pathToFileURL(require.resolve(args.path)).href,
+          external: true,
+        }));
+      },
+    },
+  ],
 });
 
-const { JoinRoomModal } = await import('data:text/javascript;base64,' + Buffer.from(bundle.outputFiles[0].text).toString('base64'));
+const { JoinRoomModal } = await import(
+  'data:text/javascript;base64,' + Buffer.from(bundle.outputFiles[0].text).toString('base64')
+);
 const { createRoot } = await import('react-dom/client');
 const root = createRoot(document.getElementById('root'));
 async function submit() {
-  await act(async () => { document.querySelector('form').dispatchEvent(new window.Event('submit', { bubbles: true, cancelable: true })); });
+  await act(async () => {
+    document.querySelector('form').dispatchEvent(new window.Event('submit', { bubbles: true, cancelable: true }));
+  });
 }
 async function outcome(state, error = '') {
-  await act(async () => { Object.assign(previewUi.roomService, { joinOutcome: state, joinError: error }); revision++; listeners.forEach(fn => fn()); });
+  await act(async () => {
+    Object.assign(previewUi.roomService, { joinOutcome: state, joinError: error });
+    revision++;
+    listeners.forEach((fn) => fn());
+  });
 }
-after(async () => { await act(async () => root.unmount()); dom.window.close(); delete globalThis.previewUi; });
+after(async () => {
+  await act(async () => root.unmount());
+  dom.window.close();
+  delete globalThis.previewUi;
+});
 
 test('a saved room previews people and keeps connection and password errors in the dialog until admitted', async () => {
   await act(async () => root.render(React.createElement(JoinRoomModal)));
   assert.ok(document.querySelector('[role="dialog"]'));
   assert.equal(joined.length, 0);
-  assert.equal(document.getElementById('join-room-password'), null,
-    'a remembered password must not expose the field before protection is confirmed');
-  await act(async () => discovery.onPreview({ name: 'Online room', protected: false,
-    participants: [{ id: 'host', name: 'Host', color: '#06b6d4' }] }));
-  assert.equal(document.getElementById('join-room-password'), null,
-    'an unprotected room must not request a password');
-  await act(async () => discovery.onPreview({ name: 'Online room', protected: true,
-    participants: [{ id: 'host', name: 'Host', color: '#06b6d4' }] }));
+  assert.equal(
+    document.getElementById('join-room-password'),
+    null,
+    'a remembered password must not expose the field before protection is confirmed',
+  );
+  await act(async () =>
+    discovery.onPreview({
+      name: 'Online room',
+      protected: false,
+      participants: [{ id: 'host', name: 'Host', color: '#06b6d4' }],
+    }),
+  );
+  assert.equal(document.getElementById('join-room-password'), null, 'an unprotected room must not request a password');
+  await act(async () =>
+    discovery.onPreview({
+      name: 'Online room',
+      protected: true,
+      participants: [{ id: 'host', name: 'Host', color: '#06b6d4' }],
+    }),
+  );
   assert.ok(document.querySelector('li').textContent.includes('Host'));
   const host = { id: 'host', name: 'Host', color: '#06b6d4' };
   const guest = { id: 'guest', name: 'Guest', color: '#ff8844' };
   await act(async () => discovery.onPreview({ name: 'Online room', protected: true, participants: [host, guest] }));
   const originalRows = [...document.querySelectorAll('.join-room-participants li')];
-  await act(async () => discovery.onPreview({ name: 'Online room', protected: true,
-    participants: [{ ...guest, color: '#123456' }, host] }));
+  await act(async () =>
+    discovery.onPreview({ name: 'Online room', protected: true, participants: [{ ...guest, color: '#123456' }, host] }),
+  );
   const updatedRows = [...document.querySelectorAll('.join-room-participants li')];
-  assert.ok(updatedRows.length === originalRows.length && updatedRows.every((row, index) => row === originalRows[index]),
-    'responses from different members must update identities without moving existing rows');
+  assert.ok(
+    updatedRows.length === originalRows.length && updatedRows.every((row, index) => row === originalRows[index]),
+    'responses from different members must update identities without moving existing rows',
+  );
   assert.equal(document.getElementById('join-room-password').value, 'remembered-fixture');
   const releasedBefore = left;
   await submit();
@@ -110,25 +185,38 @@ test('a saved room previews people and keeps connection and password errors in t
 test('unmount during discovery releases the connection after initialization without joining', async () => {
   Object.assign(previewUi.roomService, { pendingJoinInvite: 'another-fixture', pendingJoinAsOwner: false });
   let resolve;
-  ready = new Promise(done => { resolve = done; });
+  ready = new Promise((done) => {
+    resolve = done;
+  });
   const before = left;
   await act(async () => root.render(React.createElement(JoinRoomModal)));
   await act(async () => root.render(null));
   assert.equal(left, before);
-  await act(async () => { resolve(); await ready; });
+  await act(async () => {
+    resolve();
+    await ready;
+  });
   assert.equal(left, before + 1);
   assert.equal(joined.length, 2);
 });
 
 test('an unanswered discovery allows immediate entry and closes on local waiting readiness', async () => {
   ready = Promise.resolve();
-  Object.assign(previewUi.roomService, { pendingJoinInvite: 'empty-fixture', pendingJoinPassword: '',
-    pendingJoinAsOwner: false, pendingJoinError: '', joinOutcome: 'admitted' });
+  Object.assign(previewUi.roomService, {
+    pendingJoinInvite: 'empty-fixture',
+    pendingJoinPassword: '',
+    pendingJoinAsOwner: false,
+    pendingJoinError: '',
+    joinOutcome: 'admitted',
+  });
   const before = closed;
   await act(async () => root.render(React.createElement(JoinRoomModal)));
   assert.equal(document.getElementById('join-room-password'), null);
-  assert.equal(document.querySelector('button[type="submit"]').disabled, false,
-    'participant discovery must not disable joining after invite validation');
+  assert.equal(
+    document.querySelector('button[type="submit"]').disabled,
+    false,
+    'participant discovery must not disable joining after invite validation',
+  );
   await submit();
   assert.deepEqual(joined.at(-1), ['empty-fixture', '', false, { waitForAdmission: false }]);
   assert.equal(closed, before);
@@ -138,8 +226,13 @@ test('an unanswered discovery allows immediate entry and closes on local waiting
 });
 
 test('a deferred password rejection resumes the same dialog without another discovery delay', async () => {
-  Object.assign(previewUi.roomService, { pendingJoinInvite: 'protected-fixture', pendingJoinPassword: 'wrong-fixture',
-    pendingJoinAsOwner: false, pendingJoinError: 'Senha incorreta para esta sala', joinOutcome: 'error' });
+  Object.assign(previewUi.roomService, {
+    pendingJoinInvite: 'protected-fixture',
+    pendingJoinPassword: 'wrong-fixture',
+    pendingJoinAsOwner: false,
+    pendingJoinError: 'Senha incorreta para esta sala',
+    joinOutcome: 'error',
+  });
   const before = closed;
   await act(async () => root.render(React.createElement(JoinRoomModal)));
   assert.ok(document.querySelector('[role="alert"]'));
@@ -152,17 +245,27 @@ test('a deferred password rejection resumes the same dialog without another disc
 });
 
 test('closing during initialization cancels admission immediately and a fresh dialog can enter again', async () => {
-  Object.assign(previewUi.roomService, { pendingJoinInvite: 'cancelled-fixture', pendingJoinPassword: '',
-    pendingJoinAsOwner: false, pendingJoinError: '', joinOutcome: 'idle' });
+  Object.assign(previewUi.roomService, {
+    pendingJoinInvite: 'cancelled-fixture',
+    pendingJoinPassword: '',
+    pendingJoinAsOwner: false,
+    pendingJoinError: '',
+    joinOutcome: 'idle',
+  });
   let resolve;
-  ready = new Promise(done => { resolve = done; });
+  ready = new Promise((done) => {
+    resolve = done;
+  });
   await act(async () => root.render(React.createElement(JoinRoomModal, { key: 'cancelled' })));
   const before = joined.length;
   await act(async () => {
     document.querySelector('form').dispatchEvent(new window.Event('submit', { bubbles: true, cancelable: true }));
     document.querySelector('.btn-close').click();
   });
-  await act(async () => { resolve(); await ready; });
+  await act(async () => {
+    resolve();
+    await ready;
+  });
   assert.equal(joined.length, before, 'a cancelled initialization must never promote into the room');
   await act(async () => root.render(null));
   ready = Promise.resolve();
@@ -174,10 +277,15 @@ test('closing during initialization cancels admission immediately and a fresh di
   await act(async () => root.render(null));
 });
 
-test('short invitation cannot enter without an online response and times out back to code entry', async context => {
+test('short invitation cannot enter without an online response and times out back to code entry', async (context) => {
   context.mock.timers.enable({ apis: ['setTimeout', 'setInterval'] });
-  Object.assign(previewUi.roomService, { pendingJoinInvite: 'a'.repeat(32), pendingJoinPassword: '',
-    pendingJoinAsOwner: false, pendingJoinError: '', joinOutcome: 'idle' });
+  Object.assign(previewUi.roomService, {
+    pendingJoinInvite: 'a'.repeat(32),
+    pendingJoinPassword: '',
+    pendingJoinAsOwner: false,
+    pendingJoinError: '',
+    joinOutcome: 'idle',
+  });
   const before = joined.length;
   const released = left;
   await act(async () => root.render(React.createElement(JoinRoomModal, { key: 'short-empty' })));
@@ -195,8 +303,13 @@ test('short invitation cannot enter without an online response and times out bac
 });
 
 test('short invitation promotes the resolved signed invitation only after a member response', async () => {
-  Object.assign(previewUi.roomService, { pendingJoinInvite: 'b'.repeat(32), pendingJoinPassword: '',
-    pendingJoinAsOwner: false, pendingJoinError: '', joinOutcome: 'idle' });
+  Object.assign(previewUi.roomService, {
+    pendingJoinInvite: 'b'.repeat(32),
+    pendingJoinPassword: '',
+    pendingJoinAsOwner: false,
+    pendingJoinError: '',
+    joinOutcome: 'idle',
+  });
   previewUi.resolvedInvite = 'resolved-signed-fixture';
   const before = joined.length;
   await act(async () => root.render(React.createElement(JoinRoomModal, { key: 'short-online' })));
@@ -209,27 +322,92 @@ test('short invitation promotes the resolved signed invitation only after a memb
   await act(async () => root.render(null));
 });
 
-
 test('unsaved room asks trust with signed room name before connecting and honors save-room checkbox', async () => {
   let discoveriesBeforeTrust = 0;
   const originalDiscover = previewUi.discover;
-  previewUi.discover = (callbacks) => { discoveriesBeforeTrust++; return originalDiscover(callbacks); };
-  Object.assign(previewUi.roomService, { pendingJoinInvite: 'unsaved-room-1', pendingJoinPassword: '',
-    pendingJoinAsOwner: false, pendingJoinError: '', joinOutcome: 'idle' });
+  previewUi.discover = (callbacks) => {
+    discoveriesBeforeTrust++;
+    return originalDiscover(callbacks);
+  };
+  Object.assign(previewUi.roomService, {
+    pendingJoinInvite: 'unsaved-room-1',
+    pendingJoinPassword: '',
+    pendingJoinAsOwner: false,
+    pendingJoinError: '',
+    joinOutcome: 'idle',
+  });
   await act(async () => root.render(React.createElement(JoinRoomModal, { key: 'unsaved-trust' })));
   assert.equal(discoveriesBeforeTrust, 0, 'must not start P2P discovery before user confirms trust');
   assert.ok(document.querySelector('.join-room-trust-target')?.textContent.includes('Signed Unsaved Room'));
   await submit();
   assert.equal(discoveriesBeforeTrust, 1);
-  await act(async () => discovery.onPreview({ name: 'Signed Unsaved Room', protected: false,
-    participants: [{ id: 'host', name: 'Host', color: '#06b6d4' }] }));
+  await act(async () =>
+    discovery.onPreview({
+      name: 'Signed Unsaved Room',
+      protected: false,
+      participants: [{ id: 'host', name: 'Host', color: '#06b6d4' }],
+    }),
+  );
   const checkbox = document.getElementById('join-save-room');
   assert.ok(checkbox, 'first-time room entry renders save-room checkbox');
   assert.equal(checkbox.checked, false);
-  await act(async () => { checkbox.click(); });
+  await act(async () => {
+    checkbox.click();
+  });
   assert.equal(checkbox.checked, true);
   await submit();
   assert.deepEqual(joined.at(-1), ['unsaved-room-1', '', false, { waitForAdmission: true, saveOnJoin: true }]);
   previewUi.discover = originalDiscover;
+  await act(async () => root.render(null));
+});
+
+test('empty password is blocked for protected rooms and verified hosts skip the password prompt', async () => {
+  Object.assign(previewUi.roomService, {
+    pendingJoinInvite: 'saved-fixture',
+    pendingJoinPassword: '',
+    pendingJoinAsOwner: false,
+    pendingJoinError: '',
+    joinOutcome: 'idle',
+  });
+  previewUi.isHost = false;
+  const before = joined.length;
+  await act(async () => root.render(React.createElement(JoinRoomModal, { key: 'empty-pass-blocked' })));
+  await act(async () =>
+    discovery.onPreview({
+      name: 'Protected room',
+      protected: true,
+      participants: [{ id: 'host', name: 'Host', color: '#06b6d4' }],
+    }),
+  );
+  assert.ok(document.getElementById('join-room-password'));
+  await submit();
+  assert.equal(joined.length, before, 'must not enter protected room without a password');
+  assert.ok(document.querySelector('[role="alert"]'));
+  await act(async () => root.render(null));
+
+  Object.assign(previewUi.roomService, {
+    pendingJoinInvite: 'saved-fixture',
+    pendingJoinPassword: '',
+    pendingJoinAsOwner: true,
+    pendingJoinError: '',
+    joinOutcome: 'idle',
+  });
+  previewUi.isHost = true;
+  await act(async () => root.render(React.createElement(JoinRoomModal, { key: 'host-skips-password' })));
+  await act(async () =>
+    discovery.onPreview({
+      name: 'Protected owned room',
+      protected: true,
+      participants: [{ id: 'admin', name: 'Admin', color: '#06b6d4' }],
+    }),
+  );
+  assert.equal(
+    document.getElementById('join-room-password'),
+    null,
+    'verified host must not be prompted for a password',
+  );
+  await submit();
+  assert.equal(joined.length, before + 1);
+  previewUi.isHost = false;
   await act(async () => root.render(null));
 });

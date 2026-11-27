@@ -1136,6 +1136,7 @@
   "join.online": "Online-Teilnehmer: {{count}}",
   "join.participants": "Leute im Raum",
   "join.timeout": "Die Verbindung konnte nicht bestätigt werden. Überprüfen Sie das Passwort oder versuchen Sie es erneut.",
+  "join.passwordRequired": "Gib das Raumpasswort ein",
   "join.waiting": "Warten auf Teilnehmer und Raumzulassung…",
   "join.hostOfflineNotice": "Der Host und die Administratoren dieses Raums sind derzeit offline. Der Beitritt wird automatisch abgeschlossen, sobald sich jemand von ihnen verbindet.",
   "room.waitingHostBanner": "Der Host und die Administratoren dieses Raums sind momentan offline, daher können neue Teilnehmende noch nicht eingelassen werden. Warte auf ihre Verbindung oder erstelle einen eigenen Raum.",

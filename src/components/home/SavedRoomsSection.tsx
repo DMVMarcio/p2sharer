@@ -35,17 +35,21 @@ export const SavedRoomsSection: React.FC = () => {
     }
     return homeRoomPresence.start();
   }, [homeRoomPresencePolling]);
-  const sortable = useSortableGrid(rooms.map((room) => room.roomId), (ids) => {
-    try {
-      savedRooms.reorder(ids);
-      setRooms((records) => orderSavedRooms(records, ids));
-      return true;
-    } catch {
-      showToast(t("message.128c78d2ee24"), 3500, 'error');
-      return false;
-    }
-  });
-  const orderedRooms = sortable.order.map((id) => rooms.find((room) => room.roomId === id))
+  const sortable = useSortableGrid(
+    rooms.map((room) => room.roomId),
+    (ids) => {
+      try {
+        savedRooms.reorder(ids);
+        setRooms((records) => orderSavedRooms(records, ids));
+        return true;
+      } catch {
+        showToast(t('message.128c78d2ee24'), 3500, 'error');
+        return false;
+      }
+    },
+  );
+  const orderedRooms = sortable.order
+    .map((id) => rooms.find((room) => room.roomId === id))
     .filter((room): room is SavedRoom => !!room);
   // Include newly loaded records before the hook reconciles its draft in the layout effect.
   orderedRooms.push(...rooms.filter((room) => !sortable.order.includes(room.roomId)));
@@ -55,18 +59,26 @@ export const SavedRoomsSection: React.FC = () => {
     let disposed = false;
     const reload = () => {
       const current = ++generation;
-      void savedRooms.list().then((records) => {
-        if (!disposed && current === generation) setRooms(orderSavedRooms(records.filter((room) => room.saved)));
-      })
+      void savedRooms
+        .list()
+        .then((records) => {
+          if (!disposed && current === generation) setRooms(orderSavedRooms(records.filter((room) => room.saved)));
+        })
         .catch((error) => console.warn('[Rooms] Could not load saved rooms:', error));
     };
     reload();
     const unsubscribe = savedRooms.subscribe(reload);
-    return () => { disposed = true; unsubscribe(); };
+    return () => {
+      disposed = true;
+      unsubscribe();
+    };
   }, []);
 
   const openSaved = (room: SavedRoom) => {
-    if (!username) { openModal('username'); return; }
+    if (!username) {
+      openModal('username');
+      return;
+    }
     roomService.pendingJoinInvite = room.invite;
     roomService.pendingJoinAsOwner = room.owned;
     roomService.pendingJoinPassword = room.password ?? '';
@@ -77,99 +89,170 @@ export const SavedRoomsSection: React.FC = () => {
   const removeSaved = async (room: SavedRoom) => {
     try {
       await savedRooms.put({ ...room, saved: false, password: undefined });
-      showToast(t("message.8f1e60abcf3e"), 3500, 'success');
-    } catch { showToast(t("message.bef29a92c3b0"), 3500, 'error'); }
+      showToast(t('message.8f1e60abcf3e'), 3500, 'success');
+    } catch {
+      showToast(t('message.bef29a92c3b0'), 3500, 'error');
+    }
   };
 
   return (
     <section className="saved-rooms-section" aria-labelledby="saved-rooms-title">
       <div className="saved-rooms-heading">
         <div>
-          <h2 id="saved-rooms-title">{t("message.61aef6ed3afc")}</h2>
+          <h2 id="saved-rooms-title">{t('message.61aef6ed3afc')}</h2>
         </div>
         <button className="btn btn-secondary saved-rooms-add" onClick={() => openModal('saveInvite')}>
-          <BookmarkPlus size={16} /> {t("message.2e84ec959672")}</button>
+          <BookmarkPlus size={16} /> {t('message.2e84ec959672')}
+        </button>
       </div>
       {rooms.length === 0 ? (
-        <p className="saved-rooms-empty">{t("message.aa2f2b18a6b1")}</p>
+        <p className="saved-rooms-empty">{t('message.aa2f2b18a6b1')}</p>
       ) : (
         <div className={`saved-rooms-grid ${sortable.draggingId ? 'is-sorting' : ''}`} ref={sortable.gridRef}>
           {orderedRooms.map((room) => (
-            <article className={`saved-room-card ${room.owned ? 'is-owned' : ''} ${sortable.draggingId === room.roomId ? 'is-dragging' : ''}`}
-              data-sortable-id={room.roomId} key={room.roomId} ref={sortable.cardRef(room.roomId)} onContextMenu={(event) => openContextMenu(event, [
-              { id: 'enter', get label() { return t("message.f1388bfdc0f9"); }, icon: <ArrowRight size={15} />, onSelect: () => openSaved(room) },
-              { id: 'edit', get label() { return t("message.4c6b05644363"); }, icon: <Pencil size={15} />, onSelect: () => setEditingRoom(room) },
-              { id: 'remove', get label() { return t("message.10cc035e54a6"); }, icon: <Trash2 size={15} />, danger: true, onSelect: () => setRemovingRoom(room) },
-            ])}>
+            <article
+              className={`saved-room-card ${room.owned ? 'is-owned' : ''} ${sortable.draggingId === room.roomId ? 'is-dragging' : ''}`}
+              data-sortable-id={room.roomId}
+              key={room.roomId}
+              ref={sortable.cardRef(room.roomId)}
+              onContextMenu={(event) =>
+                openContextMenu(event, [
+                  {
+                    id: 'enter',
+                    get label() {
+                      return t('message.f1388bfdc0f9');
+                    },
+                    icon: <ArrowRight size={15} />,
+                    onSelect: () => openSaved(room),
+                  },
+                  {
+                    id: 'edit',
+                    get label() {
+                      return t('message.4c6b05644363');
+                    },
+                    icon: <Pencil size={15} />,
+                    onSelect: () => setEditingRoom(room),
+                  },
+                  {
+                    id: 'remove',
+                    get label() {
+                      return t('message.10cc035e54a6');
+                    },
+                    icon: <Trash2 size={15} />,
+                    danger: true,
+                    onSelect: () => setRemovingRoom(room),
+                  },
+                ])
+              }
+            >
               <div className="saved-room-card-heading">
-                <button type="button"
+                <button
+                  type="button"
                   className="btn saved-room-drag-handle"
-                  aria-label={t("message.3427432bc05d", { v0: room.customName ?? room.name })}
-                  disabled={rooms.length < 2} {...sortable.handleProps(room.roomId)}>
+                  aria-label={t('message.3427432bc05d', { v0: room.customName ?? room.name })}
+                  disabled={rooms.length < 2}
+                  {...sortable.handleProps(room.roomId)}
+                >
                   <GripVertical size={17} />
                 </button>
                 <div className="saved-room-details">
                   <strong>{room.customName ?? room.name}</strong>
                   <div className="saved-room-meta">
                     <span className="badge-host saved-room-role">
-                      {room.owned ? t("message.66abaa8c669e") : t("message.1e97ddf60a0f")}
+                      {room.owned ? t('message.66abaa8c669e') : t('message.1e97ddf60a0f')}
                     </span>
                     <span className="saved-room-id">{room.roomId.slice(0, 8)}</span>
-                    {room.password !== undefined && <LockKeyhole size={12} aria-label={t("message.3ef5534f852c")} />}
+                    {Boolean(room.password) && <LockKeyhole size={12} aria-label={t('message.3ef5534f852c')} />}
                   </div>
                 </div>
-                {homeRoomPresencePolling && (() => {
-                  const onlinePeople = homeRoomPresence.getParticipants(room.roomId);
-                  if (onlinePeople.length === 0) return null;
-                  return <ActivityParticipants
-                    className="saved-room-participants"
-                    maxVisible={4}
-                    ariaLabel={t('savedRooms.onlineMembers', { count: onlinePeople.length })}
-                    people={onlinePeople.map((person) => ({
-                      id: person.id,
-                      name: person.name,
-                      color: person.color,
-                      imageUrl: person.avatar,
-                    }))}
-                    onSelectParticipant={(person) => modalManager.openProfile({
-                      peerId: person.id,
-                      name: person.name,
-                      color: person.color,
-                      imageUrl: person.imageUrl,
-                      hideStats: true,
-                    })}
-                  />;
-                })()}
+                {homeRoomPresencePolling &&
+                  (() => {
+                    const onlinePeople = homeRoomPresence.getParticipants(room.roomId);
+                    if (onlinePeople.length === 0) return null;
+                    return (
+                      <ActivityParticipants
+                        className="saved-room-participants"
+                        maxVisible={4}
+                        ariaLabel={t('savedRooms.onlineMembers', { count: onlinePeople.length })}
+                        people={onlinePeople.map((person) => ({
+                          id: person.id,
+                          name: person.name,
+                          color: person.color,
+                          imageUrl: person.avatar,
+                        }))}
+                        onSelectParticipant={(person) =>
+                          modalManager.openProfile({
+                            peerId: person.id,
+                            name: person.name,
+                            color: person.color,
+                            imageUrl: person.imageUrl,
+                            hideStats: true,
+                          })
+                        }
+                      />
+                    );
+                  })()}
               </div>
               <div className="saved-room-actions">
                 <button className="btn btn-secondary saved-room-enter" onClick={() => openSaved(room)}>
-                  {t("message.4105811890ae")}<ArrowRight size={14} />
+                  {t('message.4105811890ae')}
+                  <ArrowRight size={14} />
                 </button>
-                <TooltipButton className="btn btn-secondary saved-room-icon-button"
-                  onClick={() => setEditingRoom(room)} tooltip={t("message.c0a6f99cb765", { v0: room.name })}>
+                <TooltipButton
+                  className="btn btn-secondary saved-room-icon-button"
+                  onClick={() => setEditingRoom(room)}
+                  tooltip={t('message.c0a6f99cb765', { v0: room.name })}
+                >
                   <Pencil size={14} />
                 </TooltipButton>
-                <TooltipButton className="btn btn-secondary saved-room-remove" onClick={() => setRemovingRoom(room)}
-                  tooltip={t("message.4814bd50cf7c", { v0: room.name })}><Trash2 size={14} /></TooltipButton>
+                <TooltipButton
+                  className="btn btn-secondary saved-room-remove"
+                  onClick={() => setRemovingRoom(room)}
+                  tooltip={t('message.4814bd50cf7c', { v0: room.name })}
+                >
+                  <Trash2 size={14} />
+                </TooltipButton>
               </div>
             </article>
           ))}
         </div>
       )}
       <span className="sr-only" aria-live="polite" aria-atomic="true">
-        {sortable.draggingId ? t("message.1ab84eb11262", { v0: sortable.order.indexOf(sortable.draggingId) + 1, v1: rooms.length }) : ''}
+        {sortable.draggingId
+          ? t('message.1ab84eb11262', { v0: sortable.order.indexOf(sortable.draggingId) + 1, v1: rooms.length })
+          : ''}
       </span>
       {editingRoom && <EditSavedRoomDialog room={editingRoom} onClose={() => setEditingRoom(null)} />}
-      {removingRoom && <ModalDialog title={t("message.f9f10a452737")} icon={<Trash2 size={20} />}
-        onClose={() => setRemovingRoom(null)} footer={(close) => <>
-          <button type="button" className="btn btn-secondary" data-autofocus onClick={close}>{t("message.bb9dbb406dcb")}</button>
-          <button type="button" className="btn btn-danger" onClick={() => {
-            void removeSaved(removingRoom);
-            close();
-          }}>{t("message.a3037dc71a43")}</button>
-        </>}>
-        <p>{t("message.d7d47d0a09e0")}<strong>{removingRoom.customName ?? removingRoom.name}</strong>{t("message.6d8b842e23ea")}</p>
-      </ModalDialog>}
+      {removingRoom && (
+        <ModalDialog
+          title={t('message.f9f10a452737')}
+          icon={<Trash2 size={20} />}
+          onClose={() => setRemovingRoom(null)}
+          footer={(close) => (
+            <>
+              <button type="button" className="btn btn-secondary" data-autofocus onClick={close}>
+                {t('message.bb9dbb406dcb')}
+              </button>
+              <button
+                type="button"
+                className="btn btn-danger"
+                onClick={() => {
+                  void removeSaved(removingRoom);
+                  close();
+                }}
+              >
+                {t('message.a3037dc71a43')}
+              </button>
+            </>
+          )}
+        >
+          <p>
+            {t('message.d7d47d0a09e0')}
+            <strong>{removingRoom.customName ?? removingRoom.name}</strong>
+            {t('message.6d8b842e23ea')}
+          </p>
+        </ModalDialog>
+      )}
     </section>
   );
 };

@@ -1136,6 +1136,7 @@
   "join.online": "Participants en ligne : {{count}}",
   "join.participants": "Des gens dans la salle",
   "join.timeout": "La connexion n'a pas pu être confirmée. Vérifiez le mot de passe ou réessayez.",
+  "join.passwordRequired": "Saisissez le mot de passe de la salle",
   "join.waiting": "En attente des participants et de l’admission des salles…",
   "join.hostOfflineNotice": "L’hôte et les administrateurs de ce salon sont actuellement hors ligne. L’entrée sera validée automatiquement dès que l’un d’eux se connectera.",
   "room.waitingHostBanner": "L’hôte et les administrateurs de ce salon sont hors ligne pour le moment, les nouveaux participants ne peuvent donc pas encore être admis. Attendez leur connexion ou créez votre propre salon.",

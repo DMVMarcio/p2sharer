@@ -7,6 +7,8 @@ import { stateStore } from '../../src/core/state_store.ts';
 import { modalManager } from '../../src/hooks/useModal.ts';
 import { setupTestDOM } from '../helpers/browser_mocks.ts';
 import { soundEffects } from '../../src/ui/sound_effects.ts';
+import { toastManager } from '../../src/hooks/useToast.ts';
+import { profileStats } from '../../src/core/profile_stats.ts';
 
 test('an unanswered room opens locally without granting admission and resumes its password dialog on denial', async () => {
   const dom = setupTestDOM();
@@ -36,7 +38,10 @@ test('an unanswered room opens locally without granting admission and resumes it
   } finally {
     service.hideConnecting();
     service.roomManager = null;
-    stateStore.set(state => { state.roomSlots = []; state.currentRoomInvite = ''; });
+    stateStore.set((state) => {
+      state.roomSlots = [];
+      state.currentRoomInvite = '';
+    });
     modalManager.open(null);
     GroupRoomManager.prototype.join = originalJoin;
     soundEffects.playUserJoin = originalSound;
@@ -59,8 +64,12 @@ test('a room setup failure cannot be reported as local waiting readiness', async
     assert.equal(service.joinOutcome, 'error');
     assert.equal(service.roomManager?.hasAdmission(), false);
   } finally {
-    service.hideConnecting(); service.roomManager = null;
-    stateStore.set(state => { state.roomSlots = []; state.currentRoomInvite = ''; });
+    service.hideConnecting();
+    service.roomManager = null;
+    stateStore.set((state) => {
+      state.roomSlots = [];
+      state.currentRoomInvite = '';
+    });
     GroupRoomManager.prototype.join = originalJoin;
     soundEffects.playUserJoin = originalSound;
     dom.cleanup();
@@ -73,22 +82,41 @@ test('cancelled discovery finishes cleanup before another preview and admission 
   const created = await createAuthenticatedInvite();
   const first = new GroupRoomManager('Viewer', created.invite, '', false);
   const next = new GroupRoomManager('Viewer', created.invite, '', false);
-  const original = { join: GroupRoomManager.prototype.join, leave: GroupRoomManager.prototype.leave,
-    sound: soundEffects.playUserJoin };
+  const original = {
+    join: GroupRoomManager.prototype.join,
+    leave: GroupRoomManager.prototype.leave,
+    sound: soundEffects.playUserJoin,
+  };
   soundEffects.playUserJoin = () => {};
   const calls: string[] = [];
   let markStarted!: () => void;
-  const started = new Promise<void>(resolve => { markStarted = resolve; });
+  const started = new Promise<void>((resolve) => {
+    markStarted = resolve;
+  });
   let finish!: () => void;
-  const ready = new Promise<void>(resolve => { finish = resolve; });
+  const ready = new Promise<void>((resolve) => {
+    finish = resolve;
+  });
   GroupRoomManager.prototype.join = async function (callbacks, previewOnly, password) {
-    if (this === first) { calls.push('first-start'); markStarted(); await ready; calls.push('first-ready'); }
-    else calls.push(previewOnly ? 'next-preview' : `next-admit:${password}`);
+    if (this === first) {
+      calls.push('first-start');
+      markStarted();
+      await ready;
+      calls.push('first-ready');
+    } else calls.push(previewOnly ? 'next-preview' : `next-admit:${password}`);
     callbacks.onStatusChange('Procurando Participantes...');
   };
-  GroupRoomManager.prototype.leave = async function () { calls.push(this === first ? 'first-left' : 'next-left'); };
-  const callbacks: RoomCallbacks = { onStreamsUpdate: () => {}, onSlotsUpdate: () => {}, onChat: () => {},
-    onChatHistory: () => {}, onPeersUpdate: () => {}, onStatusChange: () => {} };
+  GroupRoomManager.prototype.leave = async function () {
+    calls.push(this === first ? 'first-left' : 'next-left');
+  };
+  const callbacks: RoomCallbacks = {
+    onStreamsUpdate: () => {},
+    onSlotsUpdate: () => {},
+    onChat: () => {},
+    onChatHistory: () => {},
+    onPeersUpdate: () => {},
+    onStatusChange: () => {},
+  };
   const cancelled = new AbortController();
   const active = new AbortController();
   const pending: Promise<void>[] = [];
@@ -104,8 +132,11 @@ test('cancelled discovery finishes cleanup before another preview and admission 
     finish();
     await Promise.all([initial, cleanup, fresh]);
     assert.deepEqual(calls, ['first-start', 'first-ready', 'first-left', 'next-preview']);
-    await service.joinRoom(created.invite, 'fixture-password', false,
-      { preview: next, signal: active.signal, waitForAdmission: false });
+    await service.joinRoom(created.invite, 'fixture-password', false, {
+      preview: next,
+      signal: active.signal,
+      waitForAdmission: false,
+    });
     assert.equal(service.roomManager, next);
     assert.equal(service.joinOutcome, 'waiting');
     assert.equal(calls.at(-1), 'next-admit:fixture-password');
@@ -113,11 +144,64 @@ test('cancelled discovery finishes cleanup before another preview and admission 
   } finally {
     finish();
     await Promise.allSettled(pending);
-    service.hideConnecting(); service.roomManager = null;
-    stateStore.set(state => { state.roomSlots = []; state.currentRoomInvite = ''; });
+    service.hideConnecting();
+    service.roomManager = null;
+    stateStore.set((state) => {
+      state.roomSlots = [];
+      state.currentRoomInvite = '';
+    });
     GroupRoomManager.prototype.join = original.join;
     GroupRoomManager.prototype.leave = original.leave;
     soundEffects.playUserJoin = original.sound;
+    dom.cleanup();
+  }
+});
+
+test('duplicate or post-admission wrong-password statuses do not spam toasts', async () => {
+  const dom = setupTestDOM();
+  const originalJoin = GroupRoomManager.prototype.join;
+  const originalSound = soundEffects.playUserJoin;
+  soundEffects.playUserJoin = () => {};
+  const service = new RoomService();
+  const created = await createAuthenticatedInvite();
+  let callbacks: RoomCallbacks | undefined;
+  let admitted = false;
+  GroupRoomManager.prototype.join = async function (listeners) {
+    callbacks = listeners;
+    this.hasAdmission = () => admitted;
+    listeners.onStatusChange(admitted ? 'Sala Ativa' : 'Procurando Participantes...');
+  };
+  let seenToasts: Array<{ id: string; message: string }> = [];
+  const unsubscribe = toastManager.subscribe((items) => {
+    seenToasts = items;
+  });
+  try {
+    service.pendingJoinInvite = '';
+    await service.joinRoom(created.invite, 'wrong-fixture', false, { waitForAdmission: true });
+    callbacks!.onStatusChange('Senha incorreta para esta sala');
+    callbacks!.onStatusChange('Senha incorreta para esta sala');
+    callbacks!.onStatusChange('Senha incorreta para esta sala');
+    assert.equal(seenToasts.filter((t) => t.message === 'Senha incorreta para esta sala').length, 1);
+
+    for (const item of [...seenToasts]) toastManager.remove(item.id);
+    admitted = true;
+    await service.joinRoom(created.invite, 'right-fixture', true, { waitForAdmission: false });
+    callbacks!.onStatusChange('Senha incorreta para esta sala');
+    assert.equal(service.joinOutcome, 'admitted');
+    assert.equal(seenToasts.length, 0);
+  } finally {
+    unsubscribe();
+    for (const item of [...seenToasts]) toastManager.remove(item.id);
+    profileStats.setInCall(false);
+    service.hideConnecting();
+    service.roomManager = null;
+    stateStore.set((state) => {
+      state.roomSlots = [];
+      state.currentRoomInvite = '';
+    });
+    modalManager.open(null);
+    GroupRoomManager.prototype.join = originalJoin;
+    soundEffects.playUserJoin = originalSound;
     dom.cleanup();
   }
 });

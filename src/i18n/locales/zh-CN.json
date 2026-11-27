@@ -1136,6 +1136,7 @@
   "join.online": "在线参与者：{{count}}",
   "join.participants": "房间里的人",
   "join.timeout": "无法确认连接。检查密码或重试。",
+  "join.passwordRequired": "请输入房间密码",
   "join.waiting": "等待参与者和入场……",
   "join.hostOfflineNotice": "该房间的房主和管理员当前均不在线。一旦其中一人连接，系统会自动完成准入。",
   "room.waitingHostBanner": "该房间的房主和管理员当前不在线，暂时无法准入新成员。请等待他们上线，或创建您自己的新房间。",
