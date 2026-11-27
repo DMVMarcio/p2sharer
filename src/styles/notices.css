@@ -1,0 +1,24 @@
+/* ==========================================================================
+   INLINE NOTICES
+   ========================================================================== */
+
+.inline-notice {
+  font-size: 12px;
+  line-height: 1.4;
+  color: var(--text-secondary);
+  padding: 8px 12px;
+  background-color: var(--bg-elevated);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+}
+
+.inline-notice {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin: 12px 0;
+}
+.inline-notice > svg {
+  flex-shrink: 0;
+  color: var(--text-primary);
+}

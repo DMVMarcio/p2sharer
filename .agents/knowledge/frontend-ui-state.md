@@ -78,7 +78,8 @@ src/
 │   └── sound_effects.ts     # Synthesized Web Audio UI sound indicators
 ├── App.tsx                  # Root application component
 ├── main.tsx                 # React DOM mount entrypoint
-├── style.css                # Global design system & component tokens
+├── style.css                # Ordered @import index of the global stylesheet
+├── styles/                  # Global design system partials (tokens, themes, accents, base, buttons, surfaces…)
 └── index.html               # App HTML shell with #root mount point
 ```
 
@@ -115,7 +116,7 @@ Persistent settings are automatically synchronized to and restored from `localSt
 
 ---
 
-## 4. UI Design Tokens & Theme Engine (`src/style.css`)
+## 4. UI Design Tokens & Theme Engine (`src/styles/`)
 
 - **Design System Tokens**:
   - CSS Custom Properties define all surfaces (`--bg-app`, `--bg-surface`, `--bg-elevated`, `--bg-card`, `--bg-input`), borders (`--border-subtle`, `--border-focus`), text (`--text-primary`, `--text-muted`), and accent hues.
@@ -155,7 +156,7 @@ The application-wide rule covers reusable React components and shared CSS recipe
 
 | Control family | Canonical implementation |
 | --- | --- |
-| Buttons and icon actions | `style.css`: `.btn` with semantic/size variants and established specialized icon-button recipes; `TooltipButton` for actions with tooltips |
+| Buttons and icon actions | `styles/buttons.css`: `.btn` with semantic/size variants and established specialized icon-button recipes; `TooltipButton` for actions with tooltips |
 | Text fields and rich composition | `.text-input`, `.text-input-sm`, `EmojiComposerInput`; shared `text_editing_actions` and editor registration for context editing |
 | Selection fields | `components/common/inputs/Select.tsx` |
 | Context and dots menus | `ContextMenu`, `AppContextMenu`, `useContextMenu`, and shared feature action builders |

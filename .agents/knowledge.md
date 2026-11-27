@@ -19,7 +19,7 @@ The Tauri v2 host combines native Windows integration with a React interface and
 - **Core Entrypoints**:
   - Frontend: `src/main.tsx`, `src/App.tsx`
   - Backend Rust: `src-tauri/src/main.rs`, `src-tauri/src/lib.rs`
-  - Shell / UI: `index.html`, `src/style.css`
+  - Shell / UI: `index.html`, `src/style.css` (ordered `@import` index of `src/styles/*.css`)
 
 ---
 
@@ -29,7 +29,7 @@ The Tauri v2 host combines native Windows integration with a React interface and
 | **Workspace Orchestration** | `project-orchestrator.md` | `project-audit/SKILL.md`, `subagent-management/SKILL.md`, `code-structure/SKILL.md` | Whole repository, task triage & cross-domain coordination |
 | **P2P Netcode & Signaling** | `p2p-specialist.md` | `p2p-protocol/SKILL.md` | `src/p2p/*` (SignalingManager, GroupRoomManager, MediaCoordinator, PeerTracker, IceConfig) |
 | **Native Media Pipeline** | `native-media-specialist.md` | `native-media-pipeline/SKILL.md` | `src-tauri/src/*`, `src/audio/*`, `src/video/*` (WASAPI, xcap, WS bridge, resampler, process manager) |
-| **UI, State & Components** | `ui-architect.md` | `canonical-design/SKILL.md`, `code-structure/SKILL.md` | `src/components/*`, `src/hooks/*`, `src/ui/*`, `src/core/*`, `index.html`, `src/style.css` (React views, hooks, StateStore) |
+| **UI, State & Components** | `ui-architect.md` | `canonical-design/SKILL.md`, `code-structure/SKILL.md` | `src/components/*`, `src/hooks/*`, `src/ui/*`, `src/core/*`, `index.html`, `src/style.css`, `src/styles/*` (React views, hooks, StateStore) |
 
 ---
 

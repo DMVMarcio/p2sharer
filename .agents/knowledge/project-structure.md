@@ -21,6 +21,7 @@ Verified reference for **where files live and how they are composed** in P2Share
 | `src/audio/`, `src/video/` | TypeScript side of the native media bridges and voice/audio contexts. Owned by `native-media-specialist`. | Flat |
 | `src/platform/` | Desktop vs. web runtime adapters (Tauri `commands.ts` vs. `web_commands.ts`, storage, files, PiP, rendering). | Flat |
 | `src/i18n/` | i18next setup and `locales/<lang>.json` for the 13 supported languages. | By language |
+| `src/style.css`, `src/styles/` | Global stylesheet: `style.css` only lists `@import`s in cascade order (component CSS first, then `styles/` partials: tokens → themes → accents → base → header/layout/home → buttons → room/streams/sidebar → modals/settings → notices/toasts/overlays → switch → pip → accessibility overrides → voice). Add new global rules to the matching partial; keep the import order, since later partials override earlier ones. Component-specific CSS stays next to its component. | One partial per surface/system |
 | `src/ui/`, `src/releases/`, `src/assets/` | Sound effects; upcoming release notes (`current.json`); static assets. | Flat |
 | `src-tauri/src/` | Rust host: one module per native capability (`video_*`, `browser_*`, `virtual_network*`, `audio_loopback`, `port_tunnel`…). `lib.rs` declares the modules and Tauri commands; `shared_browser.rs` declares its own out-of-line submodules. | Flat `snake_case.rs`, grouped by prefix |
 | `src-tauri/native/`, `src-tauri/tests/` | Native C/C++ helpers (`mf`, `nvenc`); Rust integration tests. | By component |
@@ -104,5 +105,5 @@ Budgets are higher than the generic defaults because many existing files are lar
 
 ## 6. Known Structure Debt
 Observed, not yet fixed. Restructure gradually: small in-scope moves happen inside a task; larger moves are proposed to the user and committed separately as `refactor(structure)` with `git mv`.
-- Oversized files: `src/style.css` (~12,000 lines after its first Prettier format), `src/p2p/group_room.ts` (~5,700), `src/services/room_service.ts` (~2,500), `src/apps/whiteboard/whiteboard_canvas2d.ts` (~2,200), `src/apps/whiteboard/WhiteboardCanvas.tsx` (~1,800), `src/hooks/stream/useRemoteControl.ts` (~1,500), `src/components/modals/settings/SettingsModal.tsx` (~1,300).
+- Oversized files: `src/p2p/group_room.ts` (~5,700), `src/services/room_service.ts` (~2,500), `src/apps/whiteboard/whiteboard_canvas2d.ts` (~2,200), `src/apps/whiteboard/WhiteboardCanvas.tsx` (~1,800), `src/hooks/stream/useRemoteControl.ts` (~1,500), `src/components/modals/settings/SettingsModal.tsx` (~1,300).
 - `src-tauri/src/` is flat with ~70 modules; `video_*`, `browser_*`, and `virtual_network*` are candidates for module directories.

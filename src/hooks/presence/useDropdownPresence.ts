@@ -1,7 +1,7 @@
 import { useLayoutEffect, useState } from 'react';
 import { isReducedMotion } from '../../core/appearance/appearance_preferences.ts';
 
-// Keep in sync with --dropdown-exit-duration in style.css.
+// Keep in sync with --dropdown-exit-duration in src/styles/tokens.css.
 const EXIT_DURATION_MS = 260;
 
 /** Retain the last menu content while its noninteractive exit animation finishes. */

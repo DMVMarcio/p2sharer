@@ -1,0 +1,72 @@
+/* ==========================================================================
+   THEME PALETTES (Dark / Light)
+   ========================================================================== */
+
+/* DARK THEME (Default) */
+html[data-theme='dark'],
+:root {
+  --bg-app: #09090b;
+  --bg-surface: #121215;
+  --bg-elevated: #18181b;
+  --bg-card: #141417;
+  --bg-card-hover: #1c1c21;
+  --bg-control: #25252c;
+  --bg-control-hover: #34343e;
+  --bg-input: #18181b;
+  --bg-overlay: rgba(0, 0, 0, 0.72);
+
+  --border-subtle: rgba(255, 255, 255, 0.06);
+  --border-default: rgba(255, 255, 255, 0.1);
+  --border-focus: rgba(255, 255, 255, 0.24);
+
+  --text-primary: #f4f4f5;
+  --text-secondary: #a1a1aa;
+  --text-muted: #71717a;
+  --text-disabled: #52525b;
+
+  --danger-bg: rgba(239, 68, 68, 0.12);
+  --danger-border: rgba(239, 68, 68, 0.3);
+  --danger-text: #f87171;
+  --danger-hover: #ef4444;
+
+  --success-bg: rgba(16, 185, 129, 0.12);
+  --success-border: rgba(16, 185, 129, 0.3);
+  --success-text: #34d399;
+  --warning-text: #e6ad55;
+
+  --skeleton-base: rgba(255, 255, 255, 0.05);
+  --skeleton-highlight: rgba(255, 255, 255, 0.12);
+}
+
+/* LIGHT THEME */
+html[data-theme='light'] {
+  --bg-app: #f4f4f5;
+  --bg-surface: #ffffff;
+  --bg-elevated: #fafafa;
+  --bg-card: #ffffff;
+  --bg-card-hover: #f4f4f5;
+  --bg-input: #f4f4f5;
+  --bg-overlay: rgba(0, 0, 0, 0.45);
+
+  --border-subtle: rgba(0, 0, 0, 0.06);
+  --border-default: rgba(0, 0, 0, 0.12);
+  --border-focus: rgba(0, 0, 0, 0.3);
+
+  --text-primary: #09090b;
+  --text-secondary: #52525b;
+  --text-muted: #71717a;
+  --text-disabled: #a1a1aa;
+
+  --danger-bg: rgba(239, 68, 68, 0.08);
+  --danger-border: rgba(239, 68, 68, 0.25);
+  --danger-text: #dc2626;
+  --danger-hover: #b91c1c;
+
+  --success-bg: rgba(16, 185, 129, 0.08);
+  --success-border: rgba(16, 185, 129, 0.25);
+  --success-text: #059669;
+  --warning-text: #99600f;
+
+  --skeleton-base: rgba(0, 0, 0, 0.05);
+  --skeleton-highlight: rgba(0, 0, 0, 0.12);
+}

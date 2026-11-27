@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { isReducedMotion } from '../../core/appearance/appearance_preferences.ts';
 
-// Keep in sync with --source-loading-duration in style.css.
+// Keep in sync with --source-loading-duration in src/styles/tokens.css.
 const FADE_DURATION_MS = 400;
 
 /** Share source-loading presence so quick switches can cancel an in-progress fade. */

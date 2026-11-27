@@ -1,0 +1,109 @@
+/* ==========================================================================
+   BUTTONS SYSTEM
+   ========================================================================== */
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 10px 18px;
+  font-size: 13px;
+  font-weight: 600;
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  border: 1px solid transparent;
+  outline: none;
+  text-decoration: none;
+  font-family: inherit;
+  white-space: nowrap;
+  width: 100%;
+}
+
+.btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+  pointer-events: none;
+}
+
+.btn-primary {
+  background-color: var(--accent-color);
+  color: var(--accent-text-on-accent);
+}
+
+.btn-primary:hover {
+  background-color: var(--accent-hover);
+}
+
+.btn-primary:active {
+  transform: scale(0.98);
+}
+
+.btn-secondary {
+  background-color: var(--bg-control);
+  border-color: transparent;
+  color: var(--text-primary);
+}
+
+.btn-secondary:hover {
+  background-color: var(--bg-control-hover);
+  border-color: transparent;
+}
+
+.btn-outline {
+  background-color: var(--bg-control);
+  border-color: transparent;
+  color: var(--text-primary);
+}
+
+.btn-outline:hover {
+  background-color: var(--bg-control-hover);
+  border-color: transparent;
+}
+
+.btn-danger {
+  background-color: var(--danger-bg);
+  border-color: var(--danger-border);
+  color: var(--danger-text);
+}
+
+.btn-danger:hover {
+  background-color: var(--danger-hover);
+  color: #ffffff;
+}
+
+.btn-sm {
+  padding: 6px 12px;
+  font-size: 12px;
+  border-radius: var(--radius-sm);
+  width: auto;
+}
+
+.btn-compact {
+  padding: 6px 10px;
+}
+
+.btn.btn-transmission-menu {
+  padding-right: 8px;
+}
+.btn-transmission-menu .transmission-chevron {
+  flex-shrink: 0;
+  width: 10px;
+  margin-left: -5px;
+}
+.transmission-source-icon {
+  position: relative;
+  display: grid;
+  place-items: center;
+  padding: 7px;
+  border-radius: var(--radius-sm);
+  background: var(--accent-subtle);
+  color: var(--accent-color);
+}
+.transmission-source-icon .stream-sharing-indicator {
+  position: absolute;
+  right: 1px;
+  bottom: 1px;
+  box-shadow: 0 0 0 2px var(--bg-elevated);
+}

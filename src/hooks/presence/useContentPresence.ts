@@ -2,7 +2,7 @@ import { useLayoutEffect, useState } from 'react';
 import { isReducedMotion } from '../../core/appearance/appearance_preferences.ts';
 import { stateStore } from '../../core/state_store.ts';
 
-// Matches --content-exit-duration and the shared fast transition in style.css.
+// Matches --content-exit-duration and the shared fast transition in src/styles/tokens.css.
 const EXIT_DURATION_MS = 150;
 
 /** Keep outgoing content mounted and inert before committing the latest requested view. */
