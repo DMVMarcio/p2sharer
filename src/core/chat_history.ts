@@ -5,17 +5,19 @@ export function hasSafeChatOrder(order: unknown): boolean {
 }
 
 // Reserve before signing so concurrent local sends cannot reuse a sequence.
-export function nextChatOrder(history: ChatMessage[], reserved = 0): number {
+export function nextChatOrder(history: ChatMessage[], reserved = 0, minOrder = 0): number {
   const latest = history.reduce((order, message) => Math.max(order, message.logicalOrder ?? 0), reserved);
   if (latest >= Number.MAX_SAFE_INTEGER) throw new Error('Chat logical order exhausted');
-  return latest + 1;
+  const floor = Number.isFinite(minOrder) ? Math.max(0, Math.trunc(minOrder)) : 0;
+  if (floor > Number.MAX_SAFE_INTEGER) throw new Error('Chat logical order exhausted');
+  return Math.max(latest + 1, floor);
 }
 
 function compareChatMessages(a: ChatMessage, b: ChatMessage): number {
-  const order = (a.logicalOrder ?? 0) - (b.logicalOrder ?? 0);
-  if (order) return order;
-  // Timestamp ordering is retained only for history without a logical sequence.
-  if (a.logicalOrder === undefined && b.logicalOrder === undefined && a.timestamp !== b.timestamp) {
+  const orderA = a.logicalOrder ?? 0;
+  const orderB = b.logicalOrder ?? 0;
+  if (orderA !== orderB) return orderA < orderB ? -1 : 1;
+  if (a.timestamp !== b.timestamp) {
     return a.timestamp - b.timestamp;
   }
   return a.id < b.id ? -1 : a.id > b.id ? 1 : 0;

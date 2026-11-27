@@ -138,18 +138,20 @@ test('join creates own notice and direct handshake exchanges history both ways',
     actions.get('stream_status')!.onMessage!({ isStreaming: true, senderName: 'Host' }, { peerId: 'mallory' });
     assert.deepEqual(streamStarts.at(-1), { id: 'mallory', name: 'Mallory' });
 
+    const clockAheadTs = Date.now() + 300_000;
     const clockAheadHistory = await hostAuth.sign({ ...remote, id: 'ahead-history',
-      timestamp: Date.now() + 300_000, logicalOrder: 100 });
+      timestamp: clockAheadTs, logicalOrder: clockAheadTs });
     await historyHandler({ history: [clockAheadHistory] }, { peerId: 'host' });
     const afterHistory = await manager.sendChatMessage('after synced history');
-    assert.equal(afterHistory.logicalOrder, 101);
+    assert.equal(afterHistory.logicalOrder, clockAheadTs + 1);
     assert.ok(afterHistory.timestamp < clockAheadHistory.timestamp);
+    const clockAheadLiveTs = Date.now() + 600_000;
     const clockAheadLive = await hostAuth.sign({ ...remote, id: 'ahead-live',
-      timestamp: Date.now() + 600_000, logicalOrder: 150 });
+      timestamp: clockAheadLiveTs, logicalOrder: clockAheadLiveTs });
     await chatHandler(clockAheadLive, { peerId: 'host' });
     const [one, two] = await Promise.all([manager.sendChatMessage('one'), manager.sendChatMessage('two')]);
-    assert.equal(one.logicalOrder, 151);
-    assert.equal(two.logicalOrder, 152);
+    assert.equal(one.logicalOrder, clockAheadLiveTs + 1);
+    assert.equal(two.logicalOrder, clockAheadLiveTs + 2);
     await manager.editChatMessage(one.id, 'edited one');
     assert.equal(local.at(-1)?.logicalOrder, one.logicalOrder);
     await manager.deleteChatMessage(one.id);
@@ -157,6 +159,21 @@ test('join creates own notice and direct handshake exchanges history both ways',
     const history = (manager as any).chatHistory as ChatMessage[];
     assert.ok(history.findIndex((item) => item.id === one.id) >
       history.findIndex((item) => item.id === clockAheadLive.id));
+
+    const earlierJoinTs = local[0].timestamp - 120_000;
+    const earlierJoin = await hostAuth.sign({
+      ...message('earlier-join', earlierJoinTs, 'Host entrou'),
+      authorId: 'host', revision: 0, systemActor: 'Host', logicalOrder: earlierJoinTs,
+    });
+    const earlierChatTs = local[0].timestamp - 60_000;
+    const earlierChat = await hostAuth.sign({
+      ...remote, id: 'earlier-chat', timestamp: earlierChatTs, logicalOrder: earlierChatTs, text: 'earlier message',
+    });
+    await historyHandler({ history: [earlierJoin, earlierChat] }, { peerId: 'host' });
+    const syncedHistory = (manager as any).chatHistory as ChatMessage[];
+    const joinIdx = syncedHistory.findIndex((item) => item.id === local[0].id);
+    assert.ok(syncedHistory.findIndex((item) => item.id === earlierJoin.id) < joinIdx);
+    assert.ok(syncedHistory.findIndex((item) => item.id === earlierChat.id) < joinIdx);
   } finally {
     await manager.leave();
     (signalingManager as any).joinRoom = originalJoin;

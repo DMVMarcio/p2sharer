@@ -3,55 +3,68 @@
   "translations": {
     "en": [
       "**Performance diagnostics and exportable reports.** Measure real CPU, memory, UI frame rate, and media load across processes, and export a detailed JSON report.",
-      "**More reliable admin-managed rooms.** Fixed participants or fellow admins staying hidden when entering rooms while the original host is offline."
+      "**More reliable admin-managed rooms.** Fixed participants or fellow admins staying hidden when entering rooms while the original host is offline.",
+      "**Chronological chat ordering.** Fixed join, leave, and room notices appearing out of order when rejoining or syncing history with other participants."
     ],
     "pt-BR": [
       "**Diagnóstico de desempenho com relatório exportável.** Meça CPU, memória, fluidez da interface e carga de mídia por processo e exporte um relatório JSON detalhado.",
-      "**Salas gerenciadas por administradores mais confiáveis.** Corrigido problema em que participantes ou outros admins ficavam ocultos ao entrar com o anfitrião offline."
+      "**Salas gerenciadas por administradores mais confiáveis.** Corrigido problema em que participantes ou outros admins ficavam ocultos ao entrar com o anfitrião offline.",
+      "**Ordem cronológica do chat.** Corrigido problema que fazia avisos de entrada, saída e criação de sala aparecerem fora de ordem ao entrar ou sincronizar o histórico."
     ],
     "es": [
       "**Diagnóstico de rendimiento con informe exportable.** Mide CPU, memoria, fluidez y carga multimedia por proceso y exporta un informe JSON detallado.",
-      "**Salas gestionadas por administradores más fiables.** Se corrigió que participantes u otros admins quedaran ocultos al entrar con el anfitrión desconectado."
+      "**Salas gestionadas por administradores más fiables.** Se corrigió que participantes u otros admins quedaran ocultos al entrar con el anfitrión desconectado.",
+      "**Orden cronológico del chat.** Se corrigió que los avisos de entrada, salida y sala aparecieran desordenados al reconectar o sincronizar el historial."
     ],
     "fr": [
       "**Diagnostic des performances avec rapport exportable.** Mesurez le CPU, la mémoire, la fluidité et la charge média par processus puis exportez un rapport JSON détaillé.",
-      "**Salons gérés par des administrateurs plus fiables.** Correction des participants ou autres admins invisibles lors de l'entrée quand l'hôte est hors ligne."
+      "**Salons gérés par des administrateurs plus fiables.** Correction des participants ou autres admins invisibles lors de l'entrée quand l'hôte est hors ligne.",
+      "**Ordre chronologique du chat.** Correction des avis d'arrivée, de départ et de salon qui s'affichaient dans le désordre après une reconnexion ou synchronisation."
     ],
     "de": [
       "**Leistungsdiagnose mit exportierbarem Bericht.** Miss CPU, Speicher, UI-Flüssigkeit und Medienlast pro Prozess und exportiere einen detaillierten JSON-Bericht.",
-      "**Zuverlässigere von Admins verwaltete Räume.** Behoben, dass Teilnehmende oder andere Admins beim Beitritt ohne aktiven Host unsichtbar blieben."
+      "**Zuverlässigere von Admins verwaltete Räume.** Behoben, dass Teilnehmende oder andere Admins beim Beitritt ohne aktiven Host unsichtbar blieben.",
+      "**Chronologische Chat-Reihenfolge.** Behoben, dass Beitritts-, Austritts- und Raumhinweise beim erneuten Verbinden oder Synchronisieren unsortiert erschienen."
     ],
     "it": [
       "**Diagnostica prestazioni con report esportabile.** Misura CPU, memoria, fluidità e carico multimediale per processo ed esporta un report JSON dettagliato.",
-      "**Stanze gestite da amministratori più affidabili.** Risolto il problema per cui partecipanti o altri admin restavano nascosti entrando con l'host offline."
+      "**Stanze gestite da amministratori più affidabili.** Risolto il problema per cui partecipanti o altri admin restavano nascosti entrando con l'host offline.",
+      "**Ordine cronologico della chat.** Risolto il problema che mostrava avvisi di ingresso, uscita e stanza fuori ordine dopo il rientro o la sincronizzazione."
     ],
     "zh-CN": [
       "**性能诊断与报告导出。** 按进程测量实际 CPU、内存、界面帧率和媒体负载，并导出详细的 JSON 诊断报告。",
-      "**管理员代管房间更稳定。** 修复了原房主不在线时加入房间可能看不到其他成员或管理员的问题。"
+      "**管理员代管房间更稳定。** 修复了原房主不在线时加入房间可能看不到其他成员或管理员的问题。",
+      "**按时间顺序排列聊天记录。** 修复了重新加入房间或同步历史记录时，进出房间与创建提示顺序错乱的问题。"
     ],
     "zh-TW": [
       "**效能診斷與報告匯出。** 依處理程序測量實際 CPU、記憶體、介面幀率與媒體負載，並匯出詳細的 JSON 診斷報告。",
-      "**管理員代管房間更穩定。** 修復了原房主不在線時加入房間可能看不到其他成員或管理員的問題。"
+      "**管理員代管房間更穩定。** 修復了原房主不在線時加入房間可能看不到其他成員或管理員的問題。",
+      "**依時間順序排列聊天紀錄。** 修復了重新加入房間或同步歷史紀錄時，進出房間與建立提示順序錯亂的問題。"
     ],
     "ja": [
       "**パフォーマンス診断とレポート出力。** プロセスごとのCPU・メモリ・UI応答性・メディア負荷を計測し、詳細なJSONレポートを出力できます。",
-      "**管理者運営ルームの安定性を改善。** ホスト不在時に入室した際、他の参加者や管理者が表示されないことがある問題を修正しました。"
+      "**管理者運営ルームの安定性を改善。** ホスト不在時に入室した際、他の参加者や管理者が表示されないことがある問題を修正しました。",
+      "**チャットの時系列表示を修正。** 再入室や履歴の同期時に、入退室やルーム作成の通知が順不同で表示される問題を解消しました。"
     ],
     "ko": [
       "**성능 진단 및 보고서 내보내기.** 프로세스별 실제 CPU, 메모리, UI 프레임률 및 미디어 부하를 측정하고 상세 JSON 보고서를 내보낼 수 있습니다.",
-      "**관리자 운영 방 안정성 개선.** 호스트가 오프라인일 때 입장하면 다른 참가자나 관리자가 보이지 않던 문제를 수정했습니다."
+      "**관리자 운영 방 안정성 개선.** 호스트가 오프라인일 때 입장하면 다른 참가자나 관리자가 보이지 않던 문제를 수정했습니다.",
+      "**채팅 시간순 정렬 개선.** 다시 입장하거나 대화 기록을 동기화할 때 입장, 퇴장 및 방 생성 알림이 순서 없이 표시되던 문제를 수정했습니다."
     ],
     "hi": [
       "**प्रदर्शन निदान और निर्यात योग्य रिपोर्ट।** प्रक्रिया के अनुसार वास्तविक CPU, मेमोरी, UI फ़्रेम दर और मीडिया लोड मापें तथा विस्तृत JSON रिपोर्ट निर्यात करें।",
-      "**एडमिन द्वारा संचालित रूम अधिक भरोसेमंद।** मूल होस्ट के ऑफ़लाइन होने पर जुड़ते समय अन्य सदस्यों या एडमिन के न दिखने की समस्या ठीक की गई।"
+      "**एडमिन द्वारा संचालित रूम अधिक भरोसेमंद।** मूल होस्ट के ऑफ़लाइन होने पर जुड़ते समय अन्य सदस्यों या एडमिन के न दिखने की समस्या ठीक की गई।",
+      "**चैट का सही कालानुक्रम।** दोबारा जुड़ने या इतिहास सिंक करने पर प्रवेश, निकास और रूम सूचनाओं के गलत क्रम में दिखने की समस्या ठीक की गई।"
     ],
     "fi": [
       "**Suorituskykydiagnostiikka ja vietävä raportti.** Mittaa prosessikohtainen CPU, muisti, sujuvuus ja mediakuorma sekä vie yksityiskohtainen JSON-raportti.",
-      "**Luotettavammat ylläpitäjien hoitamat huoneet.** Korjattiin tilanne, jossa osallistujat tai muut ylläpitäjät jäivät piiloon isännän ollessa offline-tilassa."
+      "**Luotettavammat ylläpitäjien hoitamat huoneet.** Korjattiin tilanne, jossa osallistujat tai muut ylläpitäjät jäivät piiloon isännän ollessa offline-tilassa.",
+      "**Keskustelun aikajärjestys kuntoon.** Korjattiin liittymis-, poistumis- ja huoneilmoitusten väärä järjestys uudelleen liityttäessä tai historiaa synkronoitaessa."
     ],
     "ru": [
       "**Диагностика производительности и экспорт отчёта.** Измеряйте нагрузку CPU, память, плавность и медиапотоки по процессам и экспортируйте подробный JSON-отчёт.",
-      "**Более надёжная работа комнат с администраторами.** Исправлено скрытие участников или других админов при входе в комнату, когда создатель не в сети."
+      "**Более надёжная работа комнат с администраторами.** Исправлено скрытие участников или других админов при входе в комнату, когда создатель не в сети.",
+      "**Хронологический порядок чата.** Исправлен сбой порядка уведомлений о входе, выходе и создании комнаты при переподключении и синхронизации истории."
     ]
   }
 }

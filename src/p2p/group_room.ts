@@ -5361,7 +5361,7 @@ export class GroupRoomManager {
   private async publishChatMessage(msg: ChatMessage): Promise<ChatMessage> {
     if (!this.chatAuth) throw new Error('Chat identity is not ready');
     if (chatRevision(msg) === 0) {
-      this.reservedChatOrder = nextChatOrder(this.chatHistory, this.reservedChatOrder);
+      this.reservedChatOrder = nextChatOrder(this.chatHistory, this.reservedChatOrder, msg.timestamp);
       msg = { ...msg, logicalOrder: this.reservedChatOrder };
     }
     const signed = await this.chatAuth.sign(msg);

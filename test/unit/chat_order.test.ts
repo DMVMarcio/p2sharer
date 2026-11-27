@@ -25,6 +25,22 @@ test('concurrent messages converge regardless of delivery order, locale or wall 
   assert.equal(nextChatOrder([b, a], 8), 9);
 });
 
+test('equal logicalOrder ties break chronologically by timestamp before code-unit ID', () => {
+  const earlier = message('ffff', 1_000, 1);
+  const later = message('0000', 2_000, 1);
+  assert.deepEqual(mergeChatHistory([later], [earlier]).map((item) => item.id), ['ffff', '0000']);
+  const sameTsZ = message('Z', 5_000, 5);
+  const sameTsA = message('a', 5_000, 5);
+  assert.deepEqual(mergeChatHistory([sameTsA], [sameTsZ]).map((item) => item.id), ['Z', 'a']);
+});
+
+test('nextChatOrder seeds from minOrder when history is empty or older and stays monotonic', () => {
+  assert.equal(nextChatOrder([], 0, 1_700_000_000_000), 1_700_000_000_000);
+  const prior = message('prior', 1_700_000_000_500, 1_700_000_000_500);
+  assert.equal(nextChatOrder([prior], 0, 1_700_000_000_000), 1_700_000_000_501);
+  assert.equal(nextChatOrder([message('legacy', 100, 2)], 0, 1_700_000_000_000), 1_700_000_000_000);
+});
+
 test('edits and deletion keep position and cannot change the original ordering fields', () => {
   const original = message('first', 100, 1);
   const later = message('second', 50, 2);

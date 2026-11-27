@@ -2220,12 +2220,13 @@ export class RoomService {
         console.warn('[Chat] Failed to sign or send system notice:', error));
       return;
     }
+    const timestamp = Date.now();
     const msg: ChatMessage = {
-      id: `sys_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
-      logicalOrder: nextChatOrder(this.chatMessages),
+      id: `sys_${timestamp}_${Math.random().toString(36).substring(2, 7)}`,
+      logicalOrder: nextChatOrder(this.chatMessages, 0, timestamp),
       sender: t("message.f150afd3c599"),
       text,
-      timestamp: Date.now(),
+      timestamp,
       isSystem: true,
       systemType,
     };
