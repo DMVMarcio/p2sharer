@@ -276,7 +276,7 @@ export class WhiteboardCanvas2DRenderer {
       this.strokeCanvas = document.createElement('canvas');
       this.strokeCanvas.width = width;
       this.strokeCanvas.height = height;
-      this.strokeCtx = this.strokeCanvas.getContext('2d');
+      this.strokeCtx = this.strokeCanvas.getContext('2d', { willReadFrequently: true });
       this.liveSession = null;
       this.nonIncrementalPrevRect = null;
     }
@@ -295,7 +295,7 @@ export class WhiteboardCanvas2DRenderer {
       this.tipCanvas = document.createElement('canvas');
       this.tipCanvas.width = width;
       this.tipCanvas.height = height;
-      this.tipCtx = this.tipCanvas.getContext('2d');
+      this.tipCtx = this.tipCanvas.getContext('2d', { willReadFrequently: true });
     }
     if (!this.tipCtx || typeof this.tipCtx.drawImage !== 'function') return null;
     return { canvas: this.tipCanvas, ctx: this.tipCtx };
@@ -1153,6 +1153,7 @@ export class WhiteboardCanvas2DRenderer {
     height: number,
     alphaLock: boolean,
     getCompositeSample?: () => Uint8ClampedArray | null,
+    isFinal = false,
   ): DirtyRect | null {
     const sig = liveSessionSignature(d, alphaLock);
     const liveMode = getLiveStrokeMode(d);
@@ -1317,7 +1318,7 @@ export class WhiteboardCanvas2DRenderer {
         const fromIdx = Math.max(0, session.finalizedEndIdx);
         const initializeCarry = session.finalizedEndIdx < 0;
         for (let c = 0; c < symmetryLists.length; c++) {
-          const segPts = buildFinalizedSegments(symmetryLists[c], fromIdx, targetEndIdx, Boolean(d.smoothing), true);
+          const segPts = buildFinalizedSegments(symmetryLists[c], fromIdx, targetEndIdx, Boolean(d.smoothing), false);
           const carry = session.carryCanvases[c];
           if (segPts.length && carry) {
             const { bounds, residual } = this.stepSmudgeSegment(
@@ -1393,7 +1394,7 @@ export class WhiteboardCanvas2DRenderer {
         const fromIdx = Math.max(0, session.finalizedEndIdx);
         const stampStart = session.finalizedEndIdx < 0;
         for (let c = 0; c < symmetryLists.length; c++) {
-          const segPts = buildFinalizedSegments(symmetryLists[c], fromIdx, targetEndIdx, Boolean(d.smoothing), true);
+          const segPts = buildFinalizedSegments(symmetryLists[c], fromIdx, targetEndIdx, Boolean(d.smoothing), false);
           if (segPts.length) {
             const { bounds, residual } = this.stepBlurSegment(
               scratchCtx,
@@ -1488,30 +1489,14 @@ export class WhiteboardCanvas2DRenderer {
       session.dirtyRect = unionRects(session.dirtyRect, stepRect);
     }
 
-    // Tail segment preview (for subdivided Bezier smoothness right up to the live pointer)
+    // Tail segment finalization (on commit) or live preview (mid-stroke)
     let currentTipRect: DirtyRect | null = null;
-    const needsSurfaceTransfer = !isEraser && (d.brushType === 'pencil' || d.brushType === 'watercolor');
-    const tipBuf = hasSubdivide && d.points.length >= 2 && !needsSurfaceTransfer ? this.ensureTipBuffer(width, height) : null;
-    if (tipBuf && d.points.length >= 2) {
-      const lastPt = mappedPoints[mappedPoints.length - 1];
-      const prevPt = mappedPoints[mappedPoints.length - 2];
-      const approxTipPad = Math.max(8, profile.base * scaleAvg * 2.5);
-      const tipApprox = clampRect({
-        x: Math.min(prevPt.x, lastPt.x) - approxTipPad,
-        y: Math.min(prevPt.y, lastPt.y) - approxTipPad,
-        w: Math.abs(lastPt.x - prevPt.x) + approxTipPad * 2,
-        h: Math.abs(lastPt.y - prevPt.y) + approxTipPad * 2,
-      }, width, height);
-      if (d.symmetry && d.symmetry !== 'none') {
-        tipBuf.ctx.clearRect(0, 0, width, height);
-      } else if (tipApprox) {
-        tipBuf.ctx.clearRect(tipApprox.x, tipApprox.y, tipApprox.w, tipApprox.h);
-      }
+    if (isFinal && hasSubdivide && d.points.length >= 2) {
       for (let c = 0; c < symmetryLists.length; c++) {
         const tailPts = buildTailSegment(symmetryLists[c], Boolean(d.smoothing), hasSubdivide);
         if (tailPts.length >= 2) {
-          const { bounds } = this.stampInterpolatedList(
-            tipBuf.ctx,
+          const { bounds, residual, dabCount, arcLen } = this.stampInterpolatedList(
+            strokeCtx,
             tailPts,
             d,
             tip,
@@ -1524,29 +1509,95 @@ export class WhiteboardCanvas2DRenderer {
             session.dabCounts[c] ?? 0,
             session.arcLengths[c] ?? 0,
           );
-          currentTipRect = unionRects(currentTipRect, bounds);
+          session.residuals[c] = residual;
+          session.dabCounts[c] = dabCount;
+          session.arcLengths[c] = arcLen;
+          stepRect = unionRects(stepRect, bounds);
         }
+      }
+      session.dirtyRect = unionRects(session.dirtyRect, stepRect);
+    }
+
+    let tailLists: BoardPoint[][] | null = null;
+    let tailApproxRect: DirtyRect | null = null;
+    if (!isFinal && hasSubdivide && d.points.length >= 2) {
+      tailLists = [];
+      const pad = Math.max(8, profile.base * scaleAvg * (d.brushType === 'airbrush' ? 1.5 : 1.1) + 6);
+      let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+      for (let c = 0; c < symmetryLists.length; c++) {
+        const tailPts = buildTailSegment(symmetryLists[c], Boolean(d.smoothing), hasSubdivide);
+        tailLists.push(tailPts);
+        for (let k = 0; k < tailPts.length; k++) {
+          const p = tailPts[k];
+          if (p.x < minX) minX = p.x;
+          if (p.y < minY) minY = p.y;
+          if (p.x > maxX) maxX = p.x;
+          if (p.y > maxY) maxY = p.y;
+        }
+      }
+      if (maxX >= minX) {
+        tailApproxRect = clampRect({ x: minX - pad, y: minY - pad, w: maxX - minX + pad * 2, h: maxY - minY + pad * 2 }, width, height);
       }
     }
 
-    const opacityChanged = Math.abs(opacity - session.lastOpacity) > 0.001;
-    session.lastOpacity = opacity;
+    const opacityChanged = Math.abs(opacity - session.lastOpacity) > (isFinal ? 0.001 : 0.03);
+    if (opacityChanged || isFinal) {
+      session.lastOpacity = opacity;
+    }
     // Expand watercolor transfer slightly so outer-edge wet-rim re-evaluates cleanly without inner seams
     const expandedStep = d.brushType === 'watercolor' && stepRect
       ? clampRect({ x: stepRect.x - 3, y: stepRect.y - 3, w: stepRect.w + 6, h: stepRect.h + 6 }, width, height)
       : stepRect;
     const dirtyOnScratch = clampRect(
       unionRects(
-        unionRects(session.tipRect, currentTipRect),
+        unionRects(session.tipRect, tailApproxRect),
         opacityChanged ? session.dirtyRect : expandedStep,
       ),
       width,
       height,
     );
-    session.tipRect = currentTipRect;
 
+    const hasLiveTail = Boolean(!isFinal && tailLists && tailLists.some(t => t.length >= 2));
+    const tipBuf = hasLiveTail ? this.ensureTipBuffer(width, height) : null;
     if (dirtyOnScratch) {
       const { x, y, w, h } = dirtyOnScratch;
+      let sourceStrokeCtx = strokeCtx;
+      let sourceStrokeCanvas = strokeCanvas;
+
+      if (tipBuf && tailLists) {
+        const copyRect = d.brushType === 'watercolor'
+          ? (clampRect({ x: x - 3, y: y - 3, w: w + 6, h: h + 6 }, width, height) ?? dirtyOnScratch)
+          : dirtyOnScratch;
+        tipBuf.ctx.save();
+        tipBuf.ctx.globalAlpha = 1;
+        tipBuf.ctx.globalCompositeOperation = 'source-over';
+        tipBuf.ctx.clearRect(copyRect.x, copyRect.y, copyRect.w, copyRect.h);
+        tipBuf.ctx.drawImage(strokeCanvas, copyRect.x, copyRect.y, copyRect.w, copyRect.h, copyRect.x, copyRect.y, copyRect.w, copyRect.h);
+        tipBuf.ctx.restore();
+        for (let c = 0; c < symmetryLists.length; c++) {
+          const tailPts = tailLists[c];
+          if (tailPts.length >= 2) {
+            const { bounds } = this.stampInterpolatedList(
+              tipBuf.ctx,
+              tailPts,
+              d,
+              tip,
+              profile,
+              hasPressure,
+              scaleAvg,
+              dabAlphaBase,
+              session.residuals[c] ?? 0,
+              false,
+              session.dabCounts[c] ?? 0,
+              session.arcLengths[c] ?? 0,
+            );
+            currentTipRect = unionRects(currentTipRect, bounds);
+          }
+        }
+        sourceStrokeCtx = tipBuf.ctx;
+        sourceStrokeCanvas = tipBuf.canvas;
+      }
+
       scratchCtx.save();
       scratchCtx.beginPath();
       scratchCtx.rect(x, y, w, h);
@@ -1560,20 +1611,11 @@ export class WhiteboardCanvas2DRenderer {
         applyClipPolygon(scratchCtx, d.clipPolygon, tx, ty, sx, sy);
         scratchCtx.globalCompositeOperation = 'destination-out';
         scratchCtx.globalAlpha = opacity;
-        scratchCtx.drawImage(strokeCanvas, x, y, w, h, x, y, w, h);
-        if (tipBuf && currentTipRect) {
-          const tx0 = Math.max(x, currentTipRect.x);
-          const ty0 = Math.max(y, currentTipRect.y);
-          const tx1 = Math.min(x + w, currentTipRect.x + currentTipRect.w);
-          const ty1 = Math.min(y + h, currentTipRect.y + currentTipRect.h);
-          if (tx1 > tx0 && ty1 > ty0) {
-            scratchCtx.drawImage(tipBuf.canvas, tx0, ty0, tx1 - tx0, ty1 - ty0, tx0, ty0, tx1 - tx0, ty1 - ty0);
-          }
-        }
+        scratchCtx.drawImage(sourceStrokeCanvas, x, y, w, h, x, y, w, h);
         scratchCtx.restore();
       } else {
         applySurfaceTransfer(
-          strokeCtx,
+          sourceStrokeCtx,
           scratchCtx,
           dirtyOnScratch,
           d.brushType,
@@ -1586,23 +1628,9 @@ export class WhiteboardCanvas2DRenderer {
           sx,
           sy,
         );
-        if (tipBuf && currentTipRect) {
-          scratchCtx.save();
-          applyClipPolygon(scratchCtx, d.clipPolygon, tx, ty, sx, sy);
-          if (alphaLock) scratchCtx.globalCompositeOperation = 'source-atop';
-          else if (d.brushType === 'marker') scratchCtx.globalCompositeOperation = 'multiply';
-          scratchCtx.globalAlpha = d.brushType === 'marker' ? Math.max(0.05, Math.min(1, opacity * 0.82)) : opacity;
-          const tx0 = Math.max(x, currentTipRect.x);
-          const ty0 = Math.max(y, currentTipRect.y);
-          const tx1 = Math.min(x + w, currentTipRect.x + currentTipRect.w);
-          const ty1 = Math.min(y + h, currentTipRect.y + currentTipRect.h);
-          if (tx1 > tx0 && ty1 > ty0) {
-            scratchCtx.drawImage(tipBuf.canvas, tx0, ty0, tx1 - tx0, ty1 - ty0, tx0, ty0, tx1 - tx0, ty1 - ty0);
-          }
-          scratchCtx.restore();
-        }
       }
     }
+    session.tipRect = currentTipRect;
 
     return dirtyOnScratch;
   }
@@ -1734,6 +1762,7 @@ export class WhiteboardCanvas2DRenderer {
           height,
           alphaLock,
           getCompositeSample,
+          true,
         );
         const blitRect = clampRect(unionRects(this.liveSession.dirtyRect, fullLiveRect), width, height);
         if (blitRect) {

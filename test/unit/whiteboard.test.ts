@@ -414,3 +414,26 @@ test('studio brush presets, paper grain textures, and concave Magic Wand contour
   assert.equal(reRaster[18 * w + 16], 255, 'Vertical arm of L-shape is inside traced contour');
   assert.equal(reRaster[15 * w + 45], 0, 'Empty concavity is NOT bridged across by contour');
 });
+
+test('BrushStabilizer bounds pause lunges and catches up smoothly without release snap', () => {
+  for (const strength of [35, 80]) {
+    const stab = new BrushStabilizer({ x: 0, y: 0 }, 0);
+    for (let i = 1; i <= 12; i++) {
+      stab.sample({ x: i * 35, y: 0 }, i * 16, strength);
+    }
+    const restTarget = { x: 420, y: 0 };
+    const lagBeforePause = stab.distanceTo(restTarget);
+    assert.ok(lagBeforePause > 1);
+
+    // Pausing for 500 ms and making a 1 px micro-move must never snap nearly all remaining lag in one frame
+    const afterMicroMove = stab.sample({ x: 421, y: 0 }, 12 * 16 + 500, strength);
+    const jump = Math.hypot(afterMicroMove.x - (restTarget.x - lagBeforePause), afterMicroMove.y);
+    assert.ok(jump < (lagBeforePause + 1) * 0.9, `Expected bounded step after pause, jumped ${jump} of ${lagBeforePause}`);
+
+    // Repeated catch-up ticks converge cleanly to exact resting target
+    for (let frame = 0; frame < 30; frame++) {
+      stab.stepCatchUp({ x: 421, y: 0 }, 16, strength);
+    }
+    assert.equal(stab.distanceTo({ x: 421, y: 0 }), 0);
+  }
+});

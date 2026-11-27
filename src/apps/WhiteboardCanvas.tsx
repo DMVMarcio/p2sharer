@@ -40,6 +40,9 @@ type Gesture = {
   selectionPoints?: BoardPoint[];
   viewport: BoardViewport;
   stabilizer?: BrushStabilizer;
+  lastEventTime?: number;
+  lastRawLocal?: BoardPoint;
+  lastShiftKey?: boolean;
 };
 type ResizePreview = { id: string; layer: BoardLayer; shapes: BoardShape[]; fromBounds: BoardBox; bounds: BoardBox };
 type TextDraft = { x: number; y: number; layerId: string; value: string };
@@ -231,6 +234,7 @@ export function WhiteboardCanvas({
   const liveResizingRef = useRef<ResizePreview | null>(null);
   const liveRafRef = useRef<number | null>(null);
   const loupeRafRef = useRef<number | null>(null);
+  const stabilizerRafRef = useRef<number | null>(null);
 
   const [localCursorMeta, setLocalCursorMeta] = useState<{
     visible: boolean;
@@ -516,8 +520,81 @@ export function WhiteboardCanvas({
     }
   };
 
+  const stopStabilizerCatchUp = () => {
+    if (stabilizerRafRef.current !== null) {
+      cancelAnimationFrame(stabilizerRafRef.current);
+      stabilizerRafRef.current = null;
+    }
+  };
+
+  const scheduleStabilizerCatchUp = (targetGesture: Gesture) => {
+    if (stabilizerRafRef.current !== null) return;
+    let lastFrameTime = performance.now();
+    const tick = (now: number) => {
+      stabilizerRafRef.current = null;
+      const g = gesture.current;
+      const activeSettings = current.current.settings;
+      if (
+        g !== targetGesture ||
+        g.mode !== 'draw' ||
+        !g.draft ||
+        !g.layer ||
+        !g.stabilizer ||
+        !g.lastRawLocal ||
+        g.lastShiftKey ||
+        activeSettings.smoothing <= 0 ||
+        (g.draft.tool !== 'brush' && g.draft.tool !== 'eraser')
+      ) {
+        return;
+      }
+      if (g.stabilizer.distanceTo(g.lastRawLocal) <= 0.35) {
+        return;
+      }
+      const dt = Math.max(4, Math.min(20, now - lastFrameTime));
+      lastFrameTime = now;
+      const stabilized = g.stabilizer.stepCatchUp(g.lastRawLocal, dt, activeSettings.smoothing);
+      const nextPt: BoardPoint = {
+        x: Math.round(stabilized.x * 100) / 100,
+        y: Math.round(stabilized.y * 100) / 100,
+        ...(stabilized.p !== undefined ? { p: stabilized.p } : {}),
+      };
+      const viewNow = navigation.current.current;
+      const pts = g.draft.points;
+      const lastPt = pts[pts.length - 1];
+      const settled = g.stabilizer.distanceTo(g.lastRawLocal) <= 0.35;
+      const minDist = settled ? 0.1 : 0.5 / viewNow.zoom;
+      if (Math.hypot(nextPt.x - lastPt.x, nextPt.y - lastPt.y) >= minDist) {
+        const nextPoints = [...pts, nextPt];
+        const nextDraft = { ...g.draft, points: nextPoints };
+        g.draft = nextDraft;
+        if (current.current.engineActive) {
+          liveDraftRef.current = nextDraft;
+          scheduleLiveSceneFlush();
+        } else {
+          setDraft(nextDraft);
+        }
+        const worldPt = { x: nextPt.x + g.layer.x, y: nextPt.y + g.layer.y };
+        const screenPt = { x: worldPt.x * viewNow.zoom + viewNow.x, y: worldPt.y * viewNow.zoom + viewNow.y };
+        const pVal = nextPt.p;
+        const activeWidth = boardBrushWidth(activeSettings.width) * (pVal !== undefined && activeSettings.pressureSize !== false ? 0.25 + 0.75 * pVal : 1);
+        publish({
+          ...worldPt,
+          tool: activeSettings.tool,
+          width: activeWidth,
+          color: activeSettings.color,
+          draft: nextDraft,
+        }, screenPt);
+      }
+      if (g.stabilizer.distanceTo(g.lastRawLocal) > 0.35) {
+        stabilizerRafRef.current = requestAnimationFrame(tick);
+      }
+    };
+    stabilizerRafRef.current = requestAnimationFrame(tick);
+  };
+
   const leave = () => { physicalScreen.current = null; publish(null, null, true); };
   const cancel = () => {
+    stopStabilizerCatchUp();
     navigation.stop();
     if (liveRafRef.current !== null) {
       cancelAnimationFrame(liveRafRef.current);
@@ -545,6 +622,7 @@ export function WhiteboardCanvas({
     window.addEventListener('blur', blur);
     document.addEventListener('visibilitychange', visibility);
     return () => {
+      stopStabilizerCatchUp();
       clearInterval(heartbeat);
       model.presence(null);
       window.removeEventListener('blur', blur);
@@ -829,61 +907,102 @@ export function WhiteboardCanvas({
           setSelectionDraft(poly);
         }
       } else if (g.draft && g.layer) {
-        const coalesced = !final && typeof event.nativeEvent?.getCoalescedEvents === 'function' ? event.nativeEvent.getCoalescedEvents() : [];
-        const samples = coalesced.length ? coalesced : [event];
-        let points = g.draft.points;
-        let lastLocal: BoardPoint = points[points.length - 1];
-        for (const sample of samples) {
-          const sampleWorld = clampBoardPoint(worldPoint(screenPoint(sample)), boardWidth, boardHeight);
-          const p = pointerPressure(sample, final);
-          let local: BoardPoint = {
-            x: Math.round((sampleWorld.x - g.layer.x) * 100) / 100,
-            y: Math.round((sampleWorld.y - g.layer.y) * 100) / 100,
-            ...(p !== undefined ? { p } : {}),
-          };
-          if (g.stabilizer && !final && !event.shiftKey) {
-            const stabilized = g.stabilizer.sample(local, sample.timeStamp || event.timeStamp, settings.smoothing);
-            local = {
-              x: Math.round(stabilized.x * 100) / 100,
-              y: Math.round(stabilized.y * 100) / 100,
-              ...(stabilized.p !== undefined ? { p: stabilized.p } : {}),
-            };
-          }
-          if (g.draft.tool === 'brush' || g.draft.tool === 'eraser') {
-            if (event.shiftKey) {
-              const origin = g.localStart ?? points[0];
-              if (Math.abs(local.x - origin.x) >= Math.abs(local.y - origin.y)) {
-                local = { ...local, y: origin.y };
-              } else {
-                local = { ...local, x: origin.x };
-              }
-              lastLocal = local;
-              points = [origin, local];
-            } else {
-              lastLocal = local;
-              if (Math.hypot(local.x - points[points.length - 1].x, local.y - points[points.length - 1].y) >= .5 / viewNow.zoom) {
-                points = [...points, local];
-              } else if (local.p !== undefined && (points[points.length - 1].p === undefined || Math.abs(local.p - points[points.length - 1].p!) >= 0.02)) {
-                points = [...points.slice(0, -1), { ...points[points.length - 1], p: local.p }];
-              }
-            }
+        stopStabilizerCatchUp();
+        const isFreehand = g.draft.tool === 'brush' || g.draft.tool === 'eraser';
+        if (final && isFreehand && g.stabilizer && !event.shiftKey && settings.smoothing > 0) {
+          const points = g.draft.points;
+          const lastLocal = points[points.length - 1];
+          drawing = g.draft;
+          if (current.current.engineActive) {
+            liveDraftRef.current = drawing;
+            scheduleLiveSceneFlush();
           } else {
-            const origin = g.localStart ?? points[0];
-            const mode = g.draft.tool === 'line' || g.draft.tool === 'gradient' ? 'line' : 'rect';
-            const [a, b] = constrainShapeEndpoints(origin, local, event.shiftKey, event.altKey, mode);
-            lastLocal = b;
-            points = [a, b];
+            setDraft(drawing);
+          }
+          point = { x: lastLocal.x + g.layer.x, y: lastLocal.y + g.layer.y };
+        } else {
+          const coalesced = !final && typeof event.nativeEvent?.getCoalescedEvents === 'function' ? event.nativeEvent.getCoalescedEvents() : [];
+          const samples = coalesced.length ? coalesced : [event];
+          const prevTime = g.lastEventTime ?? event.timeStamp;
+          let strictlyIncreasing = samples.length > 1;
+          if (strictlyIncreasing) {
+            let tCheck = prevTime;
+            for (const s of samples) {
+              if (!s.timeStamp || s.timeStamp <= tCheck) {
+                strictlyIncreasing = false;
+                break;
+              }
+              tCheck = s.timeStamp;
+            }
+          }
+          const rawSpan = event.timeStamp - prevTime;
+          const synthSpan = Math.max(1, Math.min(20, rawSpan > 0 ? rawSpan : 16));
+          let points = g.draft.points;
+          let lastLocal: BoardPoint = points[points.length - 1];
+          let latestRawLocal: BoardPoint | undefined;
+          samples.forEach((sample, idx) => {
+            const sampleWorld = clampBoardPoint(worldPoint(screenPoint(sample)), boardWidth, boardHeight);
+            const p = pointerPressure(sample, final);
+            const rawLocal: BoardPoint = {
+              x: Math.round((sampleWorld.x - g.layer!.x) * 100) / 100,
+              y: Math.round((sampleWorld.y - g.layer!.y) * 100) / 100,
+              ...(p !== undefined ? { p } : {}),
+            };
+            latestRawLocal = rawLocal;
+            let local = rawLocal;
+            if (g.stabilizer && !final && !event.shiftKey) {
+              const sampleTime = samples.length > 1 && !strictlyIncreasing
+                ? prevTime + ((idx + 1) / samples.length) * synthSpan
+                : (sample.timeStamp || event.timeStamp);
+              const stabilized = g.stabilizer.sample(rawLocal, sampleTime, settings.smoothing);
+              local = {
+                x: Math.round(stabilized.x * 100) / 100,
+                y: Math.round(stabilized.y * 100) / 100,
+                ...(stabilized.p !== undefined ? { p: stabilized.p } : {}),
+              };
+            }
+            if (isFreehand) {
+              if (event.shiftKey) {
+                const origin = g.localStart ?? points[0];
+                if (Math.abs(local.x - origin.x) >= Math.abs(local.y - origin.y)) {
+                  local = { ...local, y: origin.y };
+                } else {
+                  local = { ...local, x: origin.x };
+                }
+                lastLocal = local;
+                points = [origin, local];
+              } else {
+                lastLocal = local;
+                if (Math.hypot(local.x - points[points.length - 1].x, local.y - points[points.length - 1].y) >= .5 / viewNow.zoom) {
+                  points = [...points, local];
+                } else if (local.p !== undefined && (points[points.length - 1].p === undefined || Math.abs(local.p - points[points.length - 1].p!) >= 0.02)) {
+                  points = [...points.slice(0, -1), { ...points[points.length - 1], p: local.p }];
+                }
+              }
+            } else {
+              const origin = g.localStart ?? points[0];
+              const mode = g.draft!.tool === 'line' || g.draft!.tool === 'gradient' ? 'line' : 'rect';
+              const [a, b] = constrainShapeEndpoints(origin, local, event.shiftKey, event.altKey, mode);
+              lastLocal = b;
+              points = [a, b];
+            }
+          });
+          g.lastEventTime = event.timeStamp;
+          if (latestRawLocal) g.lastRawLocal = latestRawLocal;
+          g.lastShiftKey = event.shiftKey;
+          drawing = { ...g.draft, points };
+          g.draft = drawing;
+          if (current.current.engineActive) {
+            liveDraftRef.current = drawing;
+            scheduleLiveSceneFlush();
+          } else {
+            setDraft(drawing);
+          }
+          point = { x: lastLocal.x + g.layer.x, y: lastLocal.y + g.layer.y };
+          if (!final && isFreehand && g.stabilizer && !event.shiftKey && settings.smoothing > 0 && g.lastRawLocal && g.stabilizer.distanceTo(g.lastRawLocal) > 0.35) {
+            scheduleStabilizerCatchUp(g);
           }
         }
-        drawing = { ...g.draft, points };
-        g.draft = drawing;
-        if (current.current.engineActive) {
-          liveDraftRef.current = drawing;
-          scheduleLiveSceneFlush();
-        } else {
-          setDraft(drawing);
-        }
-        point = { x: lastLocal.x + g.layer.x, y: lastLocal.y + g.layer.y };
       }
     }
     const view = navigation.current.current;
@@ -1154,6 +1273,9 @@ export function WhiteboardCanvas({
         draft: shape,
         viewport: view,
         stabilizer: ['brush', 'eraser'].includes(settings.tool) ? new BrushStabilizer(local, event.timeStamp) : undefined,
+        lastEventTime: event.timeStamp,
+        lastRawLocal: local,
+        lastShiftKey: event.shiftKey,
       };
       if (current.current.engineActive) {
         liveDraftRef.current = shape;
@@ -1168,6 +1290,7 @@ export function WhiteboardCanvas({
   const up = (event: ReactPointerEvent<HTMLDivElement>) => {
     const g = gesture.current;
     if (!g || g.pointer !== event.pointerId) return;
+    stopStabilizerCatchUp();
     update(event, true);
     if (liveRafRef.current !== null) {
       cancelAnimationFrame(liveRafRef.current);

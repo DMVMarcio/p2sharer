@@ -191,9 +191,30 @@ export class BrushStabilizer {
   private point: BoardPoint;
   private time: number;
   constructor(start: BoardPoint, time: number) { this.point = start; this.time = time; }
+
+  private timeConstant(strength: number): number {
+    const s = Math.max(0, Math.min(100, strength)) / 100;
+    return s * s * 65 + s * 6;
+  }
+
+  current(): BoardPoint {
+    return this.point;
+  }
+
+  distanceTo(target: BoardPoint): number {
+    return Math.hypot(target.x - this.point.x, target.y - this.point.y);
+  }
+
   sample(target: BoardPoint, time: number, strength: number): BoardPoint {
-    const delta = Math.max(1, Math.min(64, time - this.time)); this.time = time;
-    const alpha = strength <= 0 ? 1 : 1 - Math.exp(-delta / (strength * 1.2));
+    if (strength <= 0) {
+      this.time = time;
+      this.point = { ...target };
+      return this.point;
+    }
+    const delta = Math.max(0.5, Math.min(20, time - this.time));
+    this.time = time;
+    const tau = this.timeConstant(strength);
+    const alpha = 1 - Math.exp(-delta / Math.max(1, tau));
     const p = target.p !== undefined
       ? Math.round(((this.point.p ?? target.p) + (target.p - (this.point.p ?? target.p)) * alpha) * 1000) / 1000
       : undefined;
@@ -202,6 +223,32 @@ export class BrushStabilizer {
       y: this.point.y + (target.y - this.point.y) * alpha,
       ...(p !== undefined ? { p } : {}),
     };
+    return this.point;
+  }
+
+  stepCatchUp(target: BoardPoint, dtMs: number, strength: number): BoardPoint {
+    if (strength <= 0 || this.distanceTo(target) < 0.25) {
+      this.time += Math.max(1, Math.min(20, dtMs));
+      this.point = { ...target };
+      return this.point;
+    }
+    const dt = Math.max(1, Math.min(20, dtMs));
+    this.time += dt;
+    const tau = this.timeConstant(strength);
+    const alpha = 1 - Math.exp(-dt / Math.max(1, tau));
+    const p = target.p !== undefined
+      ? Math.round(((this.point.p ?? target.p) + (target.p - (this.point.p ?? target.p)) * alpha) * 1000) / 1000
+      : undefined;
+    const next: BoardPoint = {
+      x: this.point.x + (target.x - this.point.x) * alpha,
+      y: this.point.y + (target.y - this.point.y) * alpha,
+      ...(p !== undefined ? { p } : {}),
+    };
+    if (Math.hypot(target.x - next.x, target.y - next.y) < 0.25) {
+      this.point = { ...target };
+    } else {
+      this.point = next;
+    }
     return this.point;
   }
 }
