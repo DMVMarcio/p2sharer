@@ -23,7 +23,7 @@ Verified reference for **where files live and how they are composed** in P2Share
 | `src/i18n/` | i18next setup and `locales/<lang>.json` for the 13 supported languages. | By language |
 | `src/style.css`, `src/styles/` | Global stylesheet: `style.css` only lists `@import`s in cascade order (component CSS first, then `styles/` partials: tokens → themes → accents → base → header/layout/home → buttons → room/streams/sidebar → modals/settings → notices/toasts/overlays → switch → pip → accessibility overrides → voice). Add new global rules to the matching partial; keep the import order, since later partials override earlier ones. Component-specific CSS stays next to its component. | One partial per surface/system |
 | `src/ui/`, `src/releases/`, `src/assets/` | Sound effects; upcoming release notes (`current.json`); static assets. | Flat |
-| `src-tauri/src/` | Rust host: one module per native capability (`video_*`, `browser_*`, `virtual_network*`, `audio_loopback`, `port_tunnel`…). `lib.rs` declares the modules and Tauri commands; `shared_browser.rs` declares its own out-of-line submodules. | Flat `snake_case.rs`, grouped by prefix |
+| `src-tauri/src/` | Rust host, one module per native capability, grouped in folders: `browser/` (shared browser and its child modules plus the injected `.js` scripts), `video/` (capture, readback, scaling, JPEG/NVENC encoding, pacing, screen sources, camera permission), `network/` (LAN signaling, STUN, port/native tunnels, payloads, traffic counters, UPnP, diagnostics, native RTC), `virtual_network/`, `input/` (gamepad, voice shortcuts, remote control, stream pointer), `app/` (updates, distribution, data migration, localization, window chrome/placement, PiP, invitation routing), `files/`, `integrations/` (YouTube, Twitch), `diagnostics/`, and `audio/`. The root keeps `lib.rs`, `main.rs`, `logger.rs`, and `test_support.rs`. Module names stay flat (`crate::video_nvenc`): `lib.rs` maps each module to its folder with `#[path = "video/video_nvenc.rs"]`, so new modules follow the same pattern. | By capability folder, flat module names |
 | `src-tauri/native/`, `src-tauri/tests/` | Native C/C++ helpers (`mf`, `nvenc`); Rust integration tests. | By component |
 | `apps/web/`, `apps/server/` | pnpm workspace packages: public website (`@p2sharer/web`) and Node signaling/download server (`@p2sharer/server`). | Package per app |
 | `test/unit/` | Frontend regressions, `snake_case.test.ts` / `.test.mjs`, named after the module or behavior they exercise. `test/support/`, `test/helpers/` hold shared fixtures. | Flat |
@@ -63,7 +63,7 @@ No React imports in `src/core/` or `src/p2p/`; React glue lives in hooks.
 
 ### Rust module — `src-tauri/src/*.rs`
 1. `use` declarations
-2. Out-of-line submodules (`mod x;`) when the module is a parent (e.g., `shared_browser.rs`)
+2. Out-of-line submodules (`mod x;`) when the module is a parent (e.g., `browser/shared_browser.rs`, whose `#[path]` children sit in the same folder)
 3. Types and constants
 4. Implementation and `#[tauri::command]` functions
 5. `#[cfg(test)] mod tests { … }` at the end
@@ -106,4 +106,3 @@ Budgets are higher than the generic defaults because many existing files are lar
 ## 6. Known Structure Debt
 Observed, not yet fixed. Restructure gradually: small in-scope moves happen inside a task; larger moves are proposed to the user and committed separately as `refactor(structure)` with `git mv`.
 - Oversized files: `src/p2p/group_room.ts` (~5,700), `src/services/room_service.ts` (~2,500), `src/apps/whiteboard/whiteboard_canvas2d.ts` (~2,200), `src/apps/whiteboard/WhiteboardCanvas.tsx` (~1,800), `src/hooks/stream/useRemoteControl.ts` (~1,500), `src/components/modals/settings/SettingsModal.tsx` (~1,300).
-- `src-tauri/src/` is flat with ~70 modules; `video_*`, `browser_*`, and `virtual_network*` are candidates for module directories.

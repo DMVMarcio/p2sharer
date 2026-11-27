@@ -16,7 +16,7 @@ test('offscreen game capture relays relative motion and releases without locking
     original(type, callback, options);
   };
   try {
-    const source = await readFile(new URL('../../src-tauri/src/browser_pointer_lock.js', import.meta.url), 'utf8');
+    const source = await readFile(new URL('../../src-tauri/src/browser/browser_pointer_lock.js', import.meta.url), 'utf8');
     window.eval(source.replaceAll('__P2SHARER_CURSOR_BINDING__', '"reportLock"'));
     const canvas = document.querySelector('canvas');
     await assert.rejects(canvas.requestPointerLock(), { name: 'NotAllowedError' });

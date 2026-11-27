@@ -14,7 +14,7 @@ test('isolated cursor telemetry identifies text and clickable controls without o
   window.requestAnimationFrame = () => { throw new Error('Offscreen rendering must not gate cursor telemetry'); };
   window.queueMicrotask = callback => callback();
   window.reportCursor = shape => shapes.push(shape);
-  const script = readFileSync(new URL('../../src-tauri/src/browser_cursor.js', import.meta.url), 'utf8').replace('__P2SHARER_CURSOR_BINDING__', '"reportCursor"');
+  const script = readFileSync(new URL('../../src-tauri/src/browser/browser_cursor.js', import.meta.url), 'utf8').replace('__P2SHARER_CURSOR_BINDING__', '"reportCursor"');
   try {
     window.eval(script);
     const hover = selector => { target = window.document.querySelector(selector); move({ isTrusted: true, clientX: 10, clientY: 10 }); return shapes.at(-1); };
@@ -34,7 +34,7 @@ test('cursor telemetry survives a late isolated binding and coalesces movement w
   window.document.elementFromPoint = () => target;
   window.queueMicrotask = callback => tasks.push(callback);
   window.requestAnimationFrame = () => { throw new Error('No rendered frames available'); };
-  const script = readFileSync(new URL('../../src-tauri/src/browser_cursor.js', import.meta.url), 'utf8').replace('__P2SHARER_CURSOR_BINDING__', '"reportCursor"');
+  const script = readFileSync(new URL('../../src-tauri/src/browser/browser_cursor.js', import.meta.url), 'utf8').replace('__P2SHARER_CURSOR_BINDING__', '"reportCursor"');
   const hover = () => move({ isTrusted: true, clientX: 10, clientY: 10 });
   const flush = () => { while (tasks.length) tasks.shift()(); };
   try {

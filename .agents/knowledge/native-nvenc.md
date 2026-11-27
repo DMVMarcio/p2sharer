@@ -24,7 +24,7 @@ disables Windows hardware encoding for diagnostics; combine it with Generic to i
 
 The published path is WGC -> GPU area scaler -> hardware encoder -> native H264 RTP
 packetization/pacing -> DTLS-SRTP -> the viewer's ordinary WebRTC video track.
-`src-tauri/src/native_rtc.rs` uses pinned webrtc-rs 0.17.2. Native video uses one
+`src-tauri/src/network/native_rtc.rs` uses pinned webrtc-rs 0.17.2. Native video uses one
 standard RTP peer connection per capture/viewer. Targeted SDP/trickle ICE signaling
 runs through `native_video_v1` on the existing verified/admitted room channel. The
 same STUN/TURN configuration and relay policy are passed to the native stack.

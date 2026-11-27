@@ -3,7 +3,7 @@ import test from 'node:test';
 import { readFileSync } from 'node:fs';
 import { JSDOM } from 'jsdom';
 
-const probe = readFileSync(new URL('../../src-tauri/src/browser_selection.js', import.meta.url), 'utf8');
+const probe = readFileSync(new URL('../../src-tauri/src/browser/browser_selection.js', import.meta.url), 'utf8');
 
 test('browser selection reads page ranges, focused fields and shadow inputs without reading the OS clipboard', () => {
   const dom = new JSDOM('<p>Shared page text</p><input value="Selected input"><textarea>Other tab paste</textarea><input type="password" value="private"><div id="shadow"></div><iframe></iframe>', { runScripts: 'outside-only' });

@@ -1,63 +1,113 @@
 #[cfg(all(test, windows))]
 mod test_support;
 
+#[path = "files/profile_image.rs"]
 pub mod profile_image;
+#[path = "audio/audio_loopback.rs"]
 pub mod audio_loopback;
 pub mod logger;
+#[path = "diagnostics/media_diagnostics.rs"]
 mod media_diagnostics;
+#[path = "files/note_files.rs"]
 pub mod note_files;
+#[path = "integrations/youtube_playlist.rs"]
 pub mod youtube_playlist;
+#[path = "files/chat_files.rs"]
 pub mod chat_files;
+#[path = "files/chat_file_direct.rs"]
 mod chat_file_direct;
+#[path = "app/pip_manager.rs"]
 pub mod pip_manager;
+#[path = "input/stream_pointer.rs"]
 pub mod stream_pointer;
+#[path = "input/remote_control.rs"]
 pub mod remote_control;
+#[path = "input/remote_control_helper.rs"]
 pub mod remote_control_helper;
+#[path = "input/voice_shortcuts.rs"]
 pub mod voice_shortcuts;
+#[path = "input/gamepad.rs"]
 pub mod gamepad;
+#[path = "audio/process_manager.rs"]
 pub mod process_manager;
+#[path = "files/room_vault.rs"]
 pub mod room_vault;
+#[path = "video/screen_sources.rs"]
 pub mod screen_sources;
+#[path = "video/capture_recovery.rs"]
 mod capture_recovery;
+#[path = "video/video_jpeg.rs"]
 mod video_jpeg;
+#[path = "video/video_load.rs"]
 mod video_load;
+#[path = "video/video_pacer.rs"]
 mod video_pacer;
+#[path = "network/native_rtc.rs"]
 mod native_rtc;
 #[cfg(windows)]
+#[path = "video/video_readback.rs"]
 mod video_readback;
 #[cfg(windows)]
+#[path = "video/video_gpu_scale.rs"]
 mod video_gpu_scale;
 #[cfg(windows)]
+#[path = "video/video_dxgi.rs"]
 mod video_dxgi;
 #[cfg(windows)]
+#[path = "video/video_nvenc.rs"]
 mod video_nvenc;
 #[cfg(windows)]
+#[path = "video/video_hardware.rs"]
 mod video_hardware;
+#[path = "video/camera_permission.rs"]
 mod camera_permission;
+#[path = "browser/browser_shortcuts.rs"]
 mod browser_shortcuts;
+#[path = "browser/shared_browser.rs"]
 pub mod shared_browser;
+#[path = "app/window_chrome.rs"]
 mod window_chrome;
 #[cfg(windows)]
+#[path = "app/window_placement.rs"]
 mod window_placement;
+#[path = "app/localization.rs"]
 mod localization;
+#[path = "app/app_data_migration.rs"]
 mod app_data_migration;
+#[path = "app/invitation_routing.rs"]
 mod invitation_routing;
+#[path = "app/app_updates.rs"]
 mod app_updates;
+#[path = "app/app_distribution.rs"]
 mod app_distribution;
+#[path = "app/portable_update.rs"]
 pub mod portable_update;
+#[path = "network/lan_signaling.rs"]
 pub mod lan_signaling;
+#[path = "network/interface_stun.rs"]
 mod interface_stun;
+#[path = "network/port_tunnel.rs"]
 pub mod port_tunnel;
+#[path = "network/native_tunnel.rs"]
 pub mod native_tunnel;
+#[path = "network/peer_payload.rs"]
 mod peer_payload;
+#[path = "network/traffic_counters.rs"]
 mod traffic_counters;
+#[path = "virtual_network/virtual_network.rs"]
 pub mod virtual_network;
+#[path = "network/upnp.rs"]
 pub mod upnp;
+#[path = "network/network_diagnostic.rs"]
 pub mod network_diagnostic;
+#[path = "diagnostics/performance_diagnostic.rs"]
 pub mod performance_diagnostic;
+#[path = "integrations/twitch_auth.rs"]
 pub mod twitch_auth;
+#[path = "virtual_network/virtual_network_policy.rs"]
 mod virtual_network_policy;
 #[cfg(all(windows, target_arch = "x86_64"))]
+#[path = "virtual_network/virtual_network_driver.rs"]
 mod virtual_network_driver;
 
 use audio_loopback::{start_audio_capture, stop_audio_capture};

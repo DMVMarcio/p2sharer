@@ -5,7 +5,7 @@ P2Sharer provides native Windows audio loopback capture with process-level isola
 
 ---
 
-## 1. Windows WASAPI Audio Loopback (`src-tauri/src/audio_loopback.rs`)
+## 1. Windows WASAPI Audio Loopback (`src-tauri/src/audio/audio_loopback.rs`)
 
 ### Event-Driven Capture Loop
 - Uses Windows Core Audio APIs (`IMMDeviceEnumerator`, `IAudioClient`, `IAudioCaptureClient`).
@@ -58,7 +58,7 @@ When capture devices output 5.1, 7.1, or other multi-channel audio:
 
 ---
 
-## 2. Screen & Window Capture (`src-tauri/src/screen_sources.rs`)
+## 2. Screen & Window Capture (`src-tauri/src/video/screen_sources.rs`)
 
 ### Direct Capture via `xcap`
 - Captures monitors or individual top-level windows without requiring invasive display hooks.
@@ -158,7 +158,7 @@ in addition to the hardware-independent recovery-policy regressions.
 
 ---
 
-## 6. Process Lifecycle & Atomic Child Teardown via Windows Job Object (`src-tauri/src/process_manager.rs`)
+## 6. Process Lifecycle & Atomic Child Teardown via Windows Job Object (`src-tauri/src/audio/process_manager.rs`)
 
 ### Elimination of Orphan WebView2 Processes
 - In Windows, child processes spawned by an application (including all `msedgewebview2.exe` renderer, GPU, utility, and crashpad processes) are not automatically terminated when the parent process exits unless managed by a Windows Job Object.

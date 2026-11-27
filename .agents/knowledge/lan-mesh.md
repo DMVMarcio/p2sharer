@@ -14,7 +14,7 @@ LAN uses signed `p2s5` snapshots containing `{ mode, endpoint, token }`. The tok
 
 ## Native rendezvous and recovery
 
-`src-tauri/src/lan_signaling.rs` binds TCP port 49154 only on the selected assigned address. It authenticates sockets with room ID/capability, limits message size, connections, subscription count and publish rate, and uses bounded queues. Slow consumers cannot block other subscribers. Teardown closes the listener and its client tasks. Main-window-only commands connect the frontend through IPC events; the WebView CSP needs no broad insecure WebSocket exceptions.
+`src-tauri/src/network/lan_signaling.rs` binds TCP port 49154 only on the selected assigned address. It authenticates sockets with room ID/capability, limits message size, connections, subscription count and publish rate, and uses bounded queues. Slow consumers cannot block other subscribers. Teardown closes the listener and its client tasks. Main-window-only commands connect the frontend through IPC events; the WebView CSP needs no broad insecure WebSocket exceptions.
 
 `p2p/lan_signaling.ts` adapts native routing to the public `createTopicStrategy` API. `LanRelay` serializes writes, reconnects rendezvous independently, restores subscriptions and cleans up pending joins/listeners. LAN never falls back to public brokers. Signaling status reports LAN in the existing stream diagnostics tag.
 

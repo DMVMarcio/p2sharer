@@ -1,6 +1,6 @@
-#[path = "../src/video_readback.rs"]
+#[path = "../src/video/video_readback.rs"]
 mod video_readback;
-#[path = "../src/video_jpeg.rs"]
+#[path = "../src/video/video_jpeg.rs"]
 mod video_jpeg;
 
 use std::time::Instant;

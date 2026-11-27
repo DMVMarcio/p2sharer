@@ -1,4 +1,4 @@
-#[path = "../src/video_jpeg.rs"]
+#[path = "../src/video/video_jpeg.rs"]
 mod video_jpeg;
 
 use jpeg_encoder::{ColorType, Encoder, SamplingFactor};

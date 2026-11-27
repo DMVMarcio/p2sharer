@@ -30,7 +30,7 @@ the centered square crop frame. `ColorPicker` shares an HSV
 saturation/brightness plane, hue slider, keyboard-accessible channel sliders and
 hex input; conversion functions live in `core/appearance/hsv_color.ts`.
 
-`src-tauri/src/profile_image.rs` uses the native file picker and keeps original
+`src-tauri/src/files/profile_image.rs` uses the native file picker and keeps original
 image bytes behind temporary random tokens. The frontend receives a bounded,
 data URL containing the original validated raster bytes, preserving animation and
 using the detected MIME type rather than the file extension or an arbitrary path.

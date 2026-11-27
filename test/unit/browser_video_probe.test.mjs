@@ -3,7 +3,7 @@ import test from 'node:test';
 import { readFileSync } from 'node:fs';
 import { JSDOM } from 'jsdom';
 
-const probe = readFileSync(new URL('../../src-tauri/src/browser_video_probe.js', import.meta.url), 'utf8');
+const probe = readFileSync(new URL('../../src-tauri/src/browser/browser_video_probe.js', import.meta.url), 'utf8');
 test('native browser probe detects visible playback, including shadow players, and ignores paused or hidden video', () => {
   const dom = new JSDOM('<video></video><div id="player"></div>', { runScripts: 'outside-only' });
   const { window } = dom;

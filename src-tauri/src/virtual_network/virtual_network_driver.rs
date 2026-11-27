@@ -30,7 +30,7 @@ use windows::{
     },
 };
 
-const DLL: &[u8] = include_bytes!("../resources/wintun/wintun.dll");
+const DLL: &[u8] = include_bytes!("../../resources/wintun/wintun.dll");
 type Create = unsafe extern "system" fn(*const u16, *const u16, *const GUID) -> usize;
 type Open = unsafe extern "system" fn(*const u16) -> usize;
 type Close = unsafe extern "system" fn(usize);
