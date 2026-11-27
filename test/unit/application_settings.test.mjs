@@ -10,74 +10,159 @@ import { AppUpdateController } from '../../src/core/app_updates.ts';
 import { backgroundTokens } from '../../src/core/background_color.ts';
 
 const dom = new JSDOM('<div id="root"></div>', { url: 'http://localhost', pretendToBeVisual: true });
-for (const key of ['window', 'document', 'HTMLElement', 'Element', 'Node', 'MutationObserver', 'Event', 'CustomEvent', 'localStorage']) globalThis[key] = dom.window[key];
+for (const key of [
+  'window',
+  'document',
+  'HTMLElement',
+  'Element',
+  'Node',
+  'MutationObserver',
+  'Event',
+  'CustomEvent',
+  'localStorage',
+])
+  globalThis[key] = dom.window[key];
 globalThis.getComputedStyle = window.getComputedStyle;
 globalThis.requestAnimationFrame = window.requestAnimationFrame.bind(window);
 globalThis.cancelAnimationFrame = window.cancelAnimationFrame.bind(window);
 HTMLElement.prototype.scrollIntoView = () => {};
 // These regressions exercise settings data; motion has separate lifecycle coverage.
-window.matchMedia = query => ({ matches: query.includes('prefers-reduced-motion'), addEventListener() {}, removeEventListener() {} });
+window.matchMedia = (query) => ({
+  matches: query.includes('prefers-reduced-motion'),
+  addEventListener() {},
+  removeEventListener() {},
+});
 globalThis.IS_REACT_ACT_ENVIRONMENT = true;
 const require = createRequire(import.meta.url);
 const bundle = await build({
-  stdin: { contents: `export { ApplicationSettings } from './src/components/modals/ApplicationSettings.tsx';
+  stdin: {
+    contents: `export { ApplicationSettings } from './src/components/modals/ApplicationSettings.tsx';
     export { SettingsModal } from './src/components/modals/SettingsModal.tsx';
     export { ProfileModal } from './src/components/modals/ProfileModal.tsx';
     export { ReleaseNotesDialog } from './src/components/modals/ReleaseNotesDialog.tsx';
     export { getLanguage, setLanguage } from './src/i18n/index.ts';
     export { stateStore } from './src/core/state_store.ts';
-    export { profileImages, profileBanners } from './src/core/profile_image.ts';`, resolveDir: process.cwd() },
-  bundle: true, write: false, format: 'esm', platform: 'node', jsx: 'automatic',
-  plugins: [{ name: 'updater-fixture', setup(builder) {
-    // Exercise localized Markdown without depending on the upcoming release copy.
-    builder.onResolve({ filter: /\/releases\/current\.json$/ }, () => ({ path: 'notes', namespace: 'release-notes-fixture' }));
-    builder.onLoad({ filter: /.*/, namespace: 'release-notes-fixture' }, () => ({ loader: 'json', contents: JSON.stringify({
-      translations: {
-        'pt-BR': ['**arquivos e imagens** ![imagem](https://example.com/image.png)'],
-        en: ['**files and images** ![image](https://example.com/image.png)'],
-      },
-    }) }));
-    builder.onResolve({ filter: /room_service|useRoom|useModal$|platform\/commands\.ts$|@tauri-apps\/api\/core/ }, args => ({
-      path: args.path.includes('room_service') ? 'room' : args.path.includes('useRoom') ? 'room-hook' : args.path.includes('useModal') ? 'modal' : 'native', namespace: 'settings-fixture',
-    }));
-    builder.onLoad({ filter: /.*/, namespace: 'settings-fixture' }, args => ({ contents: {
-      room: 'export const roomService = { refreshStreamPointerPermissions() {}, setRemoteControlHostPriorityEnabled() {} };',
-      'room-hook': 'export const useRoom = () => ({ peers: [] });',
-      modal: `export const useModal = () => ({ isClosing: false, closeModal: () => globalThis.settingsClosed++ });
+    export { profileImages, profileBanners } from './src/core/profile_image.ts';`,
+    resolveDir: process.cwd(),
+  },
+  bundle: true,
+  write: false,
+  format: 'esm',
+  platform: 'node',
+  jsx: 'automatic',
+  plugins: [
+    {
+      name: 'updater-fixture',
+      setup(builder) {
+        // Exercise localized Markdown without depending on the upcoming release copy.
+        builder.onResolve({ filter: /\/releases\/current\.json$/ }, () => ({
+          path: 'notes',
+          namespace: 'release-notes-fixture',
+        }));
+        builder.onLoad({ filter: /.*/, namespace: 'release-notes-fixture' }, () => ({
+          loader: 'json',
+          contents: JSON.stringify({
+            translations: {
+              'pt-BR': ['**arquivos e imagens** ![imagem](https://example.com/image.png)'],
+              en: ['**files and images** ![image](https://example.com/image.png)'],
+            },
+          }),
+        }));
+        builder.onResolve(
+          { filter: /room_service|useRoom|useModal$|platform\/commands\.ts$|@tauri-apps\/api\/core/ },
+          (args) => ({
+            path: args.path.includes('room_service')
+              ? 'room'
+              : args.path.includes('useRoom')
+                ? 'room-hook'
+                : args.path.includes('useModal')
+                  ? 'modal'
+                  : 'native',
+            namespace: 'settings-fixture',
+          }),
+        );
+        builder.onLoad({ filter: /.*/, namespace: 'settings-fixture' }, (args) => ({
+          contents: {
+            room: 'export const roomService = { refreshStreamPointerPermissions() {}, setRemoteControlHostPriorityEnabled() {} };',
+            'room-hook': 'export const useRoom = () => ({ peers: [] });',
+            modal: `export const useModal = () => ({ isClosing: false, closeModal: () => globalThis.settingsClosed++ });
         export const modalManager = { getProfileTarget: () => globalThis.profileTarget,
           open: destination => { globalThis.profileDestination = destination; } };`,
-      native: `export const isTauri = () => globalThis.settingsRuntimeDesktop !== false; export const invoke = async (command, args) => {
+            native: `export const isTauri = () => globalThis.settingsRuntimeDesktop !== false; export const invoke = async (command, args) => {
         if (globalThis.profileBackend && command.includes('profile_image')) return globalThis.profileBackend(command, args);
         if (command === 'save_profile_image') return { hash: '', data: '', color: args.color };
         return command === 'get_log_file_path' ? 'fixture.log' : { driver_api_available: false };
-      };`,
-    }[args.path] }));
-    builder.onResolve({ filter: /services\/app_updates/ }, () => ({ path: 'updater', namespace: 'fixture' }));
-    builder.onLoad({ filter: /.*/, namespace: 'fixture' }, () => ({
-      contents: 'export const appUpdates = globalThis.applicationSettingsController; export const storeManagedUpdates = async () => false;',
-    }));
-    builder.onResolve({ filter: /^[^./]/ }, args => ({ path: pathToFileURL(require.resolve(args.path)).href, external: true }));
-  } }],
+      };
+      export class Channel { constructor() { throw new Error('Unexpected native channel'); } }`,
+          }[args.path],
+        }));
+        builder.onResolve({ filter: /services\/app_updates/ }, () => ({ path: 'updater', namespace: 'fixture' }));
+        builder.onLoad({ filter: /.*/, namespace: 'fixture' }, () => ({
+          contents:
+            'export const appUpdates = globalThis.applicationSettingsController; export const storeManagedUpdates = async () => false;',
+        }));
+        builder.onResolve({ filter: /^[^./]/ }, (args) => ({
+          path: pathToFileURL(require.resolve(args.path)).href,
+          external: true,
+        }));
+      },
+    },
+  ],
 });
 // The component reads the real controller through its normal subscription hook.
 const channels = [];
 const controller = new AppUpdateController({
-  check: async preview => { channels.push(preview); return null; },
-  prepareInstall: async () => {}, restart: async () => {},
+  check: async (preview) => {
+    channels.push(preview);
+    return null;
+  },
+  prepareInstall: async () => {},
+  restart: async () => {},
 });
 controller.setPreferences(false, false);
 globalThis.applicationSettingsController = controller;
-const { ApplicationSettings, SettingsModal, ProfileModal, ReleaseNotesDialog, getLanguage, setLanguage, profileImages, profileBanners, stateStore } = await import(`data:text/javascript;base64,${Buffer.from(bundle.outputFiles[0].text + '\n//# sourceURL=application-settings-test.js').toString('base64')}`);
+const {
+  ApplicationSettings,
+  SettingsModal,
+  ProfileModal,
+  ReleaseNotesDialog,
+  getLanguage,
+  setLanguage,
+  profileImages,
+  profileBanners,
+  stateStore,
+} = await import(
+  `data:text/javascript;base64,${Buffer.from(bundle.outputFiles[0].text + '\n//# sourceURL=application-settings-test.js').toString('base64')}`
+);
 const { createRoot } = await import('react-dom/client');
 const root = createRoot(document.getElementById('root'));
 function Harness() {
   const [automatic, setAutomatic] = useState(false);
   const [preview, setPreview] = useState(false);
   const [language, setLanguageDraft] = useState(getLanguage);
-  return React.createElement(React.Fragment, null,
-    React.createElement(ApplicationSettings, { language, onLanguageChange: setLanguageDraft, automatic, includePrereleases: preview,
-      onAutomaticChange: setAutomatic, onPrereleasesChange: setPreview }),
-    React.createElement('button', { id: 'save', onClick: () => { controller.setPreferences(automatic, preview); setLanguage(language); } }, 'Save'));
+  return React.createElement(
+    React.Fragment,
+    null,
+    React.createElement(ApplicationSettings, {
+      language,
+      onLanguageChange: setLanguageDraft,
+      automatic,
+      includePrereleases: preview,
+      onAutomaticChange: setAutomatic,
+      onPrereleasesChange: setPreview,
+    }),
+    React.createElement(
+      'button',
+      {
+        id: 'save',
+        onClick: () => {
+          controller.setPreferences(automatic, preview);
+          setLanguage(language);
+        },
+      },
+      'Save',
+    ),
+  );
 }
 after(async () => {
   await act(async () => root.unmount());
@@ -90,24 +175,51 @@ after(async () => {
 test('web settings describe the application version and omit native transmission controls', async () => {
   globalThis.settingsRuntimeDesktop = false;
   try {
-    await act(async () => { root.render(null); setLanguage('en'); });
+    await act(async () => {
+      root.render(null);
+      setLanguage('en');
+    });
     await act(async () => root.render(React.createElement(Harness)));
     assert.match(document.querySelector('.app-version').textContent, /Application version:/);
     assert.equal(document.querySelector('#settings-auto-updates'), null);
     await act(async () => root.render(React.createElement(SettingsModal)));
-    await act(async () => [...document.querySelectorAll('.settings-nav-sidebar button')].find(button => button.textContent.trim() === 'Stream').click());
-    await act(async () => new Promise(resolve => setTimeout(resolve, 260)));
-    for (const id of ['settings-default-resolution', 'settings-default-fps', 'settings-default-bitrate']) assert.ok(document.getElementById(id), id);
-    for (const id of ['settings-default-quality', 'settings-remember-transmission', 'settings-video-encoder', 'settings-check-cursor', 'stream-options-pointing']) assert.equal(document.getElementById(id), null, id);
-  } finally { delete globalThis.settingsRuntimeDesktop; await act(async () => { root.render(null); setLanguage('pt-BR'); }); }
+    await act(async () =>
+      [...document.querySelectorAll('.settings-nav-sidebar button')]
+        .find((button) => button.textContent.trim() === 'Stream')
+        .click(),
+    );
+    await act(async () => new Promise((resolve) => setTimeout(resolve, 260)));
+    for (const id of ['settings-default-resolution', 'settings-default-fps', 'settings-default-bitrate'])
+      assert.ok(document.getElementById(id), id);
+    for (const id of [
+      'settings-default-quality',
+      'settings-remember-transmission',
+      'settings-video-encoder',
+      'settings-check-cursor',
+      'stream-options-pointing',
+    ])
+      assert.equal(document.getElementById(id), null, id);
+  } finally {
+    delete globalThis.settingsRuntimeDesktop;
+    await act(async () => {
+      root.render(null);
+      setLanguage('pt-BR');
+    });
+  }
 });
 
 test('Application settings reopens installed release notes offline and restores focus after dismissal', async () => {
-  await act(async () => { root.render(null); setLanguage('pt-BR'); });
-  await act(async () => root.render(React.createElement(React.Fragment, null,
-    React.createElement(Harness), React.createElement(ReleaseNotesDialog))));
+  await act(async () => {
+    root.render(null);
+    setLanguage('pt-BR');
+  });
+  await act(async () =>
+    root.render(
+      React.createElement(React.Fragment, null, React.createElement(Harness), React.createElement(ReleaseNotesDialog)),
+    ),
+  );
   assert.equal(document.querySelector('[role="dialog"]'), null);
-  const button = [...document.querySelectorAll('button')].find(node => node.textContent === 'Ver notas da versão');
+  const button = [...document.querySelectorAll('button')].find((node) => node.textContent === 'Ver notas da versão');
   button.focus();
   await act(async () => button.click());
   assert.ok(document.querySelector('[role="dialog"][aria-modal="true"]'));
@@ -117,11 +229,18 @@ test('Application settings reopens installed release notes offline and restores 
   await act(async () => setLanguage('en'));
   assert.match(document.querySelector('.release-notes-list').textContent, /files and images/);
   assert.equal(document.querySelector('.release-notes-list img'), null);
-  await act(async () => document.querySelector('.modal-card').dispatchEvent(new window.KeyboardEvent('keydown', { key: 'Escape', bubbles: true })));
-  await act(async () => new Promise(resolve => setTimeout(resolve, 260)));
+  await act(async () =>
+    document
+      .querySelector('.modal-card')
+      .dispatchEvent(new window.KeyboardEvent('keydown', { key: 'Escape', bubbles: true })),
+  );
+  await act(async () => new Promise((resolve) => setTimeout(resolve, 260)));
   assert.equal(document.querySelector('[role="dialog"]'), null);
   assert.equal(document.activeElement, button);
-  await act(async () => { root.render(null); setLanguage('pt-BR'); });
+  await act(async () => {
+    root.render(null);
+    setLanguage('pt-BR');
+  });
 });
 
 test('profile editing opens settings only for the local profile', async () => {
@@ -140,22 +259,32 @@ test('profile editing opens settings only for the local profile', async () => {
 });
 
 test('appearance applies and persists custom colors and restores preset tokens', async () => {
-  await act(async () => { root.render(null); setLanguage('pt-BR'); });
+  await act(async () => {
+    root.render(null);
+    setLanguage('pt-BR');
+  });
   await act(async () => root.render(React.createElement(SettingsModal)));
-  const appearance = [...document.querySelectorAll('.settings-nav-sidebar button')]
-    .find(button => button.textContent.includes('Aparência'));
+  const appearance = [...document.querySelectorAll('.settings-nav-sidebar button')].find((button) =>
+    button.textContent.includes('Aparência'),
+  );
   await act(async () => appearance.click());
   assert.ok(document.querySelector('[aria-label="Marrom"]'));
   assert.ok(document.querySelector('[aria-label="Azul escuro"]'));
   await act(async () => document.dispatchEvent(new window.KeyboardEvent('keydown', { key: 'Tab', bubbles: true })));
   await act(async () => document.querySelector('[aria-label="Marrom"]').focus());
-  await act(async () => new Promise(resolve => setTimeout(resolve, 100)));
+  await act(async () => new Promise((resolve) => setTimeout(resolve, 100)));
   assert.equal(document.querySelector('[role="tooltip"]').textContent, 'Marrom');
   const forest = document.querySelector('#background-colors-palette [aria-label="Floresta"]');
   await act(async () => forest.click());
   assert.equal(localStorage.getItem('p2sharer_background_color'), 'forest');
-  assert.equal(document.documentElement.style.getPropertyValue('--bg-app'), backgroundTokens('forest', 'dark').tokens['--bg-app']);
-  assert.notEqual(document.documentElement.style.getPropertyValue('--bg-card'), document.documentElement.style.getPropertyValue('--bg-app'));
+  assert.equal(
+    document.documentElement.style.getPropertyValue('--bg-app'),
+    backgroundTokens('forest', 'dark').tokens['--bg-app'],
+  );
+  assert.notEqual(
+    document.documentElement.style.getPropertyValue('--bg-card'),
+    document.documentElement.style.getPropertyValue('--bg-app'),
+  );
   const picker = document.querySelector('#accent-colors-palette .custom-color-picker');
   assert.equal(picker.getAttribute('aria-label'), 'Cor personalizada');
   await act(async () => {
@@ -175,17 +304,26 @@ test('appearance applies and persists custom colors and restores preset tokens',
     apply.focus();
     apply.click();
   });
-  await act(async () => new Promise(resolve => setTimeout(resolve, 260)));
+  await act(async () => new Promise((resolve) => setTimeout(resolve, 260)));
   assert.equal(document.activeElement, picker, 'Closing the color dialog restores its trigger focus');
-  await act(async () => new Promise(resolve => setTimeout(resolve, 100)));
-  assert.equal(document.querySelector('[role="tooltip"]'), null, 'Pointer focus restoration must not reopen the color tooltip');
+  await act(async () => new Promise((resolve) => setTimeout(resolve, 100)));
+  assert.equal(
+    document.querySelector('[role="tooltip"]'),
+    null,
+    'Pointer focus restoration must not reopen the color tooltip',
+  );
   assert.equal(localStorage.getItem('p2sharer_accent_color'), '#ffffff');
   assert.equal(document.documentElement.getAttribute('data-accent'), 'custom');
   assert.equal(document.documentElement.style.getPropertyValue('--custom-accent-text'), '#000000');
-  await act(async () => { root.render(null); });
+  await act(async () => {
+    root.render(null);
+  });
   await act(async () => root.render(React.createElement(SettingsModal)));
-  await act(async () => [...document.querySelectorAll('.settings-nav-sidebar button')]
-    .find(button => button.textContent.includes('Aparência')).click());
+  await act(async () =>
+    [...document.querySelectorAll('.settings-nav-sidebar button')]
+      .find((button) => button.textContent.includes('Aparência'))
+      .click(),
+  );
   await act(async () => document.querySelector('#accent-colors-palette .custom-color-picker').click());
   assert.equal(document.querySelector('.color-picker-dialog .text-input').value, '#ffffff');
   const brightness = document.querySelector('.color-picker-dialog [aria-label="Brilho"]');
@@ -197,7 +335,7 @@ test('appearance applies and persists custom colors and restores preset tokens',
   assert.equal(document.querySelector('.color-picker-dialog .text-input').value, '#000000');
   assert.equal(localStorage.getItem('p2sharer_accent_color'), '#ffffff');
   await act(async () => document.querySelector('.color-picker-dialog .btn-secondary').click());
-  await act(async () => new Promise(resolve => setTimeout(resolve, 260)));
+  await act(async () => new Promise((resolve) => setTimeout(resolve, 260)));
   assert.equal(localStorage.getItem('p2sharer_accent_color'), '#ffffff');
   await act(async () => document.querySelector('[aria-label="Marrom"]').click());
   assert.equal(localStorage.getItem('p2sharer_accent_color'), 'brown');
@@ -231,7 +369,9 @@ test('application update controls keep drafts unsaved and check only the saved c
   await act(async () => root.render(React.createElement(Harness)));
   assert.equal(document.querySelector('h3').textContent, 'Aplicação');
   const preview = document.getElementById('settings-beta-updates');
-  const check = [...document.querySelectorAll('#settings-pane-application button')].find(button => button.textContent === 'Procurar atualizações agora');
+  const check = [...document.querySelectorAll('#settings-pane-application button')].find(
+    (button) => button.textContent === 'Procurar atualizações agora',
+  );
   assert.equal(preview.checked, false);
   assert.equal(check.disabled, false);
   await act(async () => preview.click());
@@ -253,8 +393,14 @@ test('the canonical language selector keeps its choice as an unsaved draft', asy
   assert.equal(selector.querySelector('img').getAttribute('alt'), '');
   assert.equal(selector.querySelector('img').parentElement.getAttribute('aria-hidden'), 'true');
   await act(async () => selector.dispatchEvent(new window.KeyboardEvent('keydown', { key: 'Home', bubbles: true })));
-  assert.deepEqual([...document.querySelectorAll('[role="option"]')].map(option => option.textContent), LANGUAGE_OPTIONS.map(option => option.label));
-  assert.deepEqual([...document.querySelectorAll('[role="option"] img')].map(icon => icon.getAttribute('src')), LANGUAGE_OPTIONS.map(option => `/flags/${option.flag}.svg`));
+  assert.deepEqual(
+    [...document.querySelectorAll('[role="option"]')].map((option) => option.textContent),
+    LANGUAGE_OPTIONS.map((option) => option.label),
+  );
+  assert.deepEqual(
+    [...document.querySelectorAll('[role="option"] img')].map((icon) => icon.getAttribute('src')),
+    LANGUAGE_OPTIONS.map((option) => `/flags/${option.flag}.svg`),
+  );
   await act(async () => selector.dispatchEvent(new window.KeyboardEvent('keydown', { key: 'Enter', bubbles: true })));
   assert.equal(document.querySelector('h3').textContent, 'Aplicação');
   assert.equal(getLanguage(), 'pt-BR');
@@ -272,9 +418,9 @@ test('new languages stay in the settings draft and save without falling back to 
   let saved = getLanguage();
   for (const { value, label, flag } of LANGUAGE_OPTIONS.slice(2)) {
     const selector = document.getElementById('settings-language');
-    const key = name => selector.dispatchEvent(new window.KeyboardEvent('keydown', { key: name, bubbles: true }));
+    const key = (name) => selector.dispatchEvent(new window.KeyboardEvent('keydown', { key: name, bubbles: true }));
     await act(async () => key('Home'));
-    for (let index = 0; index < LANGUAGE_OPTIONS.findIndex(option => option.value === value); index++) {
+    for (let index = 0; index < LANGUAGE_OPTIONS.findIndex((option) => option.value === value); index++) {
       await act(async () => key('ArrowDown'));
     }
     await act(async () => key('Enter'));
@@ -290,7 +436,10 @@ test('new languages stay in the settings draft and save without falling back to 
 });
 
 test('the actual settings modal discards a closed language draft and applies it only on Save Settings', async () => {
-  await act(async () => { root.render(null); setLanguage('pt-BR'); });
+  await act(async () => {
+    root.render(null);
+    setLanguage('pt-BR');
+  });
   globalThis.settingsClosed = 0;
   async function open() {
     await act(async () => root.render(React.createElement(SettingsModal)));
@@ -301,7 +450,8 @@ test('the actual settings modal discards a closed language draft and applies it 
     await act(async () => selector.dispatchEvent(new window.KeyboardEvent('keydown', { key: 'Home', bubbles: true })));
     await act(async () => selector.dispatchEvent(new window.KeyboardEvent('keydown', { key: 'Enter', bubbles: true })));
   }
-  await open(); await chooseEnglish();
+  await open();
+  await chooseEnglish();
   assert.equal(getLanguage(), 'pt-BR');
   assert.equal(localStorage.getItem('p2sharer_language'), 'pt-BR');
   await act(async () => document.getElementById('btn-cancel-settings').click());
@@ -318,9 +468,11 @@ test('the actual settings modal discards a closed language draft and applies it 
   delete globalThis.settingsClosed;
 });
 
-
 test('nickname preview keeps a cancellable draft and saves the style independently of the name', async () => {
-  await act(async () => { root.render(null); setLanguage('pt-BR'); });
+  await act(async () => {
+    root.render(null);
+    setLanguage('pt-BR');
+  });
   const original = stateStore.nicknameStyle;
   async function open() {
     await act(async () => root.render(React.createElement(SettingsModal)));
@@ -329,63 +481,97 @@ test('nickname preview keeps a cancellable draft and saves the style independent
     const selector = document.querySelector('.nickname-editor [id$="-effect"]');
     await act(async () => selector.dispatchEvent(new window.KeyboardEvent('keydown', { key: 'Home', bubbles: true })));
     for (let index = 0; index < 4; index++) {
-      await act(async () => selector.dispatchEvent(new window.KeyboardEvent('keydown', { key: 'ArrowDown', bubbles: true })));
+      await act(async () =>
+        selector.dispatchEvent(new window.KeyboardEvent('keydown', { key: 'ArrowDown', bubbles: true })),
+      );
     }
     await act(async () => selector.dispatchEvent(new window.KeyboardEvent('keydown', { key: 'Enter', bubbles: true })));
   }
   await open();
   const name = document.getElementById('settings-input-username').value;
   const customize = () => document.querySelector('.nickname-customize-button');
-  await act(async () => { customize().focus(); customize().click(); });
+  await act(async () => {
+    customize().focus();
+    customize().click();
+  });
   await chooseRainbow();
   assert.equal(document.querySelector('.nickname-editor [id$="-effect"]').textContent.trim(), 'Arco-íris em movimento');
   assert.deepEqual(stateStore.nicknameStyle, original);
   assert.equal(localStorage.getItem('p2sharer_nickname_style_v1'), JSON.stringify(original));
   await act(async () => document.querySelector('.nickname-style-dialog .modal-footer .btn-secondary').click());
-  await act(async () => new Promise(resolve => setTimeout(resolve, 260)));
+  await act(async () => new Promise((resolve) => setTimeout(resolve, 260)));
   assert.ok(document.activeElement === customize());
-  await act(async () => { customize().focus(); customize().click(); });
+  await act(async () => {
+    customize().focus();
+    customize().click();
+  });
   assert.equal(document.querySelector('.nickname-editor [id$="-effect"]').textContent.trim(), 'Cor padrão');
   await chooseRainbow();
   await act(async () => document.querySelector('.nickname-style-dialog .modal-footer .btn-primary').click());
-  await act(async () => new Promise(resolve => setTimeout(resolve, 260)));
+  await act(async () => new Promise((resolve) => setTimeout(resolve, 260)));
   assert.deepEqual(stateStore.nicknameStyle, original);
   await act(async () => document.getElementById('btn-cancel-settings').click());
   await act(async () => root.render(null));
   await open();
-  await act(async () => { customize().focus(); customize().click(); });
+  await act(async () => {
+    customize().focus();
+    customize().click();
+  });
   assert.equal(document.querySelector('.nickname-editor [id$="-effect"]').textContent.trim(), 'Cor padrão');
   await chooseRainbow();
   await act(async () => document.querySelector('.nickname-style-dialog .modal-footer .btn-primary').click());
-  await act(async () => new Promise(resolve => setTimeout(resolve, 260)));
+  await act(async () => new Promise((resolve) => setTimeout(resolve, 260)));
   await act(async () => document.getElementById('btn-save-settings').click());
   assert.equal(stateStore.nicknameStyle.effect, 'rainbow');
   assert.equal(JSON.parse(localStorage.getItem('p2sharer_nickname_style_v1')).effect, 'rainbow');
   assert.equal(document.getElementById('settings-input-username').value, name);
-  await act(async () => stateStore.set(s => { s.nicknameStyle = original; }));
+  await act(async () =>
+    stateStore.set((s) => {
+      s.nicknameStyle = original;
+    }),
+  );
   localStorage.setItem('p2sharer_nickname_style_v1', JSON.stringify(original));
 });
 
 test('banner crop and card preferences remain drafts until Save and never replace the avatar', async () => {
-  await act(async () => { root.render(null); setLanguage('pt-BR'); });
+  await act(async () => {
+    root.render(null);
+    setLanguage('pt-BR');
+  });
   const previous = profileBanners.local;
   const avatar = profileImages.local;
   profileBanners.local = { hash: '', data: '', color: '#06b6d4' };
-  const saves = [], discarded = [];
+  const saves = [],
+    discarded = [];
   globalThis.profileBackend = async (command, args) => {
-    if (command === 'pick_profile_image') return { token: 'banner-draft', width: 1200, height: 800, preview: 'data:image/png;base64,cHJldmlldw==' };
-    if (command === 'discard_profile_image') { discarded.push(args?.token); return; }
+    if (command === 'pick_profile_image')
+      return { token: 'banner-draft', width: 1200, height: 800, preview: 'data:image/png;base64,cHJldmlldw==' };
+    if (command === 'discard_profile_image') {
+      discarded.push(args?.token);
+      return;
+    }
     if (command === 'save_profile_image') {
       saves.push(args);
-      return args.banner ? { hash: args.remove ? '' : '7'.repeat(64), data: args.remove ? '' : 'YmFubmVy', color: args.color,
-        bannerEnabled: args.bannerEnabled, bannerBlur: args.bannerBlur } : avatar;
+      return args.banner
+        ? {
+            hash: args.remove ? '' : '7'.repeat(64),
+            data: args.remove ? '' : 'YmFubmVy',
+            color: args.color,
+            bannerEnabled: args.bannerEnabled,
+            bannerBlur: args.bannerBlur,
+          }
+        : avatar;
     }
   };
   const choose = async () => {
     await act(async () => document.querySelector('[aria-label="Escolher banner"]').click());
-    await act(async () => document.querySelector('.profile-crop-stage').dispatchEvent(new window.KeyboardEvent('keydown', { bubbles: true, key: '+' })));
+    await act(async () =>
+      document
+        .querySelector('.profile-crop-stage')
+        .dispatchEvent(new window.KeyboardEvent('keydown', { bubbles: true, key: '+' })),
+    );
     await act(async () => document.querySelector('.profile-crop-dialog .btn-primary').click());
-    await act(async () => new Promise(resolve => setTimeout(resolve, 260)));
+    await act(async () => new Promise((resolve) => setTimeout(resolve, 260)));
   };
   try {
     await act(async () => root.render(React.createElement(SettingsModal)));
@@ -400,7 +586,11 @@ test('banner crop and card preferences remain drafts until Save and never replac
     await act(async () => root.render(null));
     await act(async () => root.render(React.createElement(SettingsModal)));
     await choose();
-    assert.equal(document.getElementById('profile-banner-blur').checked, false, 'New banner draft keeps blur unchecked by default');
+    assert.equal(
+      document.getElementById('profile-banner-blur').checked,
+      false,
+      'New banner draft keeps blur unchecked by default',
+    );
     await act(async () => document.getElementById('profile-banner-enabled').click());
     assert.equal(document.getElementById('profile-banner-blur'), null);
     assert.ok(document.getElementById('profile-card-automatic'));
@@ -417,7 +607,10 @@ test('banner crop and card preferences remain drafts until Save and never replac
     assert.equal(profileBanners.url('local'), 'data:image/png;base64,YmFubmVy');
     assert.equal(profileBanners.cardBanner('local'), undefined);
     assert.equal(profileImages.local, avatar);
-    assert.ok(!discarded.includes('banner-draft'), 'Applying a crop keeps its source available until the parent closes');
+    assert.ok(
+      !discarded.includes('banner-draft'),
+      'Applying a crop keeps its source available until the parent closes',
+    );
   } finally {
     await act(async () => root.render(null));
     profileBanners.local = previous;
@@ -426,30 +619,47 @@ test('banner crop and card preferences remain drafts until Save and never replac
 });
 
 test('profile crop survives tab changes, applies only on Save and removal remains a cancellable draft', async () => {
-  await act(async () => { root.render(null); setLanguage('pt-BR'); });
+  await act(async () => {
+    root.render(null);
+    setLanguage('pt-BR');
+  });
   profileImages.local = { hash: '', data: '', color: '#06b6d4' };
   const saves = [];
   let finishPick, finishSave;
   globalThis.profileBackend = async (command, args) => {
-    if (command === 'pick_profile_image') return new Promise(resolve => { finishPick = resolve; });
+    if (command === 'pick_profile_image')
+      return new Promise((resolve) => {
+        finishPick = resolve;
+      });
     if (command === 'save_profile_image') {
       saves.push(args);
-      const result = { hash: args.remove ? '' : 'a'.repeat(64), data: args.remove ? '' : 'cGhvdG8=', color: args.color, cardColor: args.cardColor };
-      if (saves.length === 1) return new Promise(resolve => { finishSave = () => resolve(result); });
+      const result = {
+        hash: args.remove ? '' : 'a'.repeat(64),
+        data: args.remove ? '' : 'cGhvdG8=',
+        color: args.color,
+        cardColor: args.cardColor,
+      };
+      if (saves.length === 1)
+        return new Promise((resolve) => {
+          finishSave = () => resolve(result);
+        });
       return result;
     }
   };
   try {
     await act(async () => root.render(React.createElement(SettingsModal)));
-    const choose = [...document.querySelectorAll('#settings-pane-profile button')].find(button => button.getAttribute('aria-label') === 'Escolher imagem');
+    const choose = [...document.querySelectorAll('#settings-pane-profile button')].find(
+      (button) => button.getAttribute('aria-label') === 'Escolher imagem',
+    );
     await act(async () => choose.click());
     assert.equal(choose.getAttribute('aria-busy'), 'true');
     assert.equal(choose.disabled, true);
     assert.equal(document.querySelector('#settings-pane-profile [role="status"]').textContent, 'Lendo imagem…');
     assert.equal(document.getElementById('btn-save-settings').disabled, true);
     assert.equal(saves.length, 0);
-    await act(async () => finishPick({ token: 'draft-token', width: 400, height: 200,
-      preview: 'data:image/gif;base64,cHJldmlldw==' }));
+    await act(async () =>
+      finishPick({ token: 'draft-token', width: 400, height: 200, preview: 'data:image/gif;base64,cHJldmlldw==' }),
+    );
     assert.equal(choose.getAttribute('aria-busy'), 'false');
     assert.equal(document.querySelector('.profile-crop-stage img').src, 'data:image/gif;base64,cHJldmlldw==');
     const stage = document.querySelector('.profile-crop-stage');
@@ -460,7 +670,7 @@ test('profile crop survives tab changes, applies only on Save and removal remain
     await act(async () => stage.dispatchEvent(pan));
     assert.equal(pan.defaultPrevented, true);
     await act(async () => document.querySelector('.profile-crop-dialog .btn-primary').click());
-    await act(async () => new Promise(resolve => setTimeout(resolve, 260)));
+    await act(async () => new Promise((resolve) => setTimeout(resolve, 260)));
     assert.equal(document.querySelector('.profile-editor-preview img').src, 'data:image/gif;base64,cHJldmlldw==');
     const background = document.getElementById('profile-card-automatic');
     assert.equal(background.checked, true);
@@ -476,10 +686,14 @@ test('profile crop survives tab changes, applies only on Save and removal remain
       hex.dispatchEvent(new window.Event('input', { bubbles: true }));
     });
     await act(async () => document.querySelector('.color-picker-dialog .btn-primary').click());
-    await act(async () => new Promise(resolve => setTimeout(resolve, 260)));
+    await act(async () => new Promise((resolve) => setTimeout(resolve, 260)));
     assert.equal(profileImages.local.cardColor, undefined);
 
-    await act(async () => [...document.querySelectorAll('.settings-nav-sidebar button')].find(button => button.textContent.includes('Aplicação')).click());
+    await act(async () =>
+      [...document.querySelectorAll('.settings-nav-sidebar button')]
+        .find((button) => button.textContent.includes('Aplicação'))
+        .click(),
+    );
     assert.equal(saves.length, 0);
     await act(async () => document.getElementById('btn-save-settings').click());
     assert.equal(document.getElementById('btn-save-settings').getAttribute('aria-busy'), 'true');
@@ -495,16 +709,26 @@ test('profile crop survives tab changes, applies only on Save and removal remain
     assert.equal(saves[0].crop.y, 0.5);
     await act(async () => root.render(null));
     await act(async () => root.render(React.createElement(SettingsModal)));
-    await act(async () => [...document.querySelectorAll('#settings-pane-profile button')].find(button => button.getAttribute('aria-label') === 'Remover foto').click());
+    await act(async () =>
+      [...document.querySelectorAll('#settings-pane-profile button')]
+        .find((button) => button.getAttribute('aria-label') === 'Remover foto')
+        .click(),
+    );
     assert.ok(document.querySelector('#settings-pane-profile .custom-color-picker'));
     await act(async () => document.getElementById('btn-cancel-settings').click());
     assert.equal(saves.length, 1);
     assert.equal(profileImages.local.data, 'cGhvdG8=');
     await act(async () => root.render(null));
     await act(async () => root.render(React.createElement(SettingsModal)));
-    await act(async () => [...document.querySelectorAll('#settings-pane-profile button')].find(button => button.getAttribute('aria-label') === 'Remover foto').click());
+    await act(async () =>
+      [...document.querySelectorAll('#settings-pane-profile button')]
+        .find((button) => button.getAttribute('aria-label') === 'Remover foto')
+        .click(),
+    );
     await act(async () => document.getElementById('btn-save-settings').click());
     assert.equal(saves[1].remove, true);
     assert.equal(profileImages.local.data, '');
-  } finally { delete globalThis.profileBackend; }
+  } finally {
+    delete globalThis.profileBackend;
+  }
 });
