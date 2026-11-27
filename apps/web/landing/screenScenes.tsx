@@ -418,6 +418,62 @@ export function StudioScene() {
 /* Co-op space shooter                                                        */
 /* -------------------------------------------------------------------------- */
 
+const INVADER_ROWS = [
+  { y: 36, color: '#f472b6', xs: [120, 140, 160, 180, 200] },
+  { y: 54, color: '#fbbf24', xs: [130, 150, 170, 190] },
+];
+const ALIENS = INVADER_ROWS.flatMap(row => row.xs.map(x => ({ x, y: row.y, color: row.color })));
+const alienAt = (x: number, y: number) => ALIENS.findIndex(alien => alien.x === x && alien.y === y);
+const [PLAYER_ONE, PLAYER_TWO] = [PEERS[1], PEERS[2]];
+
+/*
+ * Scripted wave: each ship flies under its own targets and fires; an alien is
+ * destroyed when the bullet reaches it and explodes in place. P1 clears the
+ * right side while P2 clears the left, so the two players never share a
+ * target. Once the wave is cleared the ships return home and the aliens drop
+ * back into formation.
+ */
+const SLOT_MS = 950;
+const FIRE_AT = 0.4;
+const HIT_AT = 0.65;
+const BOOM_MS = 520;
+const RETURN_MS = 500;
+const RESPAWN_AT = 6000;
+const RESPAWN_STAGGER = 70;
+const DROP_MS = 450;
+const WAVE_MS = 7200;
+const BASE_SCORE = 12450;
+
+const SHIPS = [
+  { peer: PLAYER_ONE, home: 214, noseY: 138, offset: 650, targets: [[200, 36], [190, 54], [180, 36], [170, 54], [160, 36]] },
+  { peer: PLAYER_TWO, home: 112, noseY: 144, offset: 200, targets: [[150, 54], [140, 36], [130, 54], [120, 36]] },
+].map(ship => ({ ...ship, targets: ship.targets.map(([x, y]) => alienAt(x, y)) }));
+
+const HIT_TIMES = ALIENS.map(() => Infinity);
+for (const ship of SHIPS) {
+  ship.targets.forEach((alien, index) => { HIT_TIMES[alien] = ship.offset + (index + HIT_AT) * SLOT_MS; });
+}
+
+const clamp01 = (value: number) => Math.min(1, Math.max(0, value));
+
+function shipAt(ship: (typeof SHIPS)[number], time: number) {
+  const end = ship.offset + ship.targets.length * SLOT_MS;
+  if (time < ship.offset) return { x: ship.home, bullet: null };
+  if (time >= end) {
+    const last = ALIENS[ship.targets[ship.targets.length - 1]].x;
+    return { x: last + (ship.home - last) * smooth(clamp01((time - end) / RETURN_MS)), bullet: null };
+  }
+  const slot = Math.floor((time - ship.offset) / SLOT_MS);
+  const phase = (time - ship.offset) / SLOT_MS - slot;
+  const target = ALIENS[ship.targets[slot]];
+  const from = slot === 0 ? ship.home : ALIENS[ship.targets[slot - 1]].x;
+  if (phase < FIRE_AT) return { x: from + (target.x - from) * smooth(phase / FIRE_AT), bullet: null };
+  if (phase >= HIT_AT) return { x: target.x, bullet: null };
+  const travel = (phase - FIRE_AT) / (HIT_AT - FIRE_AT);
+  const startY = ship.noseY - 6;
+  return { x: target.x, bullet: { x: target.x, y: startY + (target.y + 3 - startY) * travel } };
+}
+
 function starField(count: number, seed: number) {
   const random = seeded(seed);
   return Array.from({ length: count }, () => ({ x: random() * 320, y: random() * 180, r: 0.4 + random() * 0.8 }));
@@ -425,15 +481,6 @@ function starField(count: number, seed: number) {
 
 const FAR_STARS = starField(34, 5);
 const NEAR_STARS = starField(14, 23);
-const INVADER_ROWS = [
-  { y: 36, color: '#f472b6', xs: [120, 140, 160, 180, 200] },
-  { y: 54, color: '#fbbf24', xs: [130, 150, 170, 190] },
-];
-const ENEMY_SHOTS = [
-  { x: 150, y: 60, delay: 0 },
-  { x: 186, y: 60, delay: -0.9 },
-];
-const [PLAYER_ONE, PLAYER_TWO] = [PEERS[1], PEERS[2]];
 
 function Stars({ stars, className }: { stars: { x: number; y: number; r: number }[]; className: string }) {
   return (
@@ -447,10 +494,79 @@ function Stars({ stars, className }: { stars: { x: number; y: number; r: number 
   );
 }
 
-/** Two-player co-op shooter, matching the remote-play demo's two gamepads. */
+/**
+ * Two-player co-op shooter, matching the remote-play demo's two gamepads. The
+ * P1 ship's position is exposed to the host screen as `--p1-x` so the shots the
+ * visitor fires from the demo buttons leave from that ship.
+ */
 export function ShooterScene() {
+  const ref = useRef<SVGSVGElement>(null);
+  const ships = useRef<(SVGGElement | null)[]>([]);
+  const bullets = useRef<(SVGRectElement | null)[]>([]);
+  const aliens = useRef<(SVGGElement | null)[]>([]);
+  const booms = useRef<(SVGGElement | null)[]>([]);
+  const score = useRef<SVGTextElement>(null);
+  const active = useInView(ref);
+  const reduced = useReducedMotion();
+
+  useEffect(() => {
+    const host = ref.current?.parentElement;
+    const render = (elapsed: number) => {
+      const time = elapsed % WAVE_MS;
+      SHIPS.forEach((ship, index) => {
+        const state = shipAt(ship, time);
+        ships.current[index]?.setAttribute('transform', `translate(${state.x.toFixed(2)} ${ship.noseY})`);
+        const bullet = bullets.current[index];
+        if (bullet) {
+          bullet.style.opacity = state.bullet ? '1' : '0';
+          if (state.bullet) {
+            bullet.setAttribute('x', (state.bullet.x - 1).toFixed(2));
+            bullet.setAttribute('y', state.bullet.y.toFixed(2));
+          }
+        }
+        if (index === 0) host?.style.setProperty('--p1-x', `${((state.x / 320) * 100).toFixed(2)}%`);
+      });
+      let kills = 0;
+      ALIENS.forEach((_, index) => {
+        const hit = HIT_TIMES[index];
+        const respawn = RESPAWN_AT + index * RESPAWN_STAGGER;
+        const alien = aliens.current[index];
+        if (time >= hit && time < respawn) kills += 1;
+        if (alien) {
+          const drop = time >= respawn ? clamp01((time - respawn) / DROP_MS) : 1;
+          const visible = time < hit || time >= respawn;
+          alien.style.opacity = visible ? `${drop}` : '0';
+          alien.setAttribute('transform', `translate(0 ${(-(1 - smooth(drop)) * 10).toFixed(2)})`);
+        }
+        const boom = booms.current[index];
+        if (boom) {
+          const progress = (time - hit) / BOOM_MS;
+          const showing = progress >= 0 && progress < 1;
+          boom.style.opacity = showing ? `${1 - progress}` : '0';
+          if (showing) boom.setAttribute('transform', `translate(${ALIENS[index].x} ${ALIENS[index].y}) scale(${(0.3 + progress * 1.1).toFixed(3)})`);
+        }
+      });
+      if (score.current) {
+        const wave = Math.floor(elapsed / WAVE_MS);
+        score.current.textContent = String(BASE_SCORE + (wave * ALIENS.length + kills) * 150).padStart(6, '0');
+      }
+    };
+    if (reduced || !active || typeof requestAnimationFrame === 'undefined') {
+      render(0);
+      return;
+    }
+    let frame = 0;
+    const origin = performance.now();
+    const tick = (now: number) => {
+      render(now - origin);
+      frame = requestAnimationFrame(tick);
+    };
+    frame = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(frame);
+  }, [active, reduced]);
+
   return (
-    <svg className="lp-game-scene lp-duo" viewBox={VIEW_BOX} preserveAspectRatio="xMidYMid slice" aria-hidden="true">
+    <svg ref={ref} className="lp-game-scene lp-duo" viewBox={VIEW_BOX} preserveAspectRatio="xMidYMid slice" aria-hidden="true">
       <defs>
         <linearGradient id="lp-duo-space" x1="0" y1="0" x2="0" y2="1">
           <stop offset="0" stopColor="#050816" />
@@ -484,6 +600,13 @@ export function ShooterScene() {
           <rect x="4" y="0" width="2" height="4" fill="currentColor" />
           <rect x="-2" y="2" width="4" height="1.5" fill="currentColor" />
         </g>
+        <g id="lp-duo-boom">
+          <circle r="10" fill="#fde047" opacity="0.35" />
+          <circle r="5" fill="#fff7ed" />
+          <g stroke="#fb923c" strokeWidth="1.4" strokeLinecap="round">
+            <path d="M0 -8 V-13 M0 8 V13 M-8 0 H-13 M8 0 H13 M5.5 5.5 L9 9 M-5.5 -5.5 L-9 -9 M5.5 -5.5 L9 -9 M-5.5 5.5 L-9 9" />
+          </g>
+        </g>
       </defs>
 
       <rect width="320" height="180" fill="url(#lp-duo-space)" />
@@ -505,49 +628,44 @@ export function ShooterScene() {
         <polygon className="lp-duo-rock" points="-9,-4 -4,-10 5,-9 10,-2 7,7 -2,10 -9,5" fill="#57534e" stroke="#a8a29e" strokeWidth="0.8" />
       </g>
 
-      <g className="lp-duo-formation">
-        {INVADER_ROWS.map((row, rowIndex) => row.xs.map((x, index) => (
-          <g key={`${row.y}-${x}`} transform={`translate(${x} ${row.y}) scale(1.4)`}>
-            <g className="lp-duo-bob" style={{ animationDelay: `${-((index + rowIndex) % 2) * 0.4}s` }}>
-              <use href="#lp-duo-invader" color={row.color} />
+      {ALIENS.map((alien, index) => (
+        <g key={`${alien.x}-${alien.y}`} ref={node => { aliens.current[index] = node; }}>
+          <g transform={`translate(${alien.x} ${alien.y}) scale(1.4)`}>
+            <g className="lp-duo-bob" style={{ animationDelay: `${-(index % 2) * 0.4}s` }}>
+              <use href="#lp-duo-invader" color={alien.color} />
             </g>
           </g>
-        )))}
-      </g>
-      <g transform="translate(214 46)">
-        <g className="lp-duo-boom">
-          <circle r="10" fill="#fde047" opacity="0.35" />
-          <circle r="5" fill="#fff7ed" />
-          <g stroke="#fb923c" strokeWidth="1.4" strokeLinecap="round">
-            <path d="M0 -8 V-13 M0 8 V13 M-8 0 H-13 M8 0 H13 M5.5 5.5 L9 9 M-5.5 -5.5 L-9 -9 M5.5 -5.5 L9 -9 M-5.5 5.5 L-9 9" />
-          </g>
         </g>
-      </g>
-      {ENEMY_SHOTS.map(shot => (
-        <rect key={shot.x} className="lp-duo-enemy-shot" x={shot.x - 1} y={shot.y} width="2" height="5" rx="1" fill="#f87171" style={{ animationDelay: `${shot.delay}s` }} />
+      ))}
+      {ALIENS.map((alien, index) => (
+        <g key={`boom-${alien.x}-${alien.y}`} ref={node => { booms.current[index] = node; }} style={{ opacity: 0 }}>
+          <use href="#lp-duo-boom" />
+        </g>
       ))}
 
-      <g transform="translate(116 148)">
-        <g className="lp-duo-wing">
-          {[0, -0.45].map(delay => (
-            <rect key={delay} className="lp-duo-bullet" x="-1" y="-8" width="2" height="6" rx="1" fill={PLAYER_TWO.color} style={{ animationDelay: `${delay}s` }} />
-          ))}
-          <path className="lp-duo-flame" d="M-3 19 L0 28 L3 19 Z" fill="#fb923c" />
-          <use href="#lp-duo-ship" color={PLAYER_TWO.color} />
+      {SHIPS.map((ship, index) => (
+        <rect
+          key={`bullet-${ship.peer.name}`}
+          ref={node => { bullets.current[index] = node; }}
+          width="2" height="6" rx="1"
+          fill={ship.peer.color}
+          style={{ opacity: 0, filter: `drop-shadow(0 0 2px ${ship.peer.color})` }}
+        />
+      ))}
+      {SHIPS.map((ship, index) => (
+        <g key={ship.peer.name} ref={node => { ships.current[index] = node; }} transform={`translate(${ship.home} ${ship.noseY})`}>
+          <g className="lp-duo-hover" style={{ animationDelay: `${-index * 0.8}s` }}>
+            <path className="lp-duo-flame" d="M-3.4 19 L0 30 L3.4 19 Z" fill="#fb923c" />
+            <path className="lp-duo-flame" d="M-1.6 19 L0 25 L1.6 19 Z" fill="#fef3c7" />
+            <use href="#lp-duo-ship" color={ship.peer.color} />
+          </g>
         </g>
-      </g>
-      <g transform="translate(160 138)">
-        <g className="lp-duo-hover">
-          <path className="lp-duo-flame" d="M-3.4 19 L0 30 L3.4 19 Z" fill="#fb923c" />
-          <path className="lp-duo-flame" d="M-1.6 19 L0 25 L1.6 19 Z" fill="#fef3c7" />
-          <use href="#lp-duo-ship" color={PLAYER_ONE.color} />
-        </g>
-      </g>
+      ))}
 
       <g className="lp-game-hud">
         <rect x="8" y="8" width="76" height="24" rx="5" fill="#050816" opacity="0.6" stroke="#38bdf8" strokeOpacity="0.4" strokeWidth="0.6" />
         <path d="M17 12 L18.8 16 L23 16.4 L19.8 19.2 L20.8 23.4 L17 21.2 L13.2 23.4 L14.2 19.2 L11 16.4 L15.2 16 Z" fill="#fde047" />
-        <text x="27" y="20.5" fontSize="8" fontWeight="800" fontFamily="ui-monospace, monospace" fill="#fff">012450</text>
+        <text ref={score} x="27" y="20.5" fontSize="8" fontWeight="800" fontFamily="ui-monospace, monospace" fill="#fff">{String(BASE_SCORE).padStart(6, '0')}</text>
         <g transform="translate(16 25.5) scale(0.22)"><use href="#lp-duo-ship" color={PLAYER_ONE.color} /></g>
         <g transform="translate(24 25.5) scale(0.22)"><use href="#lp-duo-ship" color={PLAYER_ONE.color} /></g>
         <g transform="translate(36 25.5) scale(0.22)"><use href="#lp-duo-ship" color={PLAYER_TWO.color} /></g>

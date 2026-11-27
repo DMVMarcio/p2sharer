@@ -681,12 +681,8 @@ html[data-theme="light"] .lp-mesh { opacity: 0.22; }
 /* Co-op shooter scene. */
 .lp-duo-stars { animation: lpDuoScroll 9s linear infinite; }
 .lp-duo-stars.is-near { animation-duration: 4.5s; }
-.lp-duo-formation { animation: lpDuoSway 4s ease-in-out infinite alternate; }
 .lp-duo-bob { animation: lpDuoBob 0.8s steps(2) infinite; }
-.lp-duo-wing { animation: lpDuoWing 3.2s ease-in-out infinite alternate; }
 .lp-duo-hover { animation: lpDuoHover 1.6s ease-in-out infinite alternate; }
-.lp-duo-bullet { animation: lpDuoBullet 0.9s linear infinite; }
-.lp-duo-enemy-shot { animation: lpDuoDrop 1.8s linear infinite; }
 .lp-duo-flame {
   transform-box: fill-box;
   transform-origin: center top;
@@ -697,47 +693,21 @@ html[data-theme="light"] .lp-mesh { opacity: 0.22; }
   transform-origin: center;
   animation: lpDuoRock 14s linear infinite;
 }
-.lp-duo-boom {
-  transform-box: fill-box;
-  transform-origin: center;
-  animation: lpDuoBoom 2.2s ease-out infinite;
-}
 
 @keyframes lpDuoScroll {
   from { transform: translateY(0); }
   to { transform: translateY(180px); }
 }
-@keyframes lpDuoSway {
-  from { transform: translateX(-16px); }
-  to { transform: translateX(16px); }
-}
 @keyframes lpDuoBob { 50% { transform: translateY(1.5px); } }
-@keyframes lpDuoWing {
-  from { transform: translateX(-6px); }
-  to { transform: translateX(8px); }
-}
 @keyframes lpDuoHover {
   from { transform: translateY(-1.5px); }
   to { transform: translateY(1.5px); }
-}
-@keyframes lpDuoBullet {
-  from { transform: translateY(0); opacity: 1; }
-  to { transform: translateY(-120px); opacity: 0; }
-}
-@keyframes lpDuoDrop {
-  from { transform: translateY(0); opacity: 1; }
-  to { transform: translateY(110px); opacity: 0.2; }
 }
 @keyframes lpDuoFlame {
   from { transform: scaleY(0.6); }
   to { transform: scaleY(1.15); }
 }
 @keyframes lpDuoRock { to { transform: rotate(360deg); } }
-@keyframes lpDuoBoom {
-  0% { transform: scale(0.1); opacity: 1; }
-  45% { transform: scale(1); opacity: 0.9; }
-  70%, 100% { transform: scale(1.3); opacity: 0; }
-}
 
 .lp-annotation {
   position: absolute;
@@ -1829,7 +1799,8 @@ html[data-theme="light"] .lp-mesh { opacity: 0.22; }
 /* Remote control demo */
 .lp-shot {
   position: absolute;
-  left: 50%;
+  /* Follows the P1 ship, whose position the shooter scene publishes. */
+  left: var(--p1-x, 50%);
   bottom: 22%;
   width: 3px;
   height: 18%;
@@ -2952,18 +2923,49 @@ html[data-theme="light"] .lp-mesh { opacity: 0.22; }
 
 .lp-scene-browser { padding: 10px; }
 
-.lp-browser-tabs { display: flex; gap: 6px; }
+/* Shared browser: one 10 s story shared by every animated part below. */
+.lp-scene-browser { --browser-loop: 10s; }
 
-.lp-browser-tabs span {
+.lp-browser-tabs { display: flex; align-items: flex-end; gap: 6px; }
+
+.lp-browser-tabs > span:not(.lp-browser-viewers) {
+  display: flex;
+  align-items: center;
+  gap: 6px;
   width: 70px;
-  height: 18px;
+  height: 20px;
+  padding: 0 8px;
   border-radius: 8px 8px 0 0;
   background: var(--bg-elevated);
 }
 
+.lp-browser-tabs > span i {
+  flex: none;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--text-muted) 45%, transparent);
+}
+
+.lp-browser-tabs > span b {
+  flex: 1;
+  height: 4px;
+  border-radius: 2px;
+  background: color-mix(in srgb, var(--text-muted) 30%, transparent);
+}
+
 .lp-browser-tabs .is-active { background: var(--bg-surface); }
 
+.lp-browser-tabs .lp-browser-favicon {
+  background: conic-gradient(var(--tone) 0 75%, transparent 0);
+  animation: lpBrowserFavicon var(--browser-loop) linear infinite;
+}
+
+.lp-browser-viewers { display: inline-flex; margin: 0 0 3px auto; }
+.lp-browser-viewers .lp-avatar + .lp-avatar { margin-left: -5px; }
+
 .lp-browser-url {
+  position: relative;
   display: flex;
   align-items: center;
   gap: 6px;
@@ -2973,23 +2975,181 @@ html[data-theme="light"] .lp-mesh { opacity: 0.22; }
   color: var(--text-muted);
 }
 
-.lp-browser-url i { width: 46%; height: 6px; border-radius: 3px; background: var(--bg-elevated); }
+.lp-browser-address {
+  display: flex;
+  align-items: center;
+  flex: 1;
+  gap: 2px;
+}
+
+.lp-browser-address i {
+  height: 6px;
+  border-radius: 3px;
+  background: color-mix(in srgb, var(--text-muted) 45%, transparent);
+  animation: lpBrowserType var(--browser-loop) infinite;
+}
+
+/* Typing caret. */
+.lp-browser-address::after {
+  content: '';
+  width: 1.5px;
+  height: 10px;
+  background: var(--text-secondary);
+  animation: lpBrowserCaret var(--browser-loop) infinite;
+}
+
+.lp-browser-host {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 3px 2px 6px;
+  border-radius: var(--radius-full);
+  background: var(--tone-soft, color-mix(in srgb, var(--tone) 14%, transparent));
+  color: var(--tone);
+}
+
+.lp-browser-loading {
+  position: absolute;
+  left: 0;
+  bottom: 0;
+  height: 2px;
+  border-radius: 2px;
+  background: var(--tone);
+  animation: lpBrowserLoad var(--browser-loop) ease-out infinite;
+}
 
 .lp-browser-page {
   position: relative;
-  display: grid;
-  gap: 10px;
+  height: 190px;
   padding: 12px;
   border-radius: 0 0 12px 12px;
   background: var(--bg-surface);
+  overflow: hidden;
 }
 
-.lp-browser-hero { height: 90px; border-radius: 10px; background: color-mix(in srgb, var(--tone) 55%, var(--bg-elevated)); }
+.lp-browser-content {
+  display: grid;
+  gap: 10px;
+  animation: lpBrowserContent var(--browser-loop) ease-in-out infinite;
+}
+
+.lp-browser-hero {
+  position: relative;
+  display: grid;
+  align-content: start;
+  gap: 7px;
+  height: 90px;
+  padding: 14px;
+  border-radius: 10px;
+  background: linear-gradient(120deg, color-mix(in srgb, var(--tone) 70%, var(--bg-elevated)), color-mix(in srgb, var(--tone) 35%, #a855f7));
+}
+
+.lp-browser-hero i { height: 10px; border-radius: 4px; background: rgba(255, 255, 255, 0.85); }
+.lp-browser-hero i.is-title { width: 46%; }
+.lp-browser-hero i.is-line { width: 30%; height: 6px; background: rgba(255, 255, 255, 0.5); }
+
+.lp-browser-cta {
+  position: absolute;
+  right: 14px;
+  bottom: 12px;
+  width: 26%;
+  height: 16px;
+  border-radius: var(--radius-full);
+  background: rgba(255, 255, 255, 0.85);
+  animation: lpBrowserCta var(--browser-loop) ease-out infinite;
+}
+
 .lp-browser-row { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
 .lp-browser-row i { height: 46px; border-radius: 8px; background: var(--bg-elevated); }
+.lp-browser-row i.is-picked { animation: lpBrowserPick var(--browser-loop) ease-out infinite; }
 
-.lp-browser-cursor-a { animation: lpBoardA 7s ease-in-out infinite; }
-.lp-browser-cursor-b { animation: lpBoardB 7s ease-in-out infinite; }
+.lp-browser-click {
+  position: absolute;
+  width: 24px;
+  height: 24px;
+  margin: -12px 0 0 -12px;
+  border: 2px solid var(--peer);
+  border-radius: 50%;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.lp-browser-click.is-a { left: 50%; top: 71%; animation: lpBrowserClickA var(--browser-loop) ease-out infinite; }
+.lp-browser-click.is-b { left: 81%; top: 43%; animation: lpBrowserClickB var(--browser-loop) ease-out infinite; }
+
+.lp-browser-cursor-a { animation: lpBrowserCursorA var(--browser-loop) ease-in-out infinite; }
+.lp-browser-cursor-b { animation: lpBrowserCursorB var(--browser-loop) ease-in-out infinite; }
+
+@keyframes lpBrowserType {
+  0% { width: 0; opacity: 1; animation-timing-function: steps(14, end); }
+  12%, 94% { width: 58%; opacity: 1; }
+  100% { width: 58%; opacity: 0; }
+}
+
+@keyframes lpBrowserCaret {
+  0%, 12% { opacity: 1; }
+  14%, 100% { opacity: 0; }
+}
+
+@keyframes lpBrowserLoad {
+  0%, 12% { width: 0; opacity: 1; }
+  23% { width: 100%; opacity: 1; }
+  27%, 100% { width: 100%; opacity: 0; }
+}
+
+@keyframes lpBrowserFavicon {
+  0%, 12% { transform: rotate(0); }
+  24%, 100% { transform: rotate(720deg); background: var(--tone); }
+}
+
+@keyframes lpBrowserContent {
+  0%, 20% { opacity: 0.3; filter: grayscale(1); transform: translateY(0); }
+  28%, 58% { opacity: 1; filter: none; transform: translateY(0); }
+  70%, 92% { opacity: 1; filter: none; transform: translateY(-46px); }
+  100% { opacity: 0.3; filter: grayscale(1); transform: translateY(0); }
+}
+
+@keyframes lpBrowserCta {
+  0%, 37% { transform: scale(1); background: rgba(255, 255, 255, 0.85); }
+  39% { transform: scale(0.9); background: var(--peer); }
+  44%, 94% { transform: scale(1); background: var(--peer); box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.35); }
+  100% { transform: scale(1); background: rgba(255, 255, 255, 0.85); }
+}
+
+@keyframes lpBrowserPick {
+  0%, 47% { transform: scale(1); box-shadow: none; }
+  50% { transform: scale(1.06); box-shadow: 0 0 0 2px var(--peer); }
+  55%, 94% { transform: scale(1); box-shadow: 0 0 0 2px var(--peer); background: color-mix(in srgb, var(--peer) 18%, var(--bg-elevated)); }
+  100% { transform: scale(1); box-shadow: none; }
+}
+
+@keyframes lpBrowserClickA {
+  0%, 47% { opacity: 0; transform: scale(0.2); }
+  48% { opacity: 0.9; transform: scale(0.3); }
+  56%, 100% { opacity: 0; transform: scale(2.2); }
+}
+
+@keyframes lpBrowserClickB {
+  0%, 37% { opacity: 0; transform: scale(0.2); }
+  38% { opacity: 0.9; transform: scale(0.3); }
+  46%, 100% { opacity: 0; transform: scale(2.2); }
+}
+
+@keyframes lpBrowserCursorB {
+  0%, 24% { left: 88%; top: 12%; }
+  35%, 39% { left: 81%; top: 43%; }
+  50% { left: 86%; top: 36%; }
+  62%, 90% { left: 70%; top: 22%; }
+  100% { left: 88%; top: 12%; }
+}
+
+@keyframes lpBrowserCursorA {
+  0%, 30% { left: 14%; top: 92%; }
+  45%, 49% { left: 50%; top: 71%; }
+  60% { left: 42%; top: 66%; }
+  72%, 90% { left: 30%; top: 54%; }
+  100% { left: 14%; top: 92%; }
+}
 
 .lp-scene-tunnel { display: grid; gap: 10px; }
 

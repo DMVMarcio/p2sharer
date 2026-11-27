@@ -1,5 +1,5 @@
 import { useId, useRef, type CSSProperties, type KeyboardEvent, type ReactNode } from 'react';
-import { ArrowRight, Check, Crown, FileText, FileVideo, Globe, MessageSquare, Network, Palette, Play, Tv } from 'lucide-react';
+import { ArrowRight, Check, Crown, FileText, FileVideo, Globe, MessageSquare, Monitor, Network, Palette, Play, Tv } from 'lucide-react';
 import { t } from '../../../src/i18n';
 import { LiveCursor, MiniChessBoard, PEERS, PeerAvatar, WhiteboardSketch } from './scenes';
 import { useAutoCycle, useInView, useLoopStep } from './motion';
@@ -83,14 +83,45 @@ function ChatScene() {
   );
 }
 
+/*
+ * One 10 s story: the host types an address, the page loads, Theo presses the
+ * page's button, Leo picks a card and the page scrolls for everyone.
+ */
 function BrowserScene() {
   return (
     <div className="lp-scene lp-scene-browser">
-      <div className="lp-browser-tabs"><span className="is-active" /><span /><span /></div>
-      <div className="lp-browser-url"><Globe size={11} /><i /></div>
+      <div className="lp-browser-tabs">
+        <span className="is-active"><i className="lp-browser-favicon" /><b /></span>
+        <span><i /><b /></span>
+        <span><i /><b /></span>
+        <span className="lp-browser-viewers">
+          <PeerAvatar peer={PEERS[3]} size={18} />
+          <PeerAvatar peer={PEERS[1]} size={18} />
+          <PeerAvatar peer={PEERS[0]} size={18} />
+        </span>
+      </div>
+      <div className="lp-browser-url">
+        <Globe size={11} />
+        <span className="lp-browser-address"><i /></span>
+        <span className="lp-browser-host"><Monitor size={10} /><PeerAvatar peer={PEERS[3]} size={14} /></span>
+        <span className="lp-browser-loading" />
+      </div>
       <div className="lp-browser-page">
-        <span className="lp-browser-hero" />
-        <span className="lp-browser-row"><i /><i /><i /></span>
+        <div className="lp-browser-content">
+          <span className="lp-browser-hero">
+            <i className="is-title" />
+            <i className="is-line" />
+            <b className="lp-browser-cta" style={{ '--peer': PEERS[3].color } as CSSProperties} />
+          </span>
+          <span className="lp-browser-row">
+            <i />
+            <i className="is-picked" style={{ '--peer': PEERS[1].color } as CSSProperties} />
+            <i />
+          </span>
+          <span className="lp-browser-row is-more"><i /><i /><i /></span>
+        </div>
+        <span className="lp-browser-click is-a" style={{ '--peer': PEERS[1].color } as CSSProperties} />
+        <span className="lp-browser-click is-b" style={{ '--peer': PEERS[3].color } as CSSProperties} />
         <LiveCursor peer={PEERS[1]} className="lp-browser-cursor-a" />
         <LiveCursor peer={PEERS[3]} className="lp-browser-cursor-b" />
       </div>
