@@ -168,29 +168,43 @@ export const SavedRoomsSection: React.FC = () => {
                 {homeRoomPresencePolling &&
                   (() => {
                     const onlinePeople = homeRoomPresence.getParticipants(room.roomId);
-                    if (onlinePeople.length === 0) return null;
-                    return (
-                      <ActivityParticipants
-                        className="saved-room-participants"
-                        maxVisible={4}
-                        ariaLabel={t('savedRooms.onlineMembers', { count: onlinePeople.length })}
-                        people={onlinePeople.map((person) => ({
-                          id: person.id,
-                          name: person.name,
-                          color: person.color,
-                          imageUrl: person.avatar,
-                        }))}
-                        onSelectParticipant={(person) =>
-                          modalManager.openProfile({
-                            peerId: person.id,
+                    const isLoadingPresence = homeRoomPresence.isLoading?.(room.roomId) ?? false;
+                    if (onlinePeople.length > 0) {
+                      return (
+                        <ActivityParticipants
+                          className="saved-room-participants"
+                          maxVisible={4}
+                          ariaLabel={t('savedRooms.onlineMembers', { count: onlinePeople.length })}
+                          people={onlinePeople.map((person) => ({
+                            id: person.id,
                             name: person.name,
                             color: person.color,
-                            imageUrl: person.imageUrl,
-                            hideStats: true,
-                          })
-                        }
-                      />
-                    );
+                            imageUrl: person.avatar,
+                          }))}
+                          onSelectParticipant={(person) =>
+                            modalManager.openProfile({
+                              peerId: person.id,
+                              name: person.name,
+                              color: person.color,
+                              imageUrl: person.imageUrl,
+                              hideStats: true,
+                            })
+                          }
+                        />
+                      );
+                    }
+                    if (isLoadingPresence) {
+                      return (
+                        <span
+                          className="saved-room-participants saved-room-participants-loading"
+                          role="status"
+                          aria-label={t('savedRooms.loadingPresence')}
+                        >
+                          <span className="loading-spinner" aria-hidden="true" />
+                        </span>
+                      );
+                    }
+                    return null;
                   })()}
               </div>
               <div className="saved-room-actions">

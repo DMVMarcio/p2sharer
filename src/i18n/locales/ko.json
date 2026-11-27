@@ -1897,6 +1897,7 @@
   "join.trustConfirm": "신뢰하고 계속",
   "join.saveRoom": "이 방 저장하기",
   "savedRooms.onlineMembers": "현재 참여자 ({{count}})",
+  "savedRooms.loadingPresence": "현재 참여자 확인 중…",
   "chat.filter.label": "채팅 필터",
   "chat.filter.messages": "메시지",
   "chat.filter.streams": "화면 공유",

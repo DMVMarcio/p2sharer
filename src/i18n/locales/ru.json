@@ -1897,6 +1897,7 @@
   "join.trustConfirm": "Доверять и продолжить",
   "join.saveRoom": "Сохранить эту комнату",
   "savedRooms.onlineMembers": "Участники в комнате ({{count}})",
+  "savedRooms.loadingPresence": "Поиск участников в комнате…",
   "chat.filter.label": "Фильтр чата",
   "chat.filter.messages": "Сообщения",
   "chat.filter.streams": "Трансляции",

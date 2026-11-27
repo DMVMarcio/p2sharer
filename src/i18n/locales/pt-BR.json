@@ -1903,6 +1903,7 @@
   "join.trustConfirm": "Confiar e continuar",
   "join.saveRoom": "Salvar esta sala",
   "savedRooms.onlineMembers": "Participantes ativos ({{count}})",
+  "savedRooms.loadingPresence": "Verificando participantes ativos…",
   "chat.filter.label": "Filtrar chat",
   "chat.filter.messages": "Mensagens",
   "chat.filter.streams": "Transmissões",

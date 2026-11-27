@@ -1897,6 +1897,7 @@
   "join.trustConfirm": "信頼して続行",
   "join.saveRoom": "このルームを保存",
   "savedRooms.onlineMembers": "参加中のメンバー ({{count}})",
+  "savedRooms.loadingPresence": "参加中のメンバーを確認中…",
   "chat.filter.label": "チャットを絞り込む",
   "chat.filter.messages": "メッセージ",
   "chat.filter.streams": "画面共有",

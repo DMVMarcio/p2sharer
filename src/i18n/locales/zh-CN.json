@@ -1897,6 +1897,7 @@
   "join.trustConfirm": "信任并继续",
   "join.saveRoom": "保存此房间",
   "savedRooms.onlineMembers": "当前在线成员 ({{count}})",
+  "savedRooms.loadingPresence": "正在检查在线成员…",
   "chat.filter.label": "筛选聊天",
   "chat.filter.messages": "消息",
   "chat.filter.streams": "屏幕共享",

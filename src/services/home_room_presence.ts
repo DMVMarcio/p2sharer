@@ -14,12 +14,16 @@ const PROBE_MAX_MS = 11000;
 const PROBE_RETRY_MS = 1200;
 const PROBE_SETTLE_AFTER_RESPONSE_MS = 900;
 
-export type ProbeRoomFn = (room: SavedRoom, signal: AbortSignal,
-  onUpdate: (participants: RoomPreviewParticipant[]) => void) => Promise<RoomPreviewParticipant[]>;
+export type ProbeRoomFn = (
+  room: SavedRoom,
+  signal: AbortSignal,
+  onUpdate: (participants: RoomPreviewParticipant[]) => void,
+) => Promise<RoomPreviewParticipant[]>;
 
 export function createHomeRoomPresenceService(probeFn?: ProbeRoomFn) {
   let participantsByRoom: Record<string, RoomPreviewParticipant[]> = {};
   const lastCheckedAt = new Map<string, number>();
+  const pendingRooms = new Set<string>();
   const listeners = new Set<() => void>();
   let version = 0;
   let intervalTimer: ReturnType<typeof setInterval> | null = null;
@@ -37,12 +41,14 @@ export function createHomeRoomPresenceService(probeFn?: ProbeRoomFn) {
 
   const canPoll = (): boolean => {
     const activeModal = modalManager.getActive();
-    return stateStore.homeRoomPresencePolling &&
+    return (
+      stateStore.homeRoomPresencePolling &&
       !stateStore.currentRoomCode &&
       !roomService.roomManager &&
       !roomService.hasActiveRoomPreview() &&
       activeModal !== 'joinRoom' &&
-      activeModal !== 'createRoom';
+      activeModal !== 'createRoom'
+    );
   };
 
   const defaultProbeRoom: ProbeRoomFn = async (room, signal, onUpdate) => {
@@ -97,23 +103,26 @@ export function createHomeRoomPresenceService(probeFn?: ProbeRoomFn) {
         }
       }, PROBE_RETRY_MS);
 
-      await manager.join({
-        onPreview: (summary) => {
-          if (settled || signal.aborted) return;
-          preview = stabilizeRoomPreview(preview, summary);
-          latestParticipants = preview.participants;
-          onUpdate(latestParticipants);
-          if (!settleTimer) {
-            settleTimer = setTimeout(finish, PROBE_SETTLE_AFTER_RESPONSE_MS);
-          }
+      await manager.join(
+        {
+          onPreview: (summary) => {
+            if (settled || signal.aborted) return;
+            preview = stabilizeRoomPreview(preview, summary);
+            latestParticipants = preview.participants;
+            onUpdate(latestParticipants);
+            if (!settleTimer) {
+              settleTimer = setTimeout(finish, PROBE_SETTLE_AFTER_RESPONSE_MS);
+            }
+          },
+          onStreamsUpdate: () => {},
+          onSlotsUpdate: () => {},
+          onChat: () => {},
+          onChatHistory: () => {},
+          onPeersUpdate: () => {},
+          onStatusChange: () => {},
         },
-        onStreamsUpdate: () => {},
-        onSlotsUpdate: () => {},
-        onChat: () => {},
-        onChatHistory: () => {},
-        onPeersUpdate: () => {},
-        onStatusChange: () => {},
-      }, true);
+        true,
+      );
 
       if (!signal.aborted && !settled) {
         manager.requestPreview();
@@ -137,6 +146,10 @@ export function createHomeRoomPresenceService(probeFn?: ProbeRoomFn) {
   const abortCurrent = () => {
     currentAbort?.abort();
     currentAbort = null;
+    if (pendingRooms.size > 0) {
+      pendingRooms.clear();
+      notify();
+    }
   };
 
   const abortAndWait = async (): Promise<void> => {
@@ -166,6 +179,12 @@ export function createHomeRoomPresenceService(probeFn?: ProbeRoomFn) {
         changed = true;
       }
     }
+    for (const id of [...pendingRooms]) {
+      if (!savedIds.has(id)) {
+        pendingRooms.delete(id);
+        changed = true;
+      }
+    }
     if (changed) {
       participantsByRoom = next;
       notify();
@@ -184,33 +203,53 @@ export function createHomeRoomPresenceService(probeFn?: ProbeRoomFn) {
     const run = (async () => {
       try {
         const records = orderSavedRooms((await savedRooms.list()).filter((room) => room.saved));
+        if (controller.signal.aborted || !canPoll() || activeConsumers === 0) return;
         const savedIds = new Set(records.map((room) => room.roomId));
         pruneDeletedRooms(savedIds);
         const now = Date.now();
-        const dueRooms = records.filter((room) =>
-          force || now - (lastCheckedAt.get(room.roomId) ?? 0) >= HOME_ROOM_PRESENCE_INTERVAL_MS);
+        const dueRooms = records.filter(
+          (room) => force || now - (lastCheckedAt.get(room.roomId) ?? 0) >= HOME_ROOM_PRESENCE_INTERVAL_MS,
+        );
+        if (dueRooms.length > 0) {
+          for (const room of dueRooms) pendingRooms.add(room.roomId);
+          notify();
+        }
         let cursor = 0;
         const workerCount = Math.min(PROBE_CONCURRENCY, dueRooms.length);
         const workers = Array.from({ length: workerCount }, async () => {
           while (cursor < dueRooms.length) {
             if (controller.signal.aborted || !canPoll() || activeConsumers === 0) break;
             const room = dueRooms[cursor++]!;
-            const result = await runProbe(room, controller.signal, (liveList) => {
-              if (controller.signal.aborted || !canPoll()) return;
-              lastCheckedAt.set(room.roomId, Date.now());
-              participantsByRoom = { ...participantsByRoom, [room.roomId]: liveList };
-              notify();
-            });
-            if (!controller.signal.aborted && canPoll()) {
-              lastCheckedAt.set(room.roomId, Date.now());
-              participantsByRoom = { ...participantsByRoom, [room.roomId]: result };
-              notify();
+            try {
+              const result = await runProbe(room, controller.signal, (liveList) => {
+                if (controller.signal.aborted || !canPoll()) return;
+                lastCheckedAt.set(room.roomId, Date.now());
+                pendingRooms.delete(room.roomId);
+                participantsByRoom = { ...participantsByRoom, [room.roomId]: liveList };
+                notify();
+              });
+              if (!controller.signal.aborted && canPoll()) {
+                lastCheckedAt.set(room.roomId, Date.now());
+                pendingRooms.delete(room.roomId);
+                participantsByRoom = { ...participantsByRoom, [room.roomId]: result };
+                notify();
+              }
+            } finally {
+              if (pendingRooms.delete(room.roomId)) {
+                notify();
+              }
             }
           }
         });
         await Promise.all(workers);
       } finally {
-        if (currentAbort === controller) currentAbort = null;
+        if (currentAbort === controller) {
+          currentAbort = null;
+          if (pendingRooms.size > 0) {
+            pendingRooms.clear();
+            notify();
+          }
+        }
       }
     })();
     activeCycle = run;
@@ -272,10 +311,13 @@ export function createHomeRoomPresenceService(probeFn?: ProbeRoomFn) {
     abortAndWait,
     refreshNow: (force = true) => refreshDueRooms(force),
     getParticipants: (roomId: string): RoomPreviewParticipant[] => participantsByRoom[roomId] ?? [],
+    isLoading: (roomId: string): boolean => pendingRooms.has(roomId),
     snapshot: () => version,
     subscribe: (listener: () => void) => {
       listeners.add(listener);
-      return () => { listeners.delete(listener); };
+      return () => {
+        listeners.delete(listener);
+      };
     },
   };
 }

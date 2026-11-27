@@ -1897,6 +1897,7 @@
   "join.trustConfirm": "Luota ja jatka",
   "join.saveRoom": "Tallenna tämä huone",
   "savedRooms.onlineMembers": "Aktiiviset osallistujat ({{count}})",
+  "savedRooms.loadingPresence": "Tarkistetaan aktiivisia osallistujia…",
   "chat.filter.label": "Suodata keskustelua",
   "chat.filter.messages": "Viestit",
   "chat.filter.streams": "Jaetut näytöt",

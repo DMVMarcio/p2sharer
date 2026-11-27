@@ -1897,6 +1897,7 @@
   "join.trustConfirm": "भरोसा करें और आगे बढ़ें",
   "join.saveRoom": "इस रूम को सहेजें",
   "savedRooms.onlineMembers": "सक्रिय सदस्य ({{count}})",
+  "savedRooms.loadingPresence": "सक्रिय सदस्य जाँचे जा रहे हैं…",
   "chat.filter.label": "चैट फ़िल्टर करें",
   "chat.filter.messages": "संदेश",
   "chat.filter.streams": "स्ट्रीम",
