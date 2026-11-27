@@ -105,4 +105,10 @@ Budgets are higher than the generic defaults because many existing files are lar
 
 ## 6. Known Structure Debt
 Observed, not yet fixed. Restructure gradually: small in-scope moves happen inside a task; larger moves are proposed to the user and committed separately as `refactor(structure)` with `git mv`.
-- Oversized files: `src/p2p/group_room.ts` (~5,700), `src/services/room_service.ts` (~2,500), `src/apps/whiteboard/whiteboard_canvas2d.ts` (~2,200), `src/apps/whiteboard/WhiteboardCanvas.tsx` (~1,800), `src/hooks/stream/useRemoteControl.ts` (~1,500), `src/components/modals/settings/SettingsModal.tsx` (~1,300).
+- Oversized files whose remaining size is one large class, hook, or component. Split them by responsibility when a task changes that area, extracting collaborators with their own regression tests (not as a blind move):
+  - `src/p2p/group_room.ts` (~6,900 lines, `GroupRoomManager`): seams are chat file transfer (request/offer/deny/send/receive, already typed in `chat_file_transfer_types.ts`), stream sharing and watching, room administration and host transfer, peer exchange/verification, and signaling switching.
+  - `src/services/room_service.ts` (~2,850, `RoomService`): room lifecycle (create/join/leave), connecting overlay state, chat and file actions, and stream controls.
+  - `src/apps/whiteboard/whiteboard_canvas2d.ts` (~2,200, `WhiteboardCanvas2DRenderer`): pure stroke/clip geometry helpers, layer canvas cache, live stroke sessions.
+  - `src/apps/whiteboard/WhiteboardCanvas.tsx` (~1,800): pointer gesture handling, text editing overlay, and shape geometry helpers.
+  - `src/hooks/stream/useRemoteControl.ts` (~1,500): immersive keyboard hook claims, mouse input, and gamepad forwarding.
+  - `src/components/modals/settings/SettingsModal.tsx` (~1,300): one pane per tab, as the existing `*SettingsPane.tsx` files already do.
