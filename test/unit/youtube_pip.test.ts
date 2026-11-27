@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { validYouTubePipCommand, validYouTubePipSettings, youtubePipEvent,
-  youtubePipPeerId } from '../../src/apps/youtube_pip.ts';
+  youtubePipPeerId } from '../../src/apps/youtube/youtube_pip.ts';
 
 test('each activity instance receives a distinct native PiP window and local event channel', () => {
   assert.equal(youtubePipPeerId('first'), 'youtube-first');

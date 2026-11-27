@@ -30,7 +30,7 @@ test('page copy writes the local clipboard and hardware changes restart only aft
   let root;
   try {
     const require = createRequire(import.meta.url);
-    const bundle = await build({ stdin: { contents: "export { BrowserApp } from './src/apps/BrowserApp'; export { t } from './src/i18n';", resolveDir: process.cwd() },
+    const bundle = await build({ stdin: { contents: "export { BrowserApp } from './src/apps/browser/BrowserApp'; export { t } from './src/i18n';", resolveDir: process.cwd() },
       bundle: true, write: false, format: 'esm', platform: 'node', loader: { '.css': 'empty' }, plugins: [{ name: 'browser-ui-boundaries', setup(builder) {
         const mocks = {
           room_apps_service: 'export const roomAppsService = { subscribe: () => () => {}, getModel: () => globalThis.browserSettingsFixture, getLocalActor: () => "local" };',

@@ -12,8 +12,8 @@ import { getRoomApp, type RoomAppViewProps } from './registry';
 import { roomAppsService } from './room_apps_service';
 import { appWindowEvent, appWindowPeerId, sendAppWindow, type AppWindowMessage } from './app_window';
 import { stateStore } from '../core/state_store';
-import { BrowserModel } from './browser_model';
-import { BrowserMedia } from './browser_media';
+import { BrowserModel } from './browser/browser_model';
+import { BrowserMedia } from './browser/browser_media';
 import { showToast } from '../hooks/useToast';
 
 export const RoomAppWindow: React.FC<{ instanceId: string }> = ({ instanceId }) => {

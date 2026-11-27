@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { BrowserControlLease, browserUrl, browserPointerPosition, validBrowserCommand, validBrowserState, validBrowserDialog, type BrowserCommand } from '../../src/apps/browser_protocol.ts';
-import { BrowserModel, type BrowserNative } from '../../src/apps/browser_model.ts';
+import { BrowserControlLease, browserUrl, browserPointerPosition, validBrowserCommand, validBrowserState, validBrowserDialog, type BrowserCommand } from '../../src/apps/browser/browser_protocol.ts';
+import { BrowserModel, type BrowserNative } from '../../src/apps/browser/browser_model.ts';
 import { toastManager } from '../../src/hooks/useToast.ts';
 
 const move = (x = 100): BrowserCommand => ({ kind: 'mouse', event: 'mouseMoved', x, y: 100, button: 'none', buttons: 0, delta_x: 0, delta_y: 0, modifiers: 0, clicks: 0 });

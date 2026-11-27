@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { loadYouTubePlaylist, loadYouTubePlaylistPreview, parseInvidiousPlaylist, parseInvidiousResults, parseYouTubeInput } from '../../src/apps/youtube_api.ts';
+import { loadYouTubePlaylist, loadYouTubePlaylistPreview, parseInvidiousPlaylist, parseInvidiousResults, parseYouTubeInput } from '../../src/apps/youtube/youtube_api.ts';
 
 test('video and playlist URLs expose both preview candidates without adding either', () => {
   assert.deepEqual(parseYouTubeInput('https://www.youtube.com/watch?v=dQw4w9WgXcQ&list=PL-SFn27cXc6q0JMNHzVeRkzrVTfTQkMFh'), {

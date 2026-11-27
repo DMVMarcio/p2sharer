@@ -5,7 +5,7 @@ import {
   twitchPipPeerId,
   validTwitchPipCommand,
   validTwitchPipSettings,
-} from '../../src/apps/twitch_pip.ts';
+} from '../../src/apps/twitch/twitch_pip.ts';
 
 test('each Twitch app instance receives a distinct native PiP window and local event channel', () => {
   assert.equal(twitchPipPeerId('first'), 'twitch-first');

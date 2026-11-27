@@ -1,10 +1,10 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { BrowserMedia } from '../../src/apps/browser_media.ts';
+import { BrowserMedia } from '../../src/apps/browser/browser_media.ts';
 import { MediaCoordinator } from '../../src/p2p/media_coordinator.ts';
 import { MockMediaStream, MockMediaStreamTrack } from '../helpers/browser_mocks.ts';
-import { BrowserQualityController, validBrowserQuality, browserVideoBitrate } from '../../src/apps/browser_quality.ts';
-import { BrowserCapture, type BrowserCaptureDependencies } from '../../src/apps/browser_capture.ts';
+import { BrowserQualityController, validBrowserQuality, browserVideoBitrate } from '../../src/apps/browser/browser_quality.ts';
+import { BrowserCapture, type BrowserCaptureDependencies } from '../../src/apps/browser/browser_capture.ts';
 
 test('shared browser and detached relay negotiate stereo in both media offer and viewer answer', async () => {
   const previous = globalThis.RTCPeerConnection;

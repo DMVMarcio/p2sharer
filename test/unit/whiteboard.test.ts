@@ -1,12 +1,12 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import * as Y from 'yjs';
-import { WhiteboardModel } from '../../src/apps/whiteboard_model.ts';
+import { WhiteboardModel } from '../../src/apps/whiteboard/whiteboard_model.ts';
 import { encodeUpdate } from '../../src/apps/models.ts';
-import { BOARD_BRUSH_TYPES, boardSvg, brushPath, shapeBounds, hitBoardShape, hitBoardLayer, boardBrushWidth, DEFAULT_BOARD_LAYER, parseBoardFile, hasVariablePressure, expandSymmetryPointLists, type BoardShape } from '../../src/apps/whiteboard_scene.ts';
-import { BOARD_WIDTH, BOARD_HEIGHT, BrushStabilizer, boardContains, clampBoardPoint, clampBoardViewport, containBoardShape, resizeBoardBounds } from '../../src/apps/whiteboard_interaction.ts';
-import { polygonToMask, invertSelectionMask, selectionMaskToPolygon } from '../../src/apps/whiteboard_raster.ts';
-import { BRUSH_STUDIO_PRESETS, getPencilPaperGrain, getWatercolorPaperGrain } from '../../src/apps/whiteboard_brushes.ts';
+import { BOARD_BRUSH_TYPES, boardSvg, brushPath, shapeBounds, hitBoardShape, hitBoardLayer, boardBrushWidth, DEFAULT_BOARD_LAYER, parseBoardFile, hasVariablePressure, expandSymmetryPointLists, type BoardShape } from '../../src/apps/whiteboard/whiteboard_scene.ts';
+import { BOARD_WIDTH, BOARD_HEIGHT, BrushStabilizer, boardContains, clampBoardPoint, clampBoardViewport, containBoardShape, resizeBoardBounds } from '../../src/apps/shared/whiteboard_interaction.ts';
+import { polygonToMask, invertSelectionMask, selectionMaskToPolygon } from '../../src/apps/whiteboard/whiteboard_raster.ts';
+import { BRUSH_STUDIO_PRESETS, getPencilPaperGrain, getWatercolorPaperGrain } from '../../src/apps/whiteboard/whiteboard_brushes.ts';
 
 function shape(overrides: Partial<BoardShape> = {}): BoardShape {
   return { id: crypto.randomUUID(), tool: 'rectangle', points: [{ x: 10, y: 20 }, { x: 110, y: 120 }],

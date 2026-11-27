@@ -10,7 +10,7 @@ test('YouTube fullscreen control preserves the player and follows fullscreen exi
   const require = createRequire(import.meta.url);
   const bundle = await build({ stdin: { contents: `
     export { useElementFullscreen } from './src/hooks/useElementFullscreen';
-    export { YouTubeControls } from './src/apps/YouTubeControls';`, resolveDir: process.cwd() },
+    export { YouTubeControls } from './src/apps/youtube/YouTubeControls';`, resolveDir: process.cwd() },
     bundle: true, write: false, format: 'esm', platform: 'node', jsx: 'automatic',
     plugins: [{ name: 'fullscreen-fixture', setup(builder) {
       builder.onResolve({ filter: /^@tauri-apps\/api\/(core|window)$/ }, args => ({ path: args.path, namespace: 'native' }));

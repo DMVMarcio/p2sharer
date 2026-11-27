@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { advanceYouTubeQueue, moveYouTubeQueueEntry } from '../../src/apps/youtube_queue.ts';
+import { advanceYouTubeQueue, moveYouTubeQueueEntry } from '../../src/apps/youtube/youtube_queue.ts';
 import type { YouTubeState } from '../../src/apps/types.ts';
 
 const state: YouTubeState = {

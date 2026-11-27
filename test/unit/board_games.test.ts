@@ -1,8 +1,8 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { RoomAppsService } from '../../src/apps/room_apps_service.ts';
-import type { TicTacToeModel, ChessModel, CheckersModel } from '../../src/apps/board_game_model.ts';
-import { indexOf } from '../../src/apps/chess_engine.ts';
+import type { TicTacToeModel, ChessModel, CheckersModel } from '../../src/apps/games/board_game_model.ts';
+import { indexOf } from '../../src/apps/games/chess/chess_engine.ts';
 
 test('board game lobbies support multiple independent rooms and free role switching between players and spectators', () => {
   const alice = new RoomAppsService();

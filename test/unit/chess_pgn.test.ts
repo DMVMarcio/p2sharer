@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { applyChessMove, createInitialChessState, indexOf } from '../../src/apps/chess_engine.ts';
-import { buildChessPgn } from '../../src/apps/chess_pgn.ts';
+import { applyChessMove, createInitialChessState, indexOf } from '../../src/apps/games/chess/chess_engine.ts';
+import { buildChessPgn } from '../../src/apps/games/chess/chess_pgn.ts';
 
 test('completed chess games export PGN tags, escaped names, numbered SAN moves and result', () => {
   let game = createInitialChessState();

@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { describeYouTubeActivity } from '../../src/apps/youtube_activity.ts';
+import { describeYouTubeActivity } from '../../src/apps/youtube/youtube_activity.ts';
 import { validYouTubeState } from '../../src/apps/models.ts';
 import type { YouTubeState } from '../../src/apps/types.ts';
 

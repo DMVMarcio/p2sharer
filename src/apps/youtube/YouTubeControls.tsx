@@ -1,0 +1,80 @@
+import { t } from '../../i18n';
+import { useLocale } from '../../hooks/useLocale';
+import React from 'react';
+import { Captions, CaptionsOff, Maximize, Minimize, Pause, PictureInPicture2, Play, SkipBack, SkipForward, Volume2, VolumeX } from 'lucide-react';
+import { MediaSeekBar } from '../../components/common/MediaSeekBar';
+import { TooltipButton } from '../../components/common/TooltipButton';
+import { formatMediaTime } from '../../core/media_time';
+
+interface Props {
+  hasVideo: boolean;
+  playing: boolean;
+  hasPrevious: boolean;
+  hasNext: boolean;
+  position: number;
+  duration: number;
+  buffered: number;
+  volume: number;
+  muted: boolean;
+  captions: boolean;
+  live?: boolean;
+  onTogglePlayback: () => void;
+  onPrevious: () => void;
+  onNext: () => void;
+  onSeek: (position: number) => void;
+  onVolume: (volume: number) => void;
+  onToggleMute: () => void;
+  onToggleCaptions: () => void;
+  onPictureInPicture?: () => void;
+  fullscreen: boolean;
+  onToggleFullscreen: () => void;
+}
+
+export const YouTubeControls: React.FC<Props> = ({ hasVideo, playing, hasPrevious, hasNext,
+  position, duration, buffered, volume, muted, onTogglePlayback, onPrevious, onNext, onSeek,
+  onVolume, onToggleMute, captions, onToggleCaptions, onPictureInPicture, fullscreen, onToggleFullscreen, live = false }) => {
+  useLocale();
+  const timelineDuration = Math.max(duration, position);
+  return <div className="youtube-control-deck" aria-label={t("message.167ca79b3dab")}>
+    <MediaSeekBar value={position} duration={timelineDuration} buffered={buffered} onCommit={onSeek}
+      disabled={!hasVideo || timelineDuration <= 0} />
+    <div className="youtube-control-row">
+      <div className="youtube-transport">
+        <TooltipButton tooltip={t("message.f96e57440a4b")} className="youtube-control-button"
+          disabled={!hasVideo || (!hasPrevious && position < 1)} onClick={onPrevious}>
+          <SkipBack size={18} strokeWidth={2} /></TooltipButton>
+        <TooltipButton tooltip={playing ? t("message.c1301275ce3f") : t("message.ca0709c34209")}
+          className="youtube-control-button youtube-play-button" disabled={!hasVideo} onClick={onTogglePlayback}>
+          {playing ? <Pause size={19} strokeWidth={2.4} /> : <Play size={19} strokeWidth={2.4} />}
+        </TooltipButton>
+        <TooltipButton tooltip={t("message.16be79a2e191")} className="youtube-control-button"
+          disabled={!hasNext} onClick={onNext}><SkipForward size={18} strokeWidth={2} /></TooltipButton>
+        <span className="youtube-time-readout">{formatMediaTime(position)} <span>/</span> {formatMediaTime(timelineDuration)}</span>
+        {live && <span className="youtube-live-label">{t("message.b7c19868a9a8")}</span>}
+      </div>
+      <div className="youtube-volume-control">
+        <TooltipButton tooltip={captions ? t("message.44cac55cd399") : t("message.ca0e837b4bbe")}
+          className={`youtube-control-button ${captions ? 'youtube-captions-active' : ''}`}
+          aria-pressed={captions} onClick={onToggleCaptions}>
+          {captions ? <Captions size={18} /> : <CaptionsOff size={18} />}
+        </TooltipButton>
+        {onPictureInPicture && <TooltipButton tooltip="Picture-in-Picture"
+          className="youtube-control-button" onClick={onPictureInPicture}>
+          <PictureInPicture2 size={17} />
+        </TooltipButton>}
+        <TooltipButton tooltip={muted ? t("message.7e3d4925b5c5") : t("message.8953cc8c3228")} className="youtube-control-button"
+          onClick={onToggleMute}>
+          {muted || volume === 0 ? <VolumeX size={17} /> : <Volume2 size={17} />}
+        </TooltipButton>
+        <input autoComplete="off" aria-label={t("message.4c2b4c2523af")} type="range" min="0" max="100" value={volume}
+          onChange={(event) => onVolume(Number(event.target.value))}
+          style={{ '--volume-progress': `${muted ? 0 : volume}%` } as React.CSSProperties} />
+        <span>{muted ? 0 : volume}%</span>
+        <TooltipButton tooltip={t(fullscreen ? 'browser.exitFullscreen' : 'browser.fullscreen')}
+          className="youtube-control-button" aria-pressed={fullscreen} disabled={!hasVideo && !fullscreen} onClick={onToggleFullscreen}>
+          {fullscreen ? <Minimize size={18} /> : <Maximize size={18} />}
+        </TooltipButton>
+      </div>
+    </div>
+  </div>;
+};

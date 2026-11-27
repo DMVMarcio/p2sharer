@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { reconcileYouTubePlayer, type YouTubePlaybackTracker, type YouTubePlayer } from '../../src/apps/youtube_player.ts';
+import { reconcileYouTubePlayer, type YouTubePlaybackTracker, type YouTubePlayer } from '../../src/apps/youtube/youtube_player.ts';
 import type { YouTubeState } from '../../src/apps/types.ts';
 
 const state: YouTubeState = {

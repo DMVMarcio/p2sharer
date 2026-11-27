@@ -1,5 +1,5 @@
 import { useEffect, useRef, type RefObject } from 'react';
-import type { BrowserCommand } from '../apps/browser_protocol';
+import type { BrowserCommand } from '../apps/browser/browser_protocol';
 
 /** Physical capture belongs only to the controlling participant's local surface. */
 export function useBrowserPointerLock(surface: RefObject<HTMLDivElement | null>, enabled: boolean,

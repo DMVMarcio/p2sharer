@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { TunnelModel, type TunnelNative } from '../../src/apps/tunnel_model.ts';
-import { createTunnelRules, isVirtualIp, validTunnelRule, type TunnelRule } from '../../src/apps/tunnel_rules.ts';
+import { TunnelModel, type TunnelNative } from '../../src/apps/tunnels/tunnel_model.ts';
+import { createTunnelRules, isVirtualIp, validTunnelRule, type TunnelRule } from '../../src/apps/tunnels/tunnel_rules.ts';
 
 const localIP = [10,160,1,1].join('.');
 const peerIP = [10,160,1,2].join('.');

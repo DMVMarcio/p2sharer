@@ -4,15 +4,15 @@ import { invoke, isTauri } from '@tauri-apps/api/core';
 import { listen } from '@tauri-apps/api/event';
 import { roomAppsService } from './room_apps_service';
 import { appWindowEvent, appWindowPeerId, sendAppWindow, type AppWindowMessage } from './app_window';
-import { youtubePipPeerId } from './youtube_pip';
-import { twitchPipPeerId } from './twitch_pip';
+import { youtubePipPeerId } from './youtube/youtube_pip';
+import { twitchPipPeerId } from './twitch/twitch_pip';
 import { stateStore } from '../core/state_store';
 import { showToast } from '../hooks/useToast';
 import type { RoomAppInstance } from './types';
 import { YouTubeModel } from './models';
 import { getRoomApp } from './registry';
-import { BrowserModel } from './browser_model';
-import { BrowserMedia } from './browser_media';
+import { BrowserModel } from './browser/browser_model';
+import { BrowserMedia } from './browser/browser_media';
 
 export function useAppWindow(instance: RoomAppInstance) {
   const [detached, setDetached] = useState(false);

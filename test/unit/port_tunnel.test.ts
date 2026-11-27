@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { createTunnelRules, TUNNEL_RULES_KEY, type TunnelRule } from '../../src/apps/tunnel_rules.ts';
-import { TunnelModel, type TunnelNative, type TunnelForward } from '../../src/apps/tunnel_model.ts';
+import { createTunnelRules, TUNNEL_RULES_KEY, type TunnelRule } from '../../src/apps/tunnels/tunnel_rules.ts';
+import { TunnelModel, type TunnelNative, type TunnelForward } from '../../src/apps/tunnels/tunnel_model.ts';
 
 const rule: TunnelRule = { id: '11111111-1111-4111-8111-111111111111', name: 'Local service', port: 12345, protocol: 'tcp' };
 const generation = '22222222-2222-4222-8222-222222222222';

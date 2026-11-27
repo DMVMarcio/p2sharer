@@ -2,12 +2,12 @@ import { t } from '../i18n/index.ts';
 import protocolLabels from '../i18n/protocol.json' with { type: 'json' };
 import type React from 'react';
 import { FileText, Network, Globe, Palette, Grid3x3, Crown, CircleDot } from 'lucide-react';
-import { WhiteboardModel } from './whiteboard_model.ts';
+import { WhiteboardModel } from './whiteboard/whiteboard_model.ts';
 import { SiYoutube, SiTwitch } from 'react-icons/si';
 import { NotepadModel, YouTubeModel, TwitchModel, type RoomAppModel, type RoomAppModelContext } from './models.ts';
-import { TunnelModel } from './tunnel_model.ts';
-import { BrowserModel } from './browser_model.ts';
-import { TicTacToeModel, ChessModel, CheckersModel } from './board_game_model.ts';
+import { TunnelModel } from './tunnels/tunnel_model.ts';
+import { BrowserModel } from './browser/browser_model.ts';
+import { TicTacToeModel, ChessModel, CheckersModel } from './games/board_game_model.ts';
 
 export interface RoomAppViewProps { instanceId: string; compact?: boolean }
 export interface RoomAppDefinition {
@@ -50,40 +50,40 @@ export function isRoomAppKind(value: unknown): value is string {
 registerRoomApp({ kind: 'notepad', protocolLabel: protocolLabels.notepad, get label() { return t("message.753e28f9f62e"); },
   get description() { return t("message.db228884dc9d"); },
   icon: FileText, bannerClass: 'notepad', createModel: (context) => new NotepadModel(context),
-  loadView: () => import('./NotepadApp').then((module) => ({ default: module.NotepadApp })) });
+  loadView: () => import('./notepad/NotepadApp').then((module) => ({ default: module.NotepadApp })) });
 registerRoomApp({ kind: 'youtube', label: 'YouTube',
   get description() { return t("message.22dea6587836"); },
   icon: SiYoutube, iconStyle: 'filled', bannerClass: 'youtube', createModel: (context) => new YouTubeModel(context),
-  loadView: () => import('./YouTubeApp').then((module) => ({ default: module.YouTubeApp })) });
+  loadView: () => import('./youtube/YouTubeApp').then((module) => ({ default: module.YouTubeApp })) });
 registerRoomApp({ kind: 'twitch', label: 'Twitch',
   get description() { return t('twitch.description'); },
   icon: SiTwitch, iconStyle: 'filled', bannerClass: 'twitch', createModel: (context) => new TwitchModel(context),
-  loadView: () => import('./TwitchApp').then((module) => ({ default: module.TwitchApp })) });
+  loadView: () => import('./twitch/TwitchApp').then((module) => ({ default: module.TwitchApp })) });
 registerRoomApp({ kind: 'tunnels', protocolLabel: 'Tunnels', get label() { return t('tunnels.title'); },
   get description() { return t('tunnels.description'); }, icon: Network, bannerClass: 'tunnels', detachable: false, desktopOnly: true,
   createModel: (context) => new TunnelModel(context),
-  loadView: () => import('./TunnelApp').then((module) => ({ default: module.TunnelApp })) });
+  loadView: () => import('./tunnels/TunnelApp').then((module) => ({ default: module.TunnelApp })) });
 registerRoomApp({ kind: 'browser', protocolLabel: 'Browser', get label() { return t('browser.title'); },
   get description() { return t('browser.description'); }, icon: Globe, bannerClass: 'browser', desktopOnly: true,
   createModel: context => new BrowserModel(context),
-  loadView: () => import('./BrowserApp').then(module => ({ default: module.BrowserApp })) });
+  loadView: () => import('./browser/BrowserApp').then(module => ({ default: module.BrowserApp })) });
 
 registerRoomApp({ kind: 'whiteboard', protocolLabel: 'Whiteboard', get label() { return t('whiteboard.title'); },
   get description() { return t('whiteboard.description'); }, icon: Palette, bannerClass: 'whiteboard',
   createModel: context => new WhiteboardModel(context),
-  loadView: () => import('./WhiteboardApp').then(module => ({ default: module.WhiteboardApp })) });
+  loadView: () => import('./whiteboard/WhiteboardApp').then(module => ({ default: module.WhiteboardApp })) });
 
 registerRoomApp({ kind: 'tictactoe', protocolLabel: 'Tic-Tac-Toe', get label() { return t('tictactoe.title'); },
   get description() { return t('tictactoe.description'); }, icon: Grid3x3, bannerClass: 'tictactoe',
   createModel: context => new TicTacToeModel(context),
-  loadView: () => import('./TicTacToeApp').then(module => ({ default: module.TicTacToeApp })) });
+  loadView: () => import('./games/tictactoe/TicTacToeApp').then(module => ({ default: module.TicTacToeApp })) });
 
 registerRoomApp({ kind: 'chess', protocolLabel: 'Chess', get label() { return t('chess.title'); },
   get description() { return t('chess.description'); }, icon: Crown, bannerClass: 'chess',
   createModel: context => new ChessModel(context),
-  loadView: () => import('./ChessApp').then(module => ({ default: module.ChessApp })) });
+  loadView: () => import('./games/chess/ChessApp').then(module => ({ default: module.ChessApp })) });
 
 registerRoomApp({ kind: 'checkers', protocolLabel: 'Checkers', get label() { return t('checkers.title'); },
   get description() { return t('checkers.description'); }, icon: CircleDot, bannerClass: 'checkers',
   createModel: context => new CheckersModel(context),
-  loadView: () => import('./CheckersApp').then(module => ({ default: module.CheckersApp })) });
+  loadView: () => import('./games/checkers/CheckersApp').then(module => ({ default: module.CheckersApp })) });

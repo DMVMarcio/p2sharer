@@ -3,11 +3,11 @@ import * as Y from 'yjs';
 import { Awareness, applyAwarenessUpdate, encodeAwarenessUpdate } from 'y-protocols/awareness';
 import * as decoding from 'lib0/decoding';
 import type { YouTubeState, TwitchState } from './types.ts';
-import { preserveYouTubeTimeline, YOUTUBE_MAX_POSITION_SECONDS } from './youtube_timeline.ts';
+import { preserveYouTubeTimeline, YOUTUBE_MAX_POSITION_SECONDS } from './youtube/youtube_timeline.ts';
 import { validProfileHash } from '../core/profile_image.ts';
 import {
   decodeBase64, inspectPngBytes, PeerImageStore, stripDataPrefix, type WhiteboardImageRecord,
-} from './whiteboard_image.ts';
+} from './shared/whiteboard_image.ts';
 
 export interface RoomAppModel {
   localSnapshot?(): unknown;

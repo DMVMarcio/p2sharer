@@ -1,10 +1,10 @@
 import { t } from '../i18n/index.ts';
 import { blobToDataUrl } from '../core/image_clipboard.ts';
-import { decodeBase64, inspectPngBytes, sha256Hex, verifyWhiteboardPng } from '../apps/whiteboard_image.ts';
+import { decodeBase64, inspectPngBytes, sha256Hex, verifyWhiteboardPng } from '../apps/shared/whiteboard_image.ts';
 import { browserRecord } from './web_storage.ts';
 import { browserFileCommand, downloadBlob, pickBrowserFile } from './web_files.ts';
 import type { ProfileImage } from '../core/profile_image.ts';
-import type { SavedNote } from '../apps/NotepadFilesDialog.ts';
+import type { SavedNote } from '../apps/notepad/NotepadFilesDialog.ts';
 import { cropDimensions } from '../core/profile_crop.ts';
 import { isGif, inspectProfileGif, cropProfileGif, PROFILE_INPUT_LIMIT } from './web_profile_gif.ts';
 

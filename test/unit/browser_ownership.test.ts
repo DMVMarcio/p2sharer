@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { BrowserOwnership } from '../../src/apps/browser_ownership.ts';
+import { BrowserOwnership } from '../../src/apps/browser/browser_ownership.ts';
 
 test('the first accepted starter owns the browser, concurrent starts cannot split ownership, and stale releases cannot stop its successor', async () => {
   const models = new Map<string, BrowserOwnership>();

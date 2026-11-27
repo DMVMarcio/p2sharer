@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { browserHistoryButton, browserShortcut } from '../../src/apps/browser_shortcuts.ts';
-import { validBrowserCommand } from '../../src/apps/browser_protocol.ts';
+import { browserHistoryButton, browserShortcut } from '../../src/apps/browser/browser_shortcuts.ts';
+import { validBrowserCommand } from '../../src/apps/browser/browser_protocol.ts';
 
 test('browser navigation shortcuts select the address, reload normally or bypass cache, and navigate history', () => {
   const key = (key: string, modifiers = {}) => browserShortcut({ key, ctrlKey: false, shiftKey: false, altKey: false, metaKey: false, ...modifiers });

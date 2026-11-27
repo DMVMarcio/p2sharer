@@ -1,9 +1,9 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { YouTubeModel, validYouTubeState } from '../../src/apps/models.ts';
-import { appendYouTubeQueue, advanceYouTubeQueue, importYouTubeQueue, moveYouTubeQueueEntry } from '../../src/apps/youtube_queue.ts';
-import { describeAutomaticYouTubeActivity, describeYouTubeActivity } from '../../src/apps/youtube_activity.ts';
-import { reconcileYouTubePlayer, type YouTubePlayer, type YouTubePlaybackTracker } from '../../src/apps/youtube_player.ts';
+import { appendYouTubeQueue, advanceYouTubeQueue, importYouTubeQueue, moveYouTubeQueueEntry } from '../../src/apps/youtube/youtube_queue.ts';
+import { describeAutomaticYouTubeActivity, describeYouTubeActivity } from '../../src/apps/youtube/youtube_activity.ts';
+import { reconcileYouTubePlayer, type YouTubePlayer, type YouTubePlaybackTracker } from '../../src/apps/youtube/youtube_player.ts';
 import type { YouTubeState } from '../../src/apps/types.ts';
 
 const entries = [{ videoId: 'aaaaaaaaaaa', title: 'First' }, { videoId: 'bbbbbbbbbbb', title: 'Second' }];

@@ -1,9 +1,9 @@
 @import '@fontsource-variable/jetbrains-mono/wght.css';
-@import './tunnels.css';
-@import './browser.css';
-@import './whiteboard.css';
-@import './twitch.css';
-@import './games.css';
+@import './tunnels/tunnels.css';
+@import './browser/browser.css';
+@import './whiteboard/whiteboard.css';
+@import './twitch/twitch.css';
+@import './games/games.css';
 
 /* Room App library */
 .modal-card.apps-library-modal { max-width: 800px; }

@@ -59,10 +59,10 @@ const mocks = {
     );
   };`,
 };
-const bundle = await build({ stdin: { contents: `export { NotepadApp } from './src/apps/NotepadApp.tsx';
-  export { resizedNoteImageDimensions } from './src/apps/NotepadImageExtension.tsx';
-  export { sha256Hex, decodeBase64 } from './src/apps/whiteboard_image.ts';
-  export { useDocumentLibraryDeletion } from './src/apps/useDocumentLibraryDeletion.ts';
+const bundle = await build({ stdin: { contents: `export { NotepadApp } from './src/apps/notepad/NotepadApp.tsx';
+  export { resizedNoteImageDimensions } from './src/apps/notepad/NotepadImageExtension.tsx';
+  export { sha256Hex, decodeBase64 } from './src/apps/shared/whiteboard_image.ts';
+  export { useDocumentLibraryDeletion } from './src/apps/shared/useDocumentLibraryDeletion.ts';
   export { NotepadModel } from './src/apps/models.ts'; export { setLanguage } from './src/i18n/index.ts';`, resolveDir: process.cwd() },
   bundle: true, write: false, platform: 'node', format: 'esm', jsx: 'automatic',
   plugins: [{ name: 'notepad-native-fixture', setup(builder) {
