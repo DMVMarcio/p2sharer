@@ -1,0 +1,471 @@
+import { PEERS } from './scenes';
+
+/*
+ * Decorative screen contents shown inside the landing page's shared-screen
+ * illustrations. Each scene uses the same 320 × 180 canvas so the overlays
+ * drawn by its host (annotation ellipse, live pointer, remote shots) line up:
+ * the focal point sits around (160, 132) and the top-right / bottom-left
+ * corners stay free for the host's chips.
+ */
+
+const VIEW_BOX = '0 0 320 180';
+
+/** Deterministic pseudo-random generator so the artwork is stable between renders. */
+function seeded(seed: number) {
+  let state = seed;
+  return () => {
+    state = (state * 16807) % 2147483647;
+    return (state - 1) / 2147483646;
+  };
+}
+
+/* -------------------------------------------------------------------------- */
+/* Neon racer                                                                 */
+/* -------------------------------------------------------------------------- */
+
+const HORIZON = 88;
+const SUN_BANDS = [[63, 1.4], [70, 2], [77, 2.6], [83, 3.2]] as const;
+const GRID_FAN = [-6, -5, -4, -3, -2, 2, 3, 4, 5, 6];
+const ROAD_DASHES = [0, -0.4, -0.8];
+const GRID_LINES = [0, -0.32, -0.64, -0.96, -1.28];
+const ROAD_POSTS = [0, -0.6];
+const STREAKS = [
+  { dx: -62, dy: 26, delay: 0 },
+  { dx: 66, dy: 30, delay: -0.3 },
+  { dx: -96, dy: 52, delay: -0.55 },
+  { dx: 92, dy: 50, delay: -0.15 },
+];
+
+/** Synthwave racing game: a rear-view sports car chasing a rival into the sunset. */
+export function RacingScene() {
+  return (
+    <svg className="lp-game-scene lp-race" viewBox={VIEW_BOX} preserveAspectRatio="xMidYMid slice" aria-hidden="true">
+      <defs>
+        <linearGradient id="lp-race-sky" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0" stopColor="#0b0620" />
+          <stop offset="0.62" stopColor="#3b0f5c" />
+          <stop offset="1" stopColor="#ff4f9a" />
+        </linearGradient>
+        <linearGradient id="lp-race-sun" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0" stopColor="#fff3a3" />
+          <stop offset="0.5" stopColor="#ff8a3d" />
+          <stop offset="1" stopColor="#ff2d8a" />
+        </linearGradient>
+        <linearGradient id="lp-race-ground" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0" stopColor="#1d0a33" />
+          <stop offset="1" stopColor="#07020f" />
+        </linearGradient>
+        <linearGradient id="lp-race-road" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0" stopColor="#2b1250" />
+          <stop offset="1" stopColor="#140726" />
+        </linearGradient>
+        <linearGradient id="lp-race-paint" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0" stopColor="#f0abfc" />
+          <stop offset="0.5" stopColor="#c026d3" />
+          <stop offset="1" stopColor="#581c87" />
+        </linearGradient>
+        <mask id="lp-race-sun-mask">
+          <rect x="110" y="30" width="100" height="70" fill="#fff" />
+          {SUN_BANDS.map(([y, height]) => <rect key={y} x="110" y={y} width="100" height={height} fill="#000" />)}
+        </mask>
+        <clipPath id="lp-race-ground-clip">
+          <rect y={HORIZON} width="320" height={180 - HORIZON} />
+        </clipPath>
+      </defs>
+
+      <rect width="320" height={HORIZON + 1} fill="url(#lp-race-sky)" />
+      <g fill="#fff">
+        <circle className="lp-twinkle" cx="34" cy="18" r="1.1" />
+        <circle cx="76" cy="36" r="0.8" />
+        <circle className="lp-twinkle" cx="118" cy="14" r="0.9" />
+        <circle cx="206" cy="22" r="1" />
+        <circle className="lp-twinkle" cx="248" cy="42" r="0.8" />
+        <circle cx="296" cy="16" r="1.2" />
+      </g>
+      <circle cx="160" cy="70" r="34" fill="url(#lp-race-sun)" mask="url(#lp-race-sun-mask)" />
+      <g fill="#5b1a7a" stroke="#ff6ec7" strokeOpacity="0.55" strokeWidth="0.6" strokeLinejoin="round">
+        <path d="M0 88 L22 73 L40 80 L64 60 L88 77 L104 69 L126 88 Z" />
+        <path d="M196 88 L218 71 L238 79 L262 58 L286 75 L304 65 L320 72 L320 88 Z" />
+      </g>
+      <g fill="#2a0b45">
+        <path d="M0 88 L30 79 L52 85 L76 75 L104 88 Z" />
+        <path d="M222 88 L250 77 L272 83 L298 73 L320 81 L320 88 Z" />
+      </g>
+      <rect y={HORIZON} width="320" height={180 - HORIZON} fill="url(#lp-race-ground)" />
+
+      <g clipPath="url(#lp-race-ground-clip)">
+        <g stroke="#ff4f9a" strokeOpacity="0.4" strokeWidth="0.8">
+          {GRID_FAN.map(step => <line key={step} x1="160" y1={HORIZON} x2={160 + step * 90} y2="180" />)}
+          {GRID_LINES.map(delay => (
+            <line key={delay} className="lp-race-zoom is-slow" x1="-900" x2="1220" y1="176" y2="176" style={{ animationDelay: `${delay}s` }} />
+          ))}
+        </g>
+        <polygon points={`157,${HORIZON} 163,${HORIZON} 272,180 48,180`} fill="url(#lp-race-road)" />
+        <g stroke="#22d3ee" strokeLinecap="round">
+          <path d={`M157 ${HORIZON} L48 180 M163 ${HORIZON} L272 180`} strokeWidth="4" strokeOpacity="0.22" />
+          <path d={`M157 ${HORIZON} L48 180 M163 ${HORIZON} L272 180`} strokeWidth="1.2" />
+        </g>
+        {ROAD_DASHES.map(delay => (
+          <polygon key={delay} className="lp-race-zoom" points="158.6,140 161.4,140 162.6,166 157.4,166" fill="#fde68a" style={{ animationDelay: `${delay}s` }} />
+        ))}
+        {ROAD_POSTS.map(delay => (
+          <g key={delay} className="lp-race-zoom" style={{ animationDelay: `${delay}s` }}>
+            <rect x="51" y="154" width="3" height="16" rx="1" fill="#22d3ee" />
+            <rect x="266" y="154" width="3" height="16" rx="1" fill="#22d3ee" />
+            <circle cx="52.5" cy="154" r="2.4" fill="#ecfeff" />
+            <circle cx="267.5" cy="154" r="2.4" fill="#ecfeff" />
+          </g>
+        ))}
+        <g stroke="#fff" strokeOpacity="0.7" strokeWidth="0.9" strokeLinecap="round">
+          {STREAKS.map(({ dx, dy, delay }) => (
+            <line
+              key={dx}
+              className="lp-race-zoom is-fast"
+              x1={160 + dx} y1={HORIZON + dy}
+              x2={160 + dx * 1.18} y2={HORIZON + dy * 1.18}
+              style={{ animationDelay: `${delay}s` }}
+            />
+          ))}
+        </g>
+      </g>
+
+      <g transform="translate(176 104)">
+        <g className="lp-race-rival">
+          <ellipse cx="0" cy="4.5" rx="11" ry="1.4" fill="#000" opacity="0.5" />
+          <rect x="-9" y="1" width="4" height="3.4" rx="1" fill="#05030a" />
+          <rect x="5" y="1" width="4" height="3.4" rx="1" fill="#05030a" />
+          <rect x="-6" y="-9.5" width="12" height="4.5" rx="1.6" fill="#082f49" />
+          <rect x="-9.5" y="-6" width="19" height="7.5" rx="2" fill="#0ea5e9" />
+          <rect x="-8.5" y="-3.4" width="5" height="1.6" rx="0.8" fill="#ff2d55" />
+          <rect x="3.5" y="-3.4" width="5" height="1.6" rx="0.8" fill="#ff2d55" />
+        </g>
+      </g>
+
+      <g transform="translate(160 0)">
+        <g className="lp-race-car">
+          <ellipse cx="0" cy="153" rx="42" ry="4.5" fill="#000" opacity="0.55" />
+          <rect x="-36" y="136" width="12" height="16" rx="2.5" fill="#0a0612" />
+          <rect x="24" y="136" width="12" height="16" rx="2.5" fill="#0a0612" />
+          <path d="M-20 119 L-15 108 Q-13 105 -9 105 L9 105 Q13 105 15 108 L20 119 Z" fill="#2e1065" />
+          <path d="M-14.5 117 L-10.5 109 L10.5 109 L14.5 117 Z" fill="#22d3ee" opacity="0.55" />
+          <path d="M-8 110 L-11 116" stroke="#ecfeff" strokeOpacity="0.7" strokeWidth="1.2" strokeLinecap="round" />
+          <path d="M-34 148 L-33 132 Q-31 122 -20 119 L20 119 Q31 122 33 132 L34 148 Q34 151 31 151 L-31 151 Q-34 151 -34 148 Z" fill="url(#lp-race-paint)" />
+          <rect x="-24" y="123" width="3" height="5" fill="#1e0b36" />
+          <rect x="21" y="123" width="3" height="5" fill="#1e0b36" />
+          <rect x="-38" y="119.5" width="76" height="3.5" rx="1.5" fill="#1e0b36" />
+          <rect x="-31" y="129.5" width="62" height="9" rx="4" fill="#ff2d75" opacity="0.28" />
+          <rect x="-30" y="132" width="21" height="4" rx="2" fill="#ff2d75" />
+          <rect x="9" y="132" width="21" height="4" rx="2" fill="#ff2d75" />
+          <rect x="-8" y="133" width="16" height="2" rx="1" fill="#ffb3cf" />
+          <rect x="-8" y="140.5" width="16" height="6" rx="1" fill="#fdf4ff" />
+          <rect x="-5" y="142.8" width="10" height="1.4" rx="0.7" fill="#a21caf" />
+          <rect x="-24" y="148" width="48" height="3" rx="1" fill="#12061f" />
+          <circle className="lp-race-flame" cx="-15" cy="151" r="2.2" fill="#fb923c" />
+          <circle className="lp-race-flame" cx="15" cy="151" r="2.2" fill="#fb923c" />
+        </g>
+      </g>
+
+      <g className="lp-game-hud">
+        <rect x="8" y="8" width="64" height="24" rx="5" fill="#0b0620" opacity="0.62" stroke="#ff4f9a" strokeOpacity="0.5" strokeWidth="0.6" />
+        <path d="M14 13 V27 M14 13 H22 L20.2 15.5 L22 18 H14" fill="#f9a8d4" stroke="#f9a8d4" strokeWidth="1" strokeLinejoin="round" />
+        <text x="25" y="23.5" fontSize="9" fontWeight="800" fill="#fff">2/3</text>
+        <line x1="43" y1="12" x2="43" y2="28" stroke="#ff4f9a" strokeOpacity="0.45" strokeWidth="0.6" />
+        <text x="48" y="23.5" fontSize="9" fontWeight="800" fill="#fde68a">#1</text>
+      </g>
+      <g transform="translate(292 156)">
+        <circle r="18" fill="#0b0620" opacity="0.66" stroke="#22d3ee" strokeOpacity="0.45" strokeWidth="0.7" />
+        <path d="M-12.1 7 A14 14 0 1 1 12.1 7" fill="none" stroke="#22d3ee" strokeOpacity="0.35" strokeWidth="2" strokeLinecap="round" />
+        <path d="M6 -12.6 A14 14 0 0 1 12.1 7" fill="none" stroke="#ff4f9a" strokeWidth="2" strokeLinecap="round" />
+        <line className="lp-race-needle" x1="0" y1="0" x2="0" y2="-12" stroke="#fde68a" strokeWidth="1.4" strokeLinecap="round" />
+        <circle r="1.8" fill="#fde68a" />
+        <text y="10.5" textAnchor="middle" fontSize="6.5" fontWeight="800" fill="#fff">238</text>
+      </g>
+    </svg>
+  );
+}
+
+/* -------------------------------------------------------------------------- */
+/* Music studio                                                               */
+/* -------------------------------------------------------------------------- */
+
+const TRACK_TOP = 28;
+const TRACK_HEIGHT = 24;
+const LANE_X = 60;
+
+type ClipContent = 'hits' | 'wave' | 'notes';
+const TRACKS: { color: string; content: ClipContent; clips: [number, number][] }[] = [
+  { color: '#f472b6', content: 'hits', clips: [[62, 62], [128, 62], [194, 62], [260, 58]] },
+  { color: '#38bdf8', content: 'wave', clips: [[62, 124], [194, 124]] },
+  { color: '#fbbf24', content: 'notes', clips: [[62, 96], [194, 126]] },
+  { color: '#a78bfa', content: 'wave', clips: [[96, 128], [260, 58]] },
+  { color: '#34d399', content: 'wave', clips: [[62, 52], [124, 72], [228, 60]] },
+];
+const SELECTED_CLIP = { track: 4, clip: 1 };
+
+function waveformPath(x: number, width: number, mid: number, amplitude: number, seed: number) {
+  const random = seeded(seed);
+  let path = '';
+  for (let offset = 2; offset < width - 1.5; offset += 2) {
+    const envelope = Math.sin((Math.PI * offset) / width) ** 0.6;
+    const height = Math.max(0.4, amplitude * envelope * (0.3 + 0.7 * random()));
+    path += `M${(x + offset).toFixed(1)} ${(mid - height).toFixed(1)}V${(mid + height).toFixed(1)}`;
+  }
+  return path;
+}
+
+function clipContent(content: ClipContent, x: number, width: number, top: number, seed: number) {
+  const mid = top + 13;
+  if (content === 'wave') return <path d={waveformPath(x, width, mid, 6, seed)} />;
+  const random = seeded(seed);
+  if (content === 'hits') {
+    return Array.from({ length: Math.floor((width - 4) / 8) }, (_, index) => {
+      const tall = index % 2 === 0;
+      return <rect key={index} x={x + 3 + index * 8} y={tall ? mid - 6 : mid - 2} width="2" height={tall ? 12 : 6} rx="1" />;
+    });
+  }
+  return Array.from({ length: Math.floor((width - 6) / 10) }, (_, index) => (
+    <rect key={index} x={x + 3 + index * 10} y={top + 6 + Math.floor(random() * 5) * 3} width={6 + Math.floor(random() * 3) * 2} height="2.4" rx="1" />
+  ));
+}
+
+const SPECTRUM = Array.from({ length: 26 }, (_, index) => {
+  const random = seeded(index + 11);
+  return { x: 156 + index * 6, height: 8 + 14 * Math.sin((Math.PI * (index + 2)) / 30) * (0.6 + 0.4 * random()), duration: 0.45 + random() * 0.5, delay: -random() };
+});
+
+/** Screen-shared music production app with a moving playhead and live spectrum. */
+export function StudioScene() {
+  const laneWidth = 320 - LANE_X;
+  return (
+    <svg className="lp-game-scene lp-studio" viewBox={VIEW_BOX} preserveAspectRatio="xMidYMid slice" aria-hidden="true">
+      <defs>
+        <linearGradient id="lp-studio-spectrum" x1="0" y1="176" x2="0" y2="154" gradientUnits="userSpaceOnUse">
+          <stop offset="0" stopColor="#34d399" />
+          <stop offset="0.6" stopColor="#fde047" />
+          <stop offset="1" stopColor="#f472b6" />
+        </linearGradient>
+      </defs>
+      <rect width="320" height="180" fill="#0d0f16" />
+
+      <rect width="320" height="20" fill="#151826" />
+      <rect x="8" y="5" width="13" height="10" rx="3" fill="#22c55e" />
+      <path d="M12.5 7.3 L17.3 10 L12.5 12.7 Z" fill="#0d0f16" />
+      <circle className="lp-studio-rec" cx="29" cy="10" r="3.4" fill="#ef4444" />
+      <text x="38" y="12.6" fontSize="7" fontWeight="700" fontFamily="ui-monospace, monospace" fill="#e2e8f0">02:14.6</text>
+      <rect x="76" y="5" width="34" height="10" rx="3" fill="#1f2335" />
+      <text x="93" y="12" textAnchor="middle" fontSize="5.4" fontWeight="700" fontFamily="ui-monospace, monospace" fill="#94a3b8">128 BPM</text>
+
+      <rect x={LANE_X} y="20" width={laneWidth} height="7" fill="#111420" />
+      <g stroke="#3b4157" strokeWidth="0.6">
+        {Array.from({ length: 17 }, (_, index) => (
+          <line key={index} x1={LANE_X + index * 16} x2={LANE_X + index * 16} y1={index % 4 === 0 ? 21 : 24} y2="27" />
+        ))}
+      </g>
+
+      {TRACKS.map((track, trackIndex) => {
+        const top = TRACK_TOP + trackIndex * TRACK_HEIGHT;
+        return (
+          <g key={track.color}>
+            <rect x={LANE_X} y={top - 1} width={laneWidth} height={TRACK_HEIGHT} fill={trackIndex % 2 ? '#10131c' : '#12151f'} />
+            <rect x="2" y={top} width="56" height="22" rx="3" fill="#171a28" />
+            <rect x="2" y={top} width="3" height="22" rx="1.5" fill={track.color} />
+            <rect x="9" y={top + 5} width={20 + (trackIndex % 3) * 6} height="3" rx="1.5" fill="#3b4157" />
+            <rect x="9" y={top + 13} width="7" height="5" rx="1.2" fill={trackIndex === 3 ? '#f59e0b' : '#252a3d'} />
+            <rect x="18" y={top + 13} width="7" height="5" rx="1.2" fill="#252a3d" />
+            <rect x="30" y={top + 14} width="24" height="3" rx="1.5" fill="#252a3d" />
+            <rect
+              className="lp-studio-level"
+              x="30" y={top + 14} width="24" height="3" rx="1.5"
+              fill={track.color}
+              style={{ animationDelay: `${-trackIndex * 0.23}s`, animationDuration: `${0.6 + trackIndex * 0.12}s` }}
+            />
+            {track.clips.map(([x, width], clipIndex) => {
+              const selected = SELECTED_CLIP.track === trackIndex && SELECTED_CLIP.clip === clipIndex;
+              return (
+                <g key={x}>
+                  {selected && <rect className="lp-studio-selected" x={x - 1.5} y={top - 1.5} width={width + 3} height="25" rx="4" fill="none" stroke="#fff" strokeWidth="0.9" />}
+                  <rect x={x} y={top} width={width} height="22" rx="3" fill={track.color} fillOpacity={selected ? 0.34 : 0.2} stroke={track.color} strokeOpacity="0.75" strokeWidth="0.7" />
+                  <rect x={x} y={top} width={width} height="4" rx="2" fill={track.color} fillOpacity="0.6" />
+                  <g fill={track.color} stroke={track.color} strokeWidth="1" strokeLinecap="round" opacity="0.9">
+                    {clipContent(track.content, x, width, top, trackIndex * 31 + clipIndex * 7 + 3)}
+                  </g>
+                </g>
+              );
+            })}
+          </g>
+        );
+      })}
+
+      <g className="lp-studio-playhead">
+        <line x1={LANE_X} x2={LANE_X} y1="20" y2="148" stroke="#f8fafc" strokeWidth="0.8" />
+        <path d={`M${LANE_X - 3} 20 H${LANE_X + 3} L${LANE_X} 24 Z`} fill="#f8fafc" />
+      </g>
+
+      <rect y="149" width="320" height="31" fill="#151826" />
+      <g fill="#252a3d" stroke="#3b4157" strokeWidth="0.6">
+        <circle cx="20" cy="165" r="6.5" />
+        <circle cx="40" cy="165" r="6.5" />
+        <circle cx="60" cy="165" r="6.5" />
+      </g>
+      <g stroke="#e2e8f0" strokeWidth="1.1" strokeLinecap="round">
+        <line x1="20" y1="165" x2="16" y2="160.5" />
+        <line x1="40" y1="165" x2="43.5" y2="159.5" />
+        <line x1="60" y1="165" x2="60" y2="158.8" />
+      </g>
+      <g fill="url(#lp-studio-spectrum)">
+        {SPECTRUM.map(bar => (
+          <rect
+            key={bar.x}
+            className="lp-studio-bar"
+            x={bar.x} y={176 - bar.height} width="4" height={bar.height} rx="1"
+            style={{ animationDuration: `${bar.duration.toFixed(2)}s`, animationDelay: `${bar.delay.toFixed(2)}s` }}
+          />
+        ))}
+      </g>
+    </svg>
+  );
+}
+
+/* -------------------------------------------------------------------------- */
+/* Co-op space shooter                                                        */
+/* -------------------------------------------------------------------------- */
+
+function starField(count: number, seed: number) {
+  const random = seeded(seed);
+  return Array.from({ length: count }, () => ({ x: random() * 320, y: random() * 180, r: 0.4 + random() * 0.8 }));
+}
+
+const FAR_STARS = starField(34, 5);
+const NEAR_STARS = starField(14, 23);
+const INVADER_ROWS = [
+  { y: 36, color: '#f472b6', xs: [120, 140, 160, 180, 200] },
+  { y: 54, color: '#fbbf24', xs: [130, 150, 170, 190] },
+];
+const ENEMY_SHOTS = [
+  { x: 150, y: 60, delay: 0 },
+  { x: 186, y: 60, delay: -0.9 },
+];
+const [PLAYER_ONE, PLAYER_TWO] = [PEERS[1], PEERS[2]];
+
+function Stars({ stars, className }: { stars: { x: number; y: number; r: number }[]; className: string }) {
+  return (
+    <g className={className} fill="#fff">
+      {[0, -180].map(offset => (
+        <g key={offset} transform={`translate(0 ${offset})`}>
+          {stars.map(star => <circle key={`${star.x}-${star.y}`} cx={star.x} cy={star.y} r={star.r} />)}
+        </g>
+      ))}
+    </g>
+  );
+}
+
+/** Two-player co-op shooter, matching the remote-play demo's two gamepads. */
+export function ShooterScene() {
+  return (
+    <svg className="lp-game-scene lp-duo" viewBox={VIEW_BOX} preserveAspectRatio="xMidYMid slice" aria-hidden="true">
+      <defs>
+        <linearGradient id="lp-duo-space" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0" stopColor="#050816" />
+          <stop offset="1" stopColor="#1b1145" />
+        </linearGradient>
+        <radialGradient id="lp-duo-nebula-a">
+          <stop offset="0" stopColor="#c026d3" stopOpacity="0.5" />
+          <stop offset="1" stopColor="#c026d3" stopOpacity="0" />
+        </radialGradient>
+        <radialGradient id="lp-duo-nebula-b">
+          <stop offset="0" stopColor="#0ea5e9" stopOpacity="0.4" />
+          <stop offset="1" stopColor="#0ea5e9" stopOpacity="0" />
+        </radialGradient>
+        <radialGradient id="lp-duo-planet" cx="0.35" cy="0.3">
+          <stop offset="0" stopColor="#fdba74" />
+          <stop offset="0.6" stopColor="#ea580c" />
+          <stop offset="1" stopColor="#431407" />
+        </radialGradient>
+        <g id="lp-duo-ship">
+          <path d="M0 0 L6 14 L16 20 L6 22 L0 19 L-6 22 L-16 20 L-6 14 Z" fill="currentColor" />
+          <path d="M-6 14 L-16 20 L-6 22 Z M6 14 L16 20 L6 22 Z" fill="#000" opacity="0.25" />
+          <ellipse cx="0" cy="12" rx="2.4" ry="4" fill="#e0f2fe" />
+        </g>
+        <g id="lp-duo-invader" shapeRendering="crispEdges">
+          <rect x="-4" y="-5" width="2" height="2" fill="currentColor" />
+          <rect x="2" y="-5" width="2" height="2" fill="currentColor" />
+          <rect x="-5" y="-3" width="10" height="5" fill="currentColor" />
+          <rect x="-3" y="-2" width="2" height="2" fill="#0b0820" />
+          <rect x="1" y="-2" width="2" height="2" fill="#0b0820" />
+          <rect x="-6" y="0" width="2" height="4" fill="currentColor" />
+          <rect x="4" y="0" width="2" height="4" fill="currentColor" />
+          <rect x="-2" y="2" width="4" height="1.5" fill="currentColor" />
+        </g>
+      </defs>
+
+      <rect width="320" height="180" fill="url(#lp-duo-space)" />
+      <ellipse cx="80" cy="70" rx="110" ry="60" fill="url(#lp-duo-nebula-a)" />
+      <ellipse cx="250" cy="40" rx="90" ry="50" fill="url(#lp-duo-nebula-b)" />
+      <Stars stars={FAR_STARS} className="lp-duo-stars" />
+      <g opacity="0.9">
+        <g transform="rotate(-14 286 134)" fill="none" stroke="#fed7aa" strokeWidth="2">
+          <ellipse cx="286" cy="134" rx="44" ry="7" strokeOpacity="0.3" />
+        </g>
+        <circle cx="286" cy="134" r="24" fill="url(#lp-duo-planet)" />
+        <g transform="rotate(-14 286 134)" fill="none" stroke="#fed7aa" strokeWidth="2">
+          <path d="M242 134 A44 7 0 0 0 330 134" strokeOpacity="0.6" />
+        </g>
+      </g>
+      <Stars stars={NEAR_STARS} className="lp-duo-stars is-near" />
+
+      <g transform="translate(56 96)">
+        <polygon className="lp-duo-rock" points="-9,-4 -4,-10 5,-9 10,-2 7,7 -2,10 -9,5" fill="#57534e" stroke="#a8a29e" strokeWidth="0.8" />
+      </g>
+
+      <g className="lp-duo-formation">
+        {INVADER_ROWS.map((row, rowIndex) => row.xs.map((x, index) => (
+          <g key={`${row.y}-${x}`} transform={`translate(${x} ${row.y}) scale(1.4)`}>
+            <g className="lp-duo-bob" style={{ animationDelay: `${-((index + rowIndex) % 2) * 0.4}s` }}>
+              <use href="#lp-duo-invader" color={row.color} />
+            </g>
+          </g>
+        )))}
+      </g>
+      <g transform="translate(214 46)">
+        <g className="lp-duo-boom">
+          <circle r="10" fill="#fde047" opacity="0.35" />
+          <circle r="5" fill="#fff7ed" />
+          <g stroke="#fb923c" strokeWidth="1.4" strokeLinecap="round">
+            <path d="M0 -8 V-13 M0 8 V13 M-8 0 H-13 M8 0 H13 M5.5 5.5 L9 9 M-5.5 -5.5 L-9 -9 M5.5 -5.5 L9 -9 M-5.5 5.5 L-9 9" />
+          </g>
+        </g>
+      </g>
+      {ENEMY_SHOTS.map(shot => (
+        <rect key={shot.x} className="lp-duo-enemy-shot" x={shot.x - 1} y={shot.y} width="2" height="5" rx="1" fill="#f87171" style={{ animationDelay: `${shot.delay}s` }} />
+      ))}
+
+      <g transform="translate(108 148)">
+        <g className="lp-duo-wing">
+          {[0, -0.45].map(delay => (
+            <rect key={delay} className="lp-duo-bullet" x="-1" y="-8" width="2" height="6" rx="1" fill={PLAYER_TWO.color} style={{ animationDelay: `${delay}s` }} />
+          ))}
+          <path className="lp-duo-flame" d="M-3 19 L0 28 L3 19 Z" fill="#fb923c" />
+          <use href="#lp-duo-ship" color={PLAYER_TWO.color} />
+        </g>
+      </g>
+      <g transform="translate(160 138)">
+        <g className="lp-duo-hover">
+          <path className="lp-duo-flame" d="M-3.4 19 L0 30 L3.4 19 Z" fill="#fb923c" />
+          <path className="lp-duo-flame" d="M-1.6 19 L0 25 L1.6 19 Z" fill="#fef3c7" />
+          <use href="#lp-duo-ship" color={PLAYER_ONE.color} />
+        </g>
+      </g>
+
+      <g className="lp-game-hud">
+        <rect x="8" y="8" width="76" height="24" rx="5" fill="#050816" opacity="0.6" stroke="#38bdf8" strokeOpacity="0.4" strokeWidth="0.6" />
+        <path d="M17 12 L18.8 16 L23 16.4 L19.8 19.2 L20.8 23.4 L17 21.2 L13.2 23.4 L14.2 19.2 L11 16.4 L15.2 16 Z" fill="#fde047" />
+        <text x="27" y="20.5" fontSize="8" fontWeight="800" fontFamily="ui-monospace, monospace" fill="#fff">012450</text>
+        <g transform="translate(16 25.5) scale(0.22)"><use href="#lp-duo-ship" color={PLAYER_ONE.color} /></g>
+        <g transform="translate(24 25.5) scale(0.22)"><use href="#lp-duo-ship" color={PLAYER_ONE.color} /></g>
+        <g transform="translate(36 25.5) scale(0.22)"><use href="#lp-duo-ship" color={PLAYER_TWO.color} /></g>
+        <g transform="translate(44 25.5) scale(0.22)"><use href="#lp-duo-ship" color={PLAYER_TWO.color} /></g>
+        <g transform="translate(52 25.5) scale(0.22)"><use href="#lp-duo-ship" color={PLAYER_TWO.color} /></g>
+      </g>
+    </svg>
+  );
+}

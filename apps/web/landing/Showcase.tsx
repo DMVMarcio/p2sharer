@@ -21,7 +21,8 @@ import {
   VolumeX,
 } from 'lucide-react';
 import { t } from '../../../src/i18n';
-import { GameScene, LevelMeter, LiveCursor, MiniChessBoard, PEERS, PeerAvatar, WhiteboardSketch } from './scenes';
+import { LevelMeter, LiveCursor, MiniChessBoard, PEERS, PeerAvatar, WhiteboardSketch } from './scenes';
+import { ShooterScene, StudioScene } from './screenScenes';
 import { useInView } from './motion';
 
 export type Tone = 'violet' | 'rose' | 'emerald' | 'amber' | 'sky' | 'pink' | 'teal';
@@ -78,7 +79,7 @@ export function StreamDemo() {
   return (
     <div className="lp-demo lp-stream-demo">
       <div className="lp-screen is-large" aria-hidden="true">
-        <GameScene />
+        <StudioScene />
         <svg className="lp-annotation" viewBox="0 0 100 60" preserveAspectRatio="none">
           <ellipse cx="50" cy="44" rx="12" ry="10" />
         </svg>
@@ -247,7 +248,7 @@ export function RemoteDemo() {
   return (
     <div className="lp-demo lp-remote-demo">
       <div className="lp-screen is-large" aria-hidden="true">
-        <GameScene />
+        <ShooterScene />
         {shots.map(shot => (
           <span
             key={shot.id}

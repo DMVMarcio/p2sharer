@@ -24,50 +24,6 @@ export function PeerAvatar({ peer, size = 28, speaking = false }: { peer: Peer; 
   );
 }
 
-/** Stylized game artwork shown inside shared-screen illustrations. */
-export function GameScene({ className = '' }: { className?: string }) {
-  return (
-    <svg className={`lp-game-scene ${className}`} viewBox="0 0 320 180" preserveAspectRatio="xMidYMid slice" aria-hidden="true">
-      <defs>
-        <linearGradient id="lp-sky" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0" stopColor="#312e81" />
-          <stop offset="0.55" stopColor="#7c3aed" />
-          <stop offset="1" stopColor="#f472b6" />
-        </linearGradient>
-        <linearGradient id="lp-sun" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0" stopColor="#fde68a" />
-          <stop offset="1" stopColor="#fb923c" />
-        </linearGradient>
-      </defs>
-      <rect width="320" height="180" fill="url(#lp-sky)" />
-      <circle className="lp-game-sun" cx="220" cy="92" r="34" fill="url(#lp-sun)" />
-      <g className="lp-game-stars" fill="#fff">
-        <circle cx="38" cy="22" r="1.2" /><circle cx="92" cy="40" r="1" /><circle cx="140" cy="16" r="1.4" />
-        <circle cx="270" cy="28" r="1" /><circle cx="300" cy="54" r="1.2" /><circle cx="180" cy="34" r="0.9" />
-      </g>
-      <path d="M0 132 L48 96 L92 124 L150 82 L204 128 L262 100 L320 126 L320 180 L0 180 Z" fill="#4c1d95" opacity="0.9" />
-      <path d="M0 150 L60 122 L118 146 L176 116 L236 150 L290 130 L320 140 L320 180 L0 180 Z" fill="#1e1b4b" />
-      <g className="lp-game-grid" stroke="#f472b6" strokeOpacity="0.45" strokeWidth="1">
-        <line x1="0" y1="166" x2="320" y2="166" />
-        <line x1="0" y1="174" x2="320" y2="174" />
-        <line x1="160" y1="150" x2="40" y2="180" />
-        <line x1="160" y1="150" x2="280" y2="180" />
-        <line x1="160" y1="150" x2="160" y2="180" />
-      </g>
-      <g className="lp-game-hud">
-        <rect x="12" y="12" width="64" height="6" rx="3" fill="#000" opacity="0.35" />
-        <rect className="lp-game-health" x="12" y="12" width="46" height="6" rx="3" fill="#34d399" />
-        <rect x="12" y="22" width="40" height="4" rx="2" fill="#000" opacity="0.35" />
-        <rect x="12" y="22" width="28" height="4" rx="2" fill="#38bdf8" />
-      </g>
-      <g className="lp-game-ship">
-        <path d="M150 140 L160 120 L170 140 L160 135 Z" fill="#e0e7ff" />
-        <circle cx="160" cy="142" r="3" fill="#fb923c" className="lp-game-flame" />
-      </g>
-    </svg>
-  );
-}
-
 /** Animated live cursor with a participant label. */
 export function LiveCursor({ peer, className = '' }: { peer: Peer; className?: string }) {
   return (

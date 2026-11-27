@@ -2,8 +2,9 @@ import { useRef, type CSSProperties } from 'react';
 import { Check, FileVideo, FolderUp, Lock, Mic, MicOff, Monitor, SendHorizontal, Volume2 } from 'lucide-react';
 import { t } from '../../../src/i18n';
 import logo from '../../../src/assets/logo.png';
-import { GameScene, LevelMeter, LiveCursor, PEERS, PeerAvatar } from './scenes';
+import { LevelMeter, LiveCursor, PEERS, PeerAvatar } from './scenes';
 import { useInView, useLoopStep, usePointerTilt } from './motion';
+import { RacingScene } from './screenScenes';
 
 const CHAT = [
   { peer: PEERS[0], text: 'web.mockChat1' },
@@ -33,7 +34,7 @@ export function HeroRoomPreview() {
         <div className="lp-window-body">
           <div className="lp-stage">
             <div className="lp-screen">
-              <GameScene />
+              <RacingScene />
               <svg className="lp-annotation" viewBox="0 0 100 60" preserveAspectRatio="none">
                 <ellipse cx="50" cy="44" rx="12" ry="10" />
               </svg>

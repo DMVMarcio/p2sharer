@@ -406,22 +406,130 @@ html[data-theme="light"] .lp-orb { opacity: 0.1; }
   height: 100%;
 }
 
-.lp-game-sun { animation: lpSun 6s ease-in-out infinite alternate; transform-origin: 220px 92px; }
-.lp-game-ship { animation: lpShip 3.2s ease-in-out infinite; }
-.lp-game-flame { animation: lpBlink 0.3s steps(2) infinite; }
-.lp-game-stars circle { animation: lpBlink 2.4s ease-in-out infinite; }
-.lp-game-stars circle:nth-child(even) { animation-delay: -1.2s; }
-.lp-game-health { animation: lpHealth 5s ease-in-out infinite; }
-
-@keyframes lpSun { to { transform: translateY(6px) scale(1.04); } }
-@keyframes lpShip {
-  0%, 100% { transform: translateX(-18px); }
-  50% { transform: translateX(18px); }
+/* Racing scene: road elements zoom out from the vanishing point for depth. */
+.lp-race-zoom {
+  transform-box: view-box;
+  transform-origin: 160px 88px;
+  animation: lpRaceZoom 1.2s cubic-bezier(0.55, 0, 0.95, 0.45) infinite;
 }
-@keyframes lpHealth {
-  0%, 100% { width: 46px; }
-  40% { width: 30px; }
-  70% { width: 52px; }
+.lp-race-zoom.is-slow { animation-duration: 1.6s; }
+.lp-race-zoom.is-fast { animation-duration: 0.9s; }
+.lp-race-car { animation: lpRaceCar 3.6s ease-in-out infinite alternate; }
+.lp-race-rival { animation: lpRaceRival 5s ease-in-out infinite; }
+.lp-race-flame { animation: lpBlink 0.18s steps(2) infinite; }
+.lp-race-needle { animation: lpRaceNeedle 2.4s ease-in-out infinite alternate; }
+.lp-twinkle { animation: lpBlink 2.4s ease-in-out infinite; }
+.lp-twinkle:nth-child(odd) { animation-delay: -1.2s; }
+
+@keyframes lpRaceZoom {
+  0% { transform: scale(0.02); opacity: 0; }
+  18% { opacity: 1; }
+  100% { transform: scale(1.3); opacity: 1; }
+}
+@keyframes lpRaceCar {
+  from { transform: translateX(-7px); }
+  to { transform: translateX(7px); }
+}
+@keyframes lpRaceRival {
+  0%, 100% { transform: translate(0, 0); }
+  50% { transform: translate(-16px, 1px); }
+}
+@keyframes lpRaceNeedle {
+  from { transform: rotate(38deg); }
+  to { transform: rotate(72deg); }
+}
+
+/* Studio scene: playhead sweep, track levels and spectrum. */
+.lp-studio-playhead { animation: lpStudioPlay 8s linear infinite; }
+.lp-studio-rec { animation: lpBlink 1.2s ease-in-out infinite; }
+.lp-studio-selected { animation: lpStudioGlow 1.8s ease-in-out infinite alternate; }
+.lp-studio-level {
+  transform-box: fill-box;
+  transform-origin: left center;
+  animation: lpStudioLevel 0.8s ease-in-out infinite alternate;
+}
+.lp-studio-bar {
+  transform-box: fill-box;
+  transform-origin: center bottom;
+  animation: lpStudioBar 0.7s ease-in-out infinite alternate;
+}
+
+@keyframes lpStudioPlay {
+  from { transform: translateX(0); }
+  to { transform: translateX(260px); }
+}
+@keyframes lpStudioGlow {
+  from { opacity: 0.3; }
+  to { opacity: 1; }
+}
+@keyframes lpStudioLevel {
+  from { transform: scaleX(0.3); }
+  to { transform: scaleX(0.95); }
+}
+@keyframes lpStudioBar {
+  from { transform: scaleY(0.15); }
+  to { transform: scaleY(1); }
+}
+
+/* Co-op shooter scene. */
+.lp-duo-stars { animation: lpDuoScroll 9s linear infinite; }
+.lp-duo-stars.is-near { animation-duration: 4.5s; }
+.lp-duo-formation { animation: lpDuoSway 4s ease-in-out infinite alternate; }
+.lp-duo-bob { animation: lpDuoBob 0.8s steps(2) infinite; }
+.lp-duo-wing { animation: lpDuoWing 3.2s ease-in-out infinite alternate; }
+.lp-duo-hover { animation: lpDuoHover 1.6s ease-in-out infinite alternate; }
+.lp-duo-bullet { animation: lpDuoBullet 0.9s linear infinite; }
+.lp-duo-enemy-shot { animation: lpDuoDrop 1.8s linear infinite; }
+.lp-duo-flame {
+  transform-box: fill-box;
+  transform-origin: center top;
+  animation: lpDuoFlame 0.16s ease-in-out infinite alternate;
+}
+.lp-duo-rock {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: lpDuoRock 14s linear infinite;
+}
+.lp-duo-boom {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: lpDuoBoom 2.2s ease-out infinite;
+}
+
+@keyframes lpDuoScroll {
+  from { transform: translateY(0); }
+  to { transform: translateY(180px); }
+}
+@keyframes lpDuoSway {
+  from { transform: translateX(-16px); }
+  to { transform: translateX(16px); }
+}
+@keyframes lpDuoBob { 50% { transform: translateY(1.5px); } }
+@keyframes lpDuoWing {
+  from { transform: translateX(-10px); }
+  to { transform: translateX(14px); }
+}
+@keyframes lpDuoHover {
+  from { transform: translateY(-1.5px); }
+  to { transform: translateY(1.5px); }
+}
+@keyframes lpDuoBullet {
+  from { transform: translateY(0); opacity: 1; }
+  to { transform: translateY(-120px); opacity: 0; }
+}
+@keyframes lpDuoDrop {
+  from { transform: translateY(0); opacity: 1; }
+  to { transform: translateY(110px); opacity: 0.2; }
+}
+@keyframes lpDuoFlame {
+  from { transform: scaleY(0.6); }
+  to { transform: scaleY(1.15); }
+}
+@keyframes lpDuoRock { to { transform: rotate(360deg); } }
+@keyframes lpDuoBoom {
+  0% { transform: scale(0.1); opacity: 1; }
+  45% { transform: scale(1); opacity: 0.9; }
+  70%, 100% { transform: scale(1.3); opacity: 0; }
 }
 
 .lp-annotation {
