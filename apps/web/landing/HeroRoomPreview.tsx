@@ -35,9 +35,6 @@ export function HeroRoomPreview() {
           <div className="lp-stage">
             <div className="lp-screen">
               <RacingScene />
-              <svg className="lp-annotation" viewBox="0 0 100 60" preserveAspectRatio="none">
-                <ellipse cx="50" cy="44" rx="12" ry="10" />
-              </svg>
               <LiveCursor peer={PEERS[0]} className="lp-screen-cursor" />
               <div className="lp-screen-hud">
                 <span className="lp-chip is-glass"><Monitor size={11} />Leo</span>

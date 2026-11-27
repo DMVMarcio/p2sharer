@@ -1,4 +1,4 @@
-import { useRef, type CSSProperties } from 'react';
+import { useEffect, useRef, useState, type CSSProperties } from 'react';
 import { Outlet, useLocation } from 'react-router';
 import { WebsiteLink } from '../../src/components/common/WebsiteLink';
 import { DownloadButton } from '../../src/components/common/DownloadButton';
@@ -11,10 +11,12 @@ import {
   FolderUp,
   Gamepad2,
   Globe,
+  Menu,
   Monitor,
   ShieldCheck,
   Tv,
   UserCheck,
+  X,
 } from 'lucide-react';
 import { useAppTheme } from '../../src/hooks/useAppTheme';
 import { useLocale } from '../../src/hooks/useLocale';
@@ -44,9 +46,46 @@ const platformItems = {
   desktop: ['web.platformDesktopItem1', 'web.platformDesktopItem2', 'web.platformDesktopItem3', 'web.platformDesktopItem4'],
 } as const;
 
+/** Closes the compact header menu on navigation, Escape and outside presses. */
+function useHeaderMenu(pathname: string, hash: string) {
+  const [open, setOpen] = useState(false);
+  const headerRef = useRef<HTMLElement>(null);
+  const toggleRef = useRef<HTMLButtonElement>(null);
+
+  useEffect(() => setOpen(false), [pathname, hash]);
+
+  useEffect(() => {
+    if (!open) return;
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key !== 'Escape' || event.defaultPrevented) return;
+      setOpen(false);
+      toggleRef.current?.focus();
+    };
+    const onPointerDown = (event: PointerEvent) => {
+      const target = event.target as Element | null;
+      // The language listbox is portaled outside the header.
+      if (target && (headerRef.current?.contains(target) || target.closest('.app-select-list'))) return;
+      setOpen(false);
+    };
+    const wide = window.matchMedia('(min-width: 861px)');
+    const onWide = () => { if (wide.matches) setOpen(false); };
+    document.addEventListener('keydown', onKeyDown);
+    document.addEventListener('pointerdown', onPointerDown);
+    wide.addEventListener('change', onWide);
+    return () => {
+      document.removeEventListener('keydown', onKeyDown);
+      document.removeEventListener('pointerdown', onPointerDown);
+      wide.removeEventListener('change', onWide);
+    };
+  }, [open]);
+
+  return { open, setOpen, headerRef, toggleRef };
+}
+
 export function SiteLayout() {
   const location = useLocation();
   const isLanding = location.pathname === '/';
+  const menu = useHeaderMenu(location.pathname, location.hash);
   useAppTheme();
   useLocale();
   return (
@@ -54,44 +93,55 @@ export function SiteLayout() {
       <WebsiteLink className="site-skip" href="#content">
         {t('web.skip')}
       </WebsiteLink>
-      <header className="site-header">
-        <div className="site-header-start">
-          <WebsiteLink className="site-brand" href="/" aria-label="P2Sharer">
-            <img src={logo} alt="" />
-            P2Sharer
-          </WebsiteLink>
+      <header ref={menu.headerRef} className="site-header" data-menu-open={menu.open || undefined}>
+        <WebsiteLink className="site-brand" href="/" aria-label="P2Sharer">
+          <img src={logo} alt="" />
+          P2Sharer
+        </WebsiteLink>
+        <button
+          ref={menu.toggleRef}
+          type="button"
+          className="btn-icon-header site-menu-toggle"
+          aria-expanded={menu.open}
+          aria-controls="site-menu"
+          aria-label={t(menu.open ? 'web.menuClose' : 'web.menuOpen')}
+          onClick={() => menu.setOpen(current => !current)}
+        >
+          {menu.open ? <X size={20} aria-hidden="true" /> : <Menu size={20} aria-hidden="true" />}
+        </button>
+        <div id="site-menu" className="site-header-menu">
           {isLanding && (
-            <div className="site-anchor-links">
+            <div className="site-anchor-links" onClick={event => { if ((event.target as Element).closest('a')) menu.setOpen(false); }}>
               <WebsiteLink href="#features">{t('web.navFeatures')}</WebsiteLink>
               <WebsiteLink href="#security">{t('web.navSecurity')}</WebsiteLink>
               <WebsiteLink href="#apps">{t('web.navApps')}</WebsiteLink>
               <WebsiteLink href="#platforms">{t('web.navPlatforms')}</WebsiteLink>
             </div>
           )}
+          <nav aria-label={t('web.navigation')}>
+            <Select
+              aria-label={t('web.language')}
+              value={getLanguage()}
+              options={LANGUAGE_OPTIONS.map(option => ({
+                ...option,
+                icon: (
+                  <img
+                    src={`/flags/${option.flag}.svg`}
+                    alt=""
+                    width={20}
+                    height={15}
+                    draggable={false}
+                  />
+                ),
+              }))}
+              onValueChange={value => setLanguage(value as ReturnType<typeof getLanguage>)}
+            />
+            <WebsiteLink className="btn btn-secondary" href="/app">
+              {t(location.pathname === '/download' ? 'web.useWeb' : 'web.open')}
+              <ArrowUpRight size={16} aria-hidden="true" />
+            </WebsiteLink>
+          </nav>
         </div>
-        <nav aria-label={t('web.navigation')}>
-          <Select
-            aria-label={t('web.language')}
-            value={getLanguage()}
-            options={LANGUAGE_OPTIONS.map(option => ({
-              ...option,
-              icon: (
-                <img
-                  src={`/flags/${option.flag}.svg`}
-                  alt=""
-                  width={20}
-                  height={15}
-                  draggable={false}
-                />
-              ),
-            }))}
-            onValueChange={value => setLanguage(value as ReturnType<typeof getLanguage>)}
-          />
-          <WebsiteLink className="btn btn-secondary" href="/app">
-            {t(location.pathname === '/download' ? 'web.useWeb' : 'web.open')}
-            <ArrowUpRight size={16} aria-hidden="true" />
-          </WebsiteLink>
-        </nav>
       </header>
       <main id="content" tabIndex={-1}>
         <Outlet />

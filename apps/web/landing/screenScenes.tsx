@@ -1,4 +1,7 @@
-import { PEERS } from './scenes';
+import { useEffect, useRef } from 'react';
+import { useReducedMotion } from '../../../src/core/appearance_preferences';
+import { useInView } from './motion';
+import { LiveCursor, PEERS, type Peer } from './scenes';
 
 /*
  * Decorative screen contents shown inside the landing page's shared-screen
@@ -17,6 +20,84 @@ function seeded(seed: number) {
     state = (state * 16807) % 2147483647;
     return (state - 1) / 2147483646;
   };
+}
+
+const MARKER_PATH = 'M194 117 C186 103 133 103 122 121 C112 139 146 152 172 148 C197 144 207 127 186 112';
+const MARKER_REST = { x: 252, y: 46 };
+const MARKER_LIFT = { x: 214, y: 100 };
+const DRAW_LOOP_MS = 6200;
+
+const smooth = (value: number) => value * value * (3 - 2 * value);
+const mix = (from: { x: number; y: number }, to: { x: number; y: number }, amount: number) => ({
+  x: from.x + (to.x - from.x) * amount,
+  y: from.y + (to.y - from.y) * amount,
+});
+
+/**
+ * A participant's pointer that draws a marker loop around the scene's focal
+ * point: the ink follows the pointer tip, holds, then fades as the pointer
+ * moves away. Coordinates share the scenes' 320 × 180 canvas.
+ */
+export function DrawingPointer({ peer }: { peer: Peer }) {
+  const ref = useRef<HTMLDivElement>(null);
+  const pathRef = useRef<SVGPathElement>(null);
+  const pointerRef = useRef<HTMLDivElement>(null);
+  const active = useInView(ref);
+  const reduced = useReducedMotion();
+
+  useEffect(() => {
+    const path = pathRef.current;
+    const pointer = pointerRef.current;
+    if (!path || !pointer || !path.getTotalLength) return;
+    const total = path.getTotalLength();
+    const at = (progress: number) => path.getPointAtLength(total * progress);
+    const render = (time: number) => {
+      const phase = time / DRAW_LOOP_MS;
+      let ink = 1;
+      let opacity = 1;
+      let position: { x: number; y: number };
+      if (phase < 0.16) {
+        ink = 0;
+        position = mix(MARKER_REST, at(0), smooth(phase / 0.16));
+      } else if (phase < 0.52) {
+        ink = smooth((phase - 0.16) / 0.36);
+        position = at(ink);
+      } else if (phase < 0.78) {
+        position = mix(at(1), MARKER_LIFT, smooth((phase - 0.52) / 0.26));
+      } else {
+        const leave = (phase - 0.78) / 0.22;
+        opacity = 1 - smooth(Math.min(1, leave * 1.6));
+        position = mix(MARKER_LIFT, MARKER_REST, smooth(leave));
+      }
+      path.style.strokeDashoffset = `${100 * (1 - ink)}`;
+      path.style.opacity = `${opacity}`;
+      pointer.style.left = `${(position.x / 320) * 100}%`;
+      pointer.style.top = `${(position.y / 180) * 100}%`;
+    };
+    if (reduced || !active || typeof requestAnimationFrame === 'undefined') {
+      render(DRAW_LOOP_MS * 0.6);
+      return;
+    }
+    let frame = 0;
+    const origin = performance.now();
+    const tick = (now: number) => {
+      render((now - origin) % DRAW_LOOP_MS);
+      frame = requestAnimationFrame(tick);
+    };
+    frame = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(frame);
+  }, [active, reduced]);
+
+  return (
+    <div ref={ref} className="lp-draw-layer" aria-hidden="true">
+      <svg className="lp-annotation" viewBox={VIEW_BOX} preserveAspectRatio="xMidYMid slice">
+        <path ref={pathRef} pathLength={100} d={MARKER_PATH} />
+      </svg>
+      <div ref={pointerRef} className="lp-draw-pointer">
+        <LiveCursor peer={peer} />
+      </div>
+    </div>
+  );
 }
 
 /* -------------------------------------------------------------------------- */
@@ -228,9 +309,10 @@ function clipContent(content: ClipContent, x: number, width: number, top: number
   ));
 }
 
-const SPECTRUM = Array.from({ length: 26 }, (_, index) => {
+const KNOBS = [{ x: 140, angle: -0.8 }, { x: 156, angle: 0.6 }, { x: 172, angle: 0 }];
+const SPECTRUM = Array.from({ length: 17 }, (_, index) => {
   const random = seeded(index + 11);
-  return { x: 156 + index * 6, height: 8 + 14 * Math.sin((Math.PI * (index + 2)) / 30) * (0.6 + 0.4 * random()), duration: 0.45 + random() * 0.5, delay: -random() };
+  return { x: 190 + index * 6, height: 8 + 14 * Math.sin((Math.PI * (index + 2)) / 21) * (0.6 + 0.4 * random()), duration: 0.45 + random() * 0.5, delay: -random() };
 });
 
 /** Screen-shared music production app with a moving playhead and live spectrum. */
@@ -303,14 +385,12 @@ export function StudioScene() {
 
       <rect y="149" width="320" height="31" fill="#151826" />
       <g fill="#252a3d" stroke="#3b4157" strokeWidth="0.6">
-        <circle cx="20" cy="165" r="6.5" />
-        <circle cx="40" cy="165" r="6.5" />
-        <circle cx="60" cy="165" r="6.5" />
+        {KNOBS.map(knob => <circle key={knob.x} cx={knob.x} cy="164" r="6" />)}
       </g>
       <g stroke="#e2e8f0" strokeWidth="1.1" strokeLinecap="round">
-        <line x1="20" y1="165" x2="16" y2="160.5" />
-        <line x1="40" y1="165" x2="43.5" y2="159.5" />
-        <line x1="60" y1="165" x2="60" y2="158.8" />
+        {KNOBS.map(knob => (
+          <line key={knob.x} x1={knob.x} y1="164" x2={knob.x + 4.6 * Math.sin(knob.angle)} y2={164 - 4.6 * Math.cos(knob.angle)} />
+        ))}
       </g>
       <g fill="url(#lp-studio-spectrum)">
         {SPECTRUM.map(bar => (
@@ -321,6 +401,14 @@ export function StudioScene() {
             style={{ animationDuration: `${bar.duration.toFixed(2)}s`, animationDelay: `${bar.delay.toFixed(2)}s` }}
           />
         ))}
+      </g>
+      <g fill="#252a3d">
+        <rect x="300" y="153" width="4" height="23" rx="1.5" />
+        <rect x="308" y="153" width="4" height="23" rx="1.5" />
+      </g>
+      <g fill="#34d399">
+        <rect className="lp-studio-channel" x="300" y="153" width="4" height="23" rx="1.5" />
+        <rect className="lp-studio-channel is-right" x="308" y="153" width="4" height="23" rx="1.5" />
       </g>
     </svg>
   );
@@ -439,7 +527,7 @@ export function ShooterScene() {
         <rect key={shot.x} className="lp-duo-enemy-shot" x={shot.x - 1} y={shot.y} width="2" height="5" rx="1" fill="#f87171" style={{ animationDelay: `${shot.delay}s` }} />
       ))}
 
-      <g transform="translate(108 148)">
+      <g transform="translate(116 148)">
         <g className="lp-duo-wing">
           {[0, -0.45].map(delay => (
             <rect key={delay} className="lp-duo-bullet" x="-1" y="-8" width="2" height="6" rx="1" fill={PLAYER_TWO.color} style={{ animationDelay: `${delay}s` }} />

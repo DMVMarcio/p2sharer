@@ -54,7 +54,7 @@ html.web-landing {
 
 /* Header & Navigation */
 .site-header,
-.site-header-start,
+.site-header-menu,
 .site-header nav,
 .site-brand,
 .site-anchor-links {
@@ -68,8 +68,7 @@ html.web-landing {
   z-index: 50;
   isolation: isolate;
   min-height: 72px;
-  justify-content: space-between;
-  gap: 20px;
+  gap: 32px;
 }
 
 /* Full-bleed translucent bar behind the centered header content. */
@@ -84,9 +83,17 @@ html.web-landing {
   border-bottom: 1px solid var(--border-subtle);
 }
 
-.site-header-start {
-  gap: 32px;
+.site-header-menu {
+  flex: 1;
+  justify-content: space-between;
+  gap: 20px;
   min-width: 0;
+}
+
+.site-menu-toggle {
+  display: none;
+  flex: none;
+  margin-left: auto;
 }
 
 .site-brand {
@@ -419,16 +426,73 @@ html.web-landing {
 }
 
 @media (max-width: 860px) {
-  .site-anchor-links {
-    display: none;
-  }
+  /* Compact bar: brand and a menu toggle; links and actions move into a dropdown panel. */
   .site-header {
-    flex-wrap: wrap;
-    gap: 16px;
-    padding: 12px 0;
+    min-height: 60px;
+    gap: 12px;
+  }
+  .site-menu-toggle {
+    display: flex;
+  }
+  .site-header-menu {
+    position: absolute;
+    top: calc(100% + 8px);
+    left: 0;
+    right: 0;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 12px;
+    padding: 12px;
+    border: 1px solid var(--border-subtle);
+    border-radius: 18px;
+    background: var(--bg-elevated);
+    box-shadow: var(--shadow-lg);
+    transform-origin: top center;
+    opacity: 0;
+    transform: translateY(-8px) scale(0.98);
+    visibility: hidden;
+    pointer-events: none;
+    transition:
+      opacity var(--dropdown-exit-duration) ease,
+      transform var(--dropdown-exit-duration) ease,
+      visibility 0s linear var(--dropdown-exit-duration);
+  }
+  .site-header[data-menu-open] .site-header-menu {
+    opacity: 1;
+    transform: none;
+    visibility: visible;
+    pointer-events: auto;
+    transition:
+      opacity var(--dropdown-enter-duration) cubic-bezier(0.16, 1, 0.3, 1),
+      transform var(--dropdown-enter-duration) cubic-bezier(0.16, 1, 0.3, 1),
+      visibility 0s;
+  }
+  .site-anchor-links {
+    display: grid;
+    gap: 2px;
+    padding-bottom: 10px;
+    border-bottom: 1px solid var(--border-subtle);
+  }
+  .site-anchor-links a {
+    padding: 11px 12px;
+    border-radius: 12px;
+    font-size: 15px;
+    color: var(--text-primary);
+  }
+  .site-anchor-links a:hover,
+  .site-anchor-links a:focus-visible {
+    background: var(--bg-card-hover);
   }
   .site-header nav {
-    flex-wrap: wrap;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 10px;
+  }
+  .site-header nav .app-select {
+    max-width: none;
+  }
+  .site-header nav .btn {
+    justify-content: center;
   }
   .site-policy-body,
   .site-policy-summary ul {
@@ -450,11 +514,6 @@ html.web-landing {
   }
 }
 
-@media (max-width: 640px) {
-  .site-header {
-    position: relative;
-  }
-}
 
 /* Navigation feedback stays outside the route snapshot and never intercepts input. */
 .site-route-loading {
@@ -556,4 +615,14 @@ html.web-landing {
   gap: 16px;
   padding: 48px 24px;
   color: var(--text-primary);
+}
+
+:root[data-reduced-motion="true"] .site-header-menu {
+  transition: none !important;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .site-header-menu {
+    transition: none !important;
+  }
 }

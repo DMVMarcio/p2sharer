@@ -10,6 +10,7 @@ import {
   MicOff,
   MousePointer2,
   Globe,
+  Headphones,
   Laptop,
   Monitor,
   Music,
@@ -22,7 +23,7 @@ import {
 } from 'lucide-react';
 import { t } from '../../../src/i18n';
 import { LevelMeter, LiveCursor, MiniChessBoard, PEERS, PeerAvatar, WhiteboardSketch } from './scenes';
-import { ShooterScene, StudioScene } from './screenScenes';
+import { DrawingPointer, ShooterScene, StudioScene } from './screenScenes';
 import { useInView } from './motion';
 
 export type Tone = 'violet' | 'rose' | 'emerald' | 'amber' | 'sky' | 'pink' | 'teal';
@@ -80,10 +81,7 @@ export function StreamDemo() {
     <div className="lp-demo lp-stream-demo">
       <div className="lp-screen is-large" aria-hidden="true">
         <StudioScene />
-        <svg className="lp-annotation" viewBox="0 0 100 60" preserveAspectRatio="none">
-          <ellipse cx="50" cy="44" rx="12" ry="10" />
-        </svg>
-        <LiveCursor peer={PEERS[0]} className="lp-screen-cursor" />
+        <DrawingPointer peer={PEERS[0]} />
         <div className="lp-screen-hud">
           <span className="lp-chip is-glass is-mono">3840 × 2160</span>
           <span className="lp-chip is-glass is-mono">120 FPS</span>
@@ -113,7 +111,25 @@ export function StreamDemo() {
             </button>
           );
         })}
+        <StereoField silent={AUDIO_SOURCES.every(source => muted[source.id])} />
       </div>
+    </div>
+  );
+}
+
+/** Master output showing that left and right channels reach each ear separately. */
+function StereoField({ silent }: { silent: boolean }) {
+  return (
+    <div className={`lp-stereo${silent ? ' is-off' : ''}`}>
+      <span className="lp-mixer-icon" aria-hidden="true"><Headphones size={15} /></span>
+      <span className="lp-mixer-name">
+        <strong>{t('web.visualStereoTitle')}</strong>
+        <small>{t('web.visualStereoHint')}</small>
+      </span>
+      <span className="lp-stereo-field" aria-hidden="true">
+        <span className="lp-stereo-channel"><b>L</b><i /></span>
+        <span className="lp-stereo-channel is-right"><b>R</b><i /></span>
+      </span>
     </div>
   );
 }

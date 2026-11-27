@@ -365,6 +365,8 @@ html[data-theme="light"] .lp-orb { opacity: 0.1; }
   font-size: 10px;
   font-weight: 800;
   text-transform: uppercase;
+  white-space: nowrap;
+  flex: none;
 }
 
 .lp-live-dot::before {
@@ -454,6 +456,13 @@ html[data-theme="light"] .lp-orb { opacity: 0.1; }
   animation: lpStudioBar 0.7s ease-in-out infinite alternate;
 }
 
+.lp-studio-channel {
+  transform-box: fill-box;
+  transform-origin: center bottom;
+  animation: lpStudioLeft 2.6s ease-in-out infinite;
+}
+.lp-studio-channel.is-right { animation-name: lpStudioRight; }
+
 @keyframes lpStudioPlay {
   from { transform: translateX(0); }
   to { transform: translateX(260px); }
@@ -506,8 +515,8 @@ html[data-theme="light"] .lp-orb { opacity: 0.1; }
 }
 @keyframes lpDuoBob { 50% { transform: translateY(1.5px); } }
 @keyframes lpDuoWing {
-  from { transform: translateX(-10px); }
-  to { transform: translateX(14px); }
+  from { transform: translateX(-6px); }
+  to { transform: translateX(8px); }
 }
 @keyframes lpDuoHover {
   from { transform: translateY(-1.5px); }
@@ -540,21 +549,32 @@ html[data-theme="light"] .lp-orb { opacity: 0.1; }
   overflow: visible;
 }
 
-.lp-annotation ellipse {
+.lp-annotation path {
   fill: none;
   stroke: #fde047;
-  stroke-width: 2.5;
+  stroke-width: 2.6;
   stroke-linecap: round;
-  vector-effect: non-scaling-stroke;
+  stroke-linejoin: round;
   stroke-dasharray: 100;
-  stroke-dashoffset: 0;
-  animation: lpDraw 5s ease-in-out infinite;
+  stroke-dashoffset: 100;
+  filter: drop-shadow(0 0 3px rgba(253, 224, 71, 0.45));
 }
 
-@keyframes lpDraw {
-  0%, 12% { stroke-dashoffset: 100; opacity: 1; }
-  40%, 82% { stroke-dashoffset: 0; opacity: 1; }
-  100% { stroke-dashoffset: 0; opacity: 0; }
+.lp-draw-layer {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+/* Zero-size anchor positioned by script; the cursor tip sits on the anchor. */
+.lp-draw-pointer {
+  position: absolute;
+  left: 78%;
+  top: 26%;
+  width: 0;
+  height: 0;
+  z-index: 3;
+  transform: translate(-2px, -1px);
 }
 
 .lp-screen-cursor {
@@ -1062,6 +1082,90 @@ html[data-theme="light"] .lp-orb { opacity: 0.1; }
 }
 
 .lp-mixer-row.is-off { opacity: 0.72; }
+
+/* Stereo master: channels move out of phase to show independent left/right output. */
+.lp-stereo {
+  display: grid;
+  grid-template-columns: 34px minmax(0, 1fr) minmax(96px, 0.8fr);
+  align-items: center;
+  gap: 12px;
+  padding: 10px 12px;
+  border-radius: 14px;
+  background: var(--bg-surface);
+  box-shadow: inset 0 0 0 1px var(--tone-soft);
+}
+
+.lp-stereo .lp-mixer-name strong { font-family: inherit; font-weight: 700; }
+.lp-stereo .lp-mixer-name small { color: var(--text-secondary); }
+
+.lp-stereo-field { display: grid; gap: 6px; }
+
+.lp-stereo-channel {
+  display: grid;
+  grid-template-columns: 12px minmax(0, 1fr);
+  align-items: center;
+  gap: 6px;
+}
+
+.lp-stereo-channel b {
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  color: var(--tone-text);
+}
+
+.lp-stereo-channel i {
+  position: relative;
+  height: 6px;
+  border-radius: var(--radius-full);
+  background: color-mix(in srgb, var(--text-muted) 20%, transparent);
+  overflow: hidden;
+}
+
+.lp-stereo-channel i::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: linear-gradient(90deg, var(--success-text), var(--tone-text));
+  transform-origin: left center;
+  animation: lpStereoLeft 2.6s ease-in-out infinite;
+}
+
+.lp-stereo-channel.is-right i::after { animation-name: lpStereoRight; }
+
+.lp-stereo.is-off .lp-stereo-channel i::after {
+  animation: none;
+  transform: scaleX(0.06);
+  opacity: 0.5;
+}
+
+@keyframes lpStereoLeft {
+  0%, 100% { transform: scaleX(0.92); }
+  20% { transform: scaleX(0.7); }
+  50% { transform: scaleX(0.18); }
+  75% { transform: scaleX(0.55); }
+}
+
+@keyframes lpStereoRight {
+  0%, 100% { transform: scaleX(0.18); }
+  25% { transform: scaleX(0.6); }
+  50% { transform: scaleX(0.94); }
+  80% { transform: scaleX(0.4); }
+}
+
+@keyframes lpStudioLeft {
+  0%, 100% { transform: scaleY(0.92); }
+  20% { transform: scaleY(0.7); }
+  50% { transform: scaleY(0.18); }
+  75% { transform: scaleY(0.55); }
+}
+
+@keyframes lpStudioRight {
+  0%, 100% { transform: scaleY(0.18); }
+  25% { transform: scaleY(0.6); }
+  50% { transform: scaleY(0.94); }
+  80% { transform: scaleY(0.4); }
+}
 .lp-mixer-row.is-off .lp-mixer-name small { color: var(--danger-text); }
 .lp-mixer-row.is-off .lp-mixer-toggle { background: var(--danger-bg); color: var(--danger-text); }
 
@@ -2755,6 +2859,16 @@ html[data-theme="light"] .lp-orb { opacity: 0.1; }
   .lp-dock-tab { padding: 6px; }
   .lp-tunnel-row { grid-template-columns: auto auto minmax(20px, 1fr) auto; }
   .lp-tunnel-dot { display: none; }
+  .lp-window-bar .lp-chip.is-lock,
+  .lp-window-peers { display: none; }
+  .lp-live-dot { margin-left: auto; }
+  .lp-screen .lp-chip { padding: 2px 6px; font-size: 9.5px; }
+  .lp-screen-hud { top: 6px; right: 6px; gap: 4px; }
+  .lp-screen-hud > .lp-chip:nth-child(n + 3) { display: none; }
+  .lp-screen-label { left: 6px; bottom: 6px; }
+  .lp-stereo { grid-template-columns: 30px minmax(0, 1fr); }
+  .lp-stereo .lp-mixer-icon { width: 30px; height: 30px; }
+  .lp-stereo-field { grid-column: 1 / -1; }
 }
 
 /* Reduced motion: keep final illustration states, drop movement. */
