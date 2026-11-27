@@ -32,8 +32,8 @@ import { boardGameSounds } from '../board_game_sounds.ts';
 import { useBoardReturnAnimation } from '../useBoardReturnAnimation.ts';
 import { useTimedBoardMatch } from '../useTimedBoardMatch.ts';
 import { buildChessPgn } from './chess_pgn.ts';
-import { ModalDialog } from '../../../components/common/ModalDialog.tsx';
-import { TooltipButton } from '../../../components/common/TooltipButton.tsx';
+import { ModalDialog } from '../../../components/common/overlays/ModalDialog.tsx';
+import { TooltipButton } from '../../../components/common/overlays/TooltipButton.tsx';
 
 const chessHistoryPositionCache = new WeakMap<ChessRoomState['game']['moveHistory'], ChessRoomState['game'][]>();
 

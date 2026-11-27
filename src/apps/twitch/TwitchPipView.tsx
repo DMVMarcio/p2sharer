@@ -5,8 +5,8 @@ import React, { useEffect, useRef, useState } from 'react';
 import { invoke } from '@tauri-apps/api/core';
 import { emit, listen, type UnlistenFn } from '@tauri-apps/api/event';
 import { Pin, X, PictureInPicture2, Play, Pause, Volume2, VolumeX, Maximize, Minimize } from 'lucide-react';
-import { useContextMenu } from '../../components/common/ContextMenu';
-import { TooltipButton } from '../../components/common/TooltipButton';
+import { useContextMenu } from '../../components/common/overlays/ContextMenu';
+import { TooltipButton } from '../../components/common/overlays/TooltipButton';
 import { PipWindowControls } from '../../components/common/PipWindowControls';
 import { initFrontendLogger } from '../../core/logger';
 import {

@@ -19,9 +19,9 @@ let localeReads = 0;
 globalThis.readSystemLocaleFixture = () => { localeReads++; return 'pt-BR'; };
 const bundle = await build({ stdin: { contents: `
   export * from './src/i18n/index.ts';
-  export { SystemNoticeText } from './src/components/room/SystemNoticeText.tsx';
-  export { UnreadChatBadge } from './src/components/room/UnreadChatBadge.tsx';
-  export { EmojiComposerInput } from './src/components/common/EmojiComposerInput.tsx';
+  export { SystemNoticeText } from './src/components/room/chat/SystemNoticeText.tsx';
+  export { UnreadChatBadge } from './src/components/room/chat/UnreadChatBadge.tsx';
+  export { EmojiComposerInput } from './src/components/common/emoji/EmojiComposerInput.tsx';
   export { formatFileSize } from './src/core/file_size.ts';
   export { getRoomApp } from './src/apps/registry.ts';`, resolveDir: process.cwd() },
   bundle: true, write: false, format: 'esm', platform: 'node', jsx: 'automatic',

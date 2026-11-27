@@ -1,9 +1,9 @@
 import { useSyncExternalStore } from 'react';
 import { Clock, MessageCircle, Files, Download, Pencil, Phone, Trophy } from 'lucide-react';
-import { ModalDialog } from '../common/ModalDialog';
-import { ProfileAvatar } from '../common/ProfileAvatar';
-import { TooltipButton } from '../common/TooltipButton';
-import { Nickname } from '../common/Nickname';
+import { ModalDialog } from '../common/overlays/ModalDialog';
+import { ProfileAvatar } from '../common/profile/ProfileAvatar';
+import { TooltipButton } from '../common/overlays/TooltipButton';
+import { Nickname } from '../common/profile/Nickname';
 import { modalManager } from '../../hooks/useModal';
 import { useStore } from '../../hooks/useStore';
 import { useRoom } from '../../hooks/useRoom';

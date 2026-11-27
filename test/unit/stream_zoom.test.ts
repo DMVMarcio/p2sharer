@@ -9,7 +9,7 @@ import {
   clampPanOffset,
   calculateFocalZoom,
   stepZoom,
-} from '../../src/components/room/zoom_utils.ts';
+} from '../../src/components/room/stream/zoom_utils.ts';
 
 describe('Stream Zoom System Utilities', () => {
   describe('clampZoom', () => {

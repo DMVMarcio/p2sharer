@@ -10,7 +10,7 @@ import { useModal } from '../../hooks/useModal';
 import * as releaseNotesService from '../../services/release_notes';
 import type { ReleaseNotesSection } from '../../services/release_notes';
 import { AppVersion } from '../common/AppVersion';
-import { ModalDialog } from '../common/ModalDialog';
+import { ModalDialog } from '../common/overlays/ModalDialog';
 
 // Keep release notes offline: formatting is supported, embedded content is not.
 const noteElements = ['p', 'br', 'strong', 'em', 'del', 'code', 'pre', 'ul', 'ol', 'li', 'blockquote', 'h2', 'h3', 'hr'];

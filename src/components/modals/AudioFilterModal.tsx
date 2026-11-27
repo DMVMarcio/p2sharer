@@ -5,9 +5,9 @@ import { useLocale } from '../../hooks/useLocale';
 import { useModal } from '../../hooks/useModal';
 import { useAudioFilter } from '../../hooks/media/useAudioFilter';
 import { audioProcessKey, audioProcessLabels, type AudioCaptureChoice } from '../../core/media/audio_filter_presets';
-import { ModalDialog } from '../common/ModalDialog';
-import { Select } from '../common/Select';
-import { TooltipButton } from '../common/TooltipButton';
+import { ModalDialog } from '../common/overlays/ModalDialog';
+import { Select } from '../common/inputs/Select';
+import { TooltipButton } from '../common/overlays/TooltipButton';
 
 export const AudioFilterModal = () => {
   useLocale();

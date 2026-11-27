@@ -1,5 +1,5 @@
 import { isTauri } from '@tauri-apps/api/core';
-import { useModalDialogBehavior } from '../common/useModalDialogBehavior';
+import { useModalDialogBehavior } from '../common/overlays/useModalDialogBehavior';
 import { t } from '../../i18n';
 import { useLocale } from '../../hooks/useLocale';
 import React, { useEffect, useRef } from 'react';

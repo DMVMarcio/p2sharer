@@ -1,22 +1,22 @@
-import { useModalDialogBehavior } from '../common/useModalDialogBehavior';
-import { Nickname } from '../common/Nickname';
-import { ProfileAvatar } from '../common/ProfileAvatar';
+import { useModalDialogBehavior } from '../common/overlays/useModalDialogBehavior';
+import { Nickname } from '../common/profile/Nickname';
+import { ProfileAvatar } from '../common/profile/ProfileAvatar';
 import { PlatformBadge } from '../common/PlatformBadge';
 import { getLocalPlatform } from '../../core/platform';
-import { profileAction } from '../common/profile_actions';
+import { profileAction } from '../common/profile/profile_actions';
 import { t } from '../../i18n';
 import { useLocale } from '../../hooks/useLocale';
 import React, { useState } from 'react';
 import { createPortal } from 'react-dom';
 import { MoreHorizontal, Shield, Crown, UserX, Play, MonitorCog, AlertTriangle, Mic, MicOff, HeadphoneOff, VolumeX } from 'lucide-react';
 import { RemoteControlPermissionBadges } from '../common/RemoteControlPermissionBadges';
-import { useContextMenu, type ContextMenuAction } from '../common/ContextMenu';
+import { useContextMenu, type ContextMenuAction } from '../common/overlays/ContextMenu';
 import { useRoom } from '../../hooks/useRoom';
 import { showToast } from '../../hooks/useToast';
 import { modalManager } from '../../hooks/useModal';
-import { Tooltip } from '../common/Tooltip';
+import { Tooltip } from '../common/overlays/Tooltip';
 import { roomService } from '../../services/room_service';
-import { getUserVoiceActions } from './voice_user_actions';
+import { getUserVoiceActions } from './voice/voice_user_actions';
 
 export const ParticipantsPane: React.FC = () => {
   useLocale();

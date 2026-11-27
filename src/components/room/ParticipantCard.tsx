@@ -1,11 +1,11 @@
-import { Nickname } from '../common/Nickname';
+import { Nickname } from '../common/profile/Nickname';
 import { PlatformBadge } from '../common/PlatformBadge';
 import { getLocalPlatform } from '../../core/platform';
-import { useRoomCardLayoutActions } from './RoomCardLayoutContext';
+import { useRoomCardLayoutActions } from './video/RoomCardLayoutContext';
 import { contrastingTextColor } from '../../core/appearance/accent_color';
 import { profileImages, profileBanners } from '../../core/profile/profile_image';
-import { ProfileAvatar } from '../common/ProfileAvatar';
-import { profileAction } from '../common/profile_actions';
+import { ProfileAvatar } from '../common/profile/ProfileAvatar';
+import { profileAction } from '../common/profile/profile_actions';
 import { t } from '../../i18n';
 import { useLocale } from '../../hooks/useLocale';
 import { roomService } from '../../services/room_service';
@@ -14,12 +14,12 @@ import React from 'react';
 import { RoomSlotInfo } from '../../core/types';
 import { useRoom } from '../../hooks/useRoom';
 import { useStore } from '../../hooks/useStore';
-import { Tooltip } from '../common/Tooltip';
-import { WatchersTooltipContent } from './WatchersTooltipContent';
+import { Tooltip } from '../common/overlays/Tooltip';
+import { WatchersTooltipContent } from './stream/WatchersTooltipContent';
 import { Focus, Grid2X2, Play, MonitorUp, Mic, MicOff, HeadphoneOff, VolumeX } from 'lucide-react';
-import { useContextMenu, type ContextMenuAction } from '../common/ContextMenu';
+import { useContextMenu, type ContextMenuAction } from '../common/overlays/ContextMenu';
 import { useModal } from '../../hooks/useModal';
-import { getUserVoiceActions } from './voice_user_actions';
+import { getUserVoiceActions } from './voice/voice_user_actions';
 
 interface ParticipantCardProps {
   slot: RoomSlotInfo;

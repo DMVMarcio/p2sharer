@@ -1,6 +1,6 @@
 import React from 'react';
 import { Monitor, Globe, Smartphone } from 'lucide-react';
-import { Tooltip } from './Tooltip';
+import { Tooltip } from './overlays/Tooltip';
 import { t } from '../../i18n';
 import type { AppPlatform } from '../../core/types';
 

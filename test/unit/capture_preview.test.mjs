@@ -14,7 +14,7 @@ window.HTMLMediaElement.prototype.play = () => Promise.resolve();
 const require = createRequire(import.meta.url);
 const bundle = await build({ stdin: { contents: `export { useCapturePreview } from './src/hooks/media/useCapturePreview.ts';
 export { NativeVideoBridge } from './src/video/native_video_bridge.ts';
-export { MediaPreview } from './src/components/common/MediaPreview.tsx';`, resolveDir: process.cwd() }, bundle: true,
+export { MediaPreview } from './src/components/common/media/MediaPreview.tsx';`, resolveDir: process.cwd() }, bundle: true,
   write: false, format: 'esm', platform: 'node', jsx: 'automatic', plugins: [{ name: 'external', setup(builder) {
     builder.onResolve({ filter: /^[^./]/ }, (args) => ({ path: pathToFileURL(require.resolve(args.path)).href, external: true }));
   } }] });

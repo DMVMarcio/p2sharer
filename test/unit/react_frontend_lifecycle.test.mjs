@@ -67,13 +67,13 @@ const names = { useRoom: 'useRoom', useStore: 'useStore', state_store: 'state', 
   room_apps_service: 'apps', RoomAppCard: 'appCard', audio_context_manager: 'audio', pip_service: 'pip',
   useStreamPointer: 'pointer', useModal: 'modal', useToast: 'toast', useChatFileInput: 'files', EmojiComposerInput: 'composer' };
 const require = createRequire(import.meta.url);
-const bundle = await build({ stdin: { contents: `export { RoomVideoContainer } from './src/components/room/RoomVideoContainer.tsx';
-export { ChatPane } from './src/components/room/ChatPane.tsx';
+const bundle = await build({ stdin: { contents: `export { RoomVideoContainer } from './src/components/room/video/RoomVideoContainer.tsx';
+export { ChatPane } from './src/components/room/chat/ChatPane.tsx';
 export { ParticipantsPane } from './src/components/room/ParticipantsPane.tsx';
-export { WatchersTooltipContent } from './src/components/room/WatchersTooltipContent.tsx';
-export { Nickname } from './src/components/common/Nickname.tsx';
+export { WatchersTooltipContent } from './src/components/room/stream/WatchersTooltipContent.tsx';
+export { Nickname } from './src/components/common/profile/Nickname.tsx';
 export { profileImages, profileBanners } from './src/core/profile/profile_image.ts';
-export { ContextMenuProvider } from './src/components/common/ContextMenu.tsx';`, resolveDir: process.cwd() },
+export { ContextMenuProvider } from './src/components/common/overlays/ContextMenu.tsx';`, resolveDir: process.cwd() },
   bundle: true, write: false, format: 'esm', platform: 'node', jsx: 'automatic', loader: { '.css': 'empty', '.png': 'dataurl' }, plugins: [{ name: 'fixtures', setup(builder) {
     builder.onResolve({ filter: /\/(useRoom|useStore|state_store|room_service|room_apps_service|RoomAppCard|audio_context_manager|pip_service|useStreamPointer|useModal|useToast|useChatFileInput|EmojiComposerInput)$/ }, args => ({
       namespace: 'fixture', path: names[args.path.split('/').at(-1)],

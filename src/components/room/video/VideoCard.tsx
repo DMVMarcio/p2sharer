@@ -1,0 +1,953 @@
+import { Nickname } from '../../common/profile/Nickname';
+import { ProfileAvatar } from '../../common/profile/ProfileAvatar';
+import { PlatformBadge } from '../../common/PlatformBadge';
+import { getLocalPlatform } from '../../../core/platform';
+import { useIsMobile } from '../../../hooks/ui/useIsMobile';
+import { profileAction } from '../../common/profile/profile_actions';
+import { CARD_RESIZE_EDGES } from './RoomCardFrame';
+import { useRoomCardLayoutActions } from './RoomCardLayoutContext';
+import { t } from '../../../i18n';
+import { useLocale } from '../../../hooks/useLocale';
+import { stateStore } from '../../../core/state_store';
+import { useModal } from '../../../hooks/useModal';
+import { formatFrameRate } from '../../../core/media/media_streams';
+import { useStreamPointer } from '../../../hooks/stream/useStreamPointer';
+import { StreamPointerToggle } from '../stream/StreamPointerToggle';
+import { useRemoteControl } from '../../../hooks/stream/useRemoteControl';
+import { RemoteControlToggle } from '../remote_control/RemoteControlToggle';
+import { RemoteControlFloatingOverlay, RemoteControlElevationBanner } from '../remote_control/RemoteControlFloatingOverlay';
+import { RemoteCursorOverlay } from '../remote_control/RemoteCursorOverlay';
+import { RemoteControlOverlayHud } from '../remote_control/RemoteControlOverlayHud';
+import React, { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { RoomSlotInfo } from '../../../core/types';
+import { useRoom } from '../../../hooks/useRoom';
+import { useStore } from '../../../hooks/useStore';
+import { useElementFullscreen } from '../../../hooks/media/useElementFullscreen';
+import { useStreamZoom } from '../../../hooks/stream/useStreamZoom';
+import { audioContextManager } from '../../../audio/audio_context_manager';
+import { getStreamVolumePreferenceKey } from '../../../core/media/stream_volume_preferences';
+import { roomService } from '../../../services/room_service';
+import { pipService } from '../../../services/pip_service';
+import { ZoomControlBar } from '../stream/ZoomControlBar';
+import { Tooltip } from '../../common/overlays/Tooltip';
+import { StreamStatsOverlay } from '../stream/StreamStatsOverlay';
+import { Grid2X2, Focus, Eye, EyeOff, Maximize, PanelsTopLeft, PictureInPicture2, RotateCcw, Volume2, VolumeX, Square, MonitorUp, MonitorCog, Mic, MicOff, HeadphoneOff } from 'lucide-react';
+import { useContextMenu, type ContextMenuAction } from '../../common/overlays/ContextMenu';
+import { getUserVoiceActions } from '../voice/voice_user_actions';
+import { isTauri } from '@tauri-apps/api/core';
+import { openBrowserPictureInPicture } from '../../../platform/picture_in_picture';
+import { showToast } from '../../../hooks/useToast';
+import { observeRemoteVideoStartup } from '../../../video/remote_video_startup';
+
+interface VideoCardProps {
+  children?: React.ReactNode;
+  slot: RoomSlotInfo;
+  isFeatured?: boolean;
+  inTray?: boolean;
+  isSelectedFeatured?: boolean;
+  style?: React.CSSProperties;
+  layoutDraggable?: boolean;
+  resizable?: boolean;
+  hidden?: boolean;
+}
+
+export const VideoCard: React.FC<VideoCardProps> = ({
+  children,
+  slot,
+  isFeatured = false,
+  inTray = false,
+  isSelectedFeatured = false,
+  style,
+  layoutDraggable = false,
+  resizable = false,
+  hidden = false,
+}) => {
+  useLocale();
+  const {
+    togglePin,
+    stopWatchingStream,
+    getPeerPing,
+    layoutMode,
+    returnToGrid,
+    remoteControlViewerStates,
+    remoteCursorStates,
+    remoteCursorImages,
+    selfPeerId,
+    remoteControllers,
+    inVoice,
+    voiceMicMuted,
+    voiceDeafened,
+    isLocalSpeaking,
+    voicePeers,
+  } = useRoom();
+  const ownerPeerId = slot.ownerPeerId ?? slot.peerId;
+  const remoteVoice = !slot.isLocal ? (voicePeers ?? {})[ownerPeerId] : undefined;
+  const userInVoice = slot.isLocal ? Boolean(inVoice) : Boolean(remoteVoice?.inVoice);
+  const userSpeaking = slot.isLocal ? Boolean(inVoice && isLocalSpeaking) : Boolean(remoteVoice?.speaking);
+  const userMuted = slot.isLocal ? Boolean(inVoice && voiceMicMuted) : Boolean(remoteVoice?.muted);
+  const userDeafened = slot.isLocal ? Boolean(inVoice && voiceDeafened) : Boolean(remoteVoice?.deafened);
+  const userLocallyMuted = !slot.isLocal
+    ? Boolean(roomService.getPeerVoiceVolume?.(ownerPeerId, slot.ownerPublicKey, slot.senderName)?.muted)
+    : false;
+  const openContextMenu = useContextMenu();
+  const { openModal } = useModal();
+  const defaultResolution = useStore((s) => s.currentResolution);
+  const defaultFps = useStore((s) => s.currentFps);
+  const defaultBitrate = useStore((s) => s.currentBitrate);
+  const capture = slot.mediaId ? roomService.localCaptures.get(slot.mediaId) : undefined;
+  const currentResolution = capture ? { ...capture.resolution, label: `${capture.resolution.height}p` } : defaultResolution;
+  const currentFps = capture?.fps || defaultFps;
+  const currentBitrate = capture?.bitrate || defaultBitrate;
+  const isPipActive = useStore((s) => s.isPeerInPip(slot.peerId));
+  const audioTracksKey = slot.stream?.getAudioTracks().map(track => `${track.id}:${track.readyState}`).join(',');
+  const videoTracksKey = slot.stream?.getVideoTracks().map(track => `${track.id}:${track.readyState}`).join(',');
+
+  const [liveFps, setLiveFps] = useState<number>(() => (slot.isLocal ? currentFps : 60));
+  const [liveBitrate, setLiveBitrate] = useState<number>(0);
+  const [remoteResolution, setRemoteResolution] = useState<string>('1080p');
+  const [livePing, setLivePing] = useState<number | null>(null);
+
+  const [volume, setVolume] = useState<number>(100);
+  const [isMuted, setIsMuted] = useState<boolean>(false);
+  const [lastVolume, setLastVolume] = useState<number>(100);
+  const showLocalPreview = useStore((s) => s.localPreviewStreams[slot.peerId] ?? (slot.mediaKind === 'camera'));
+  const setShowLocalPreview = (visible: boolean) => stateStore.set((s) => {
+    s.localPreviewStreams = { ...s.localPreviewStreams, [slot.peerId]: visible };
+  });
+  const isMobile = useIsMobile();
+  const [isHudPinned, setIsHudPinned] = useState<boolean>(false);
+  const [mobileHudVisible, setMobileHudVisible] = useState(false);
+  const mobileHudTimerRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  const [activeTooltips, setActiveTooltips] = useState<number>(0);
+  const [isVideoReady, setIsVideoReady] = useState<boolean>(() => Boolean(slot.isLocal));
+
+  const triggerMobileHud = useCallback(() => {
+    setMobileHudVisible((prev) => {
+      const next = !prev;
+      if (mobileHudTimerRef.current) clearTimeout(mobileHudTimerRef.current);
+      if (next) {
+        mobileHudTimerRef.current = setTimeout(() => {
+          setMobileHudVisible(false);
+        }, 4000);
+      }
+      return next;
+    });
+  }, []);
+
+  useEffect(() => {
+    return () => {
+      if (mobileHudTimerRef.current) clearTimeout(mobileHudTimerRef.current);
+    };
+  }, []);
+
+  const handleTooltipOpenChange = useCallback((open: boolean) => {
+    setActiveTooltips((prev) => Math.max(0, prev + (open ? 1 : -1)));
+  }, []);
+
+  const remoteViewerState = remoteControlViewerStates[slot.peerId];
+  const isRemoteControlEligible =
+    !slot.isLocal &&
+    slot.pointerEligible !== false &&
+    !inTray &&
+    !isPipActive &&
+    !!slot.stream &&
+    (slot.platform ?? 'desktop') === 'desktop';
+  const isRemoteControlActive = isRemoteControlEligible && remoteViewerState?.status === 'active';
+
+  const { ref: cardRef, fullscreen: isFullscreen, toggleFullscreen } = useElementFullscreen<HTMLDivElement>();
+  const {
+    zoom,
+    pan,
+    isDragging,
+    didDragRef,
+    setZoomDirect,
+    stepZoomLevel,
+    resetZoom,
+    handleMouseDown,
+    handleDoubleClick,
+  } = useStreamZoom(cardRef, slot.stream, !inTray && !isRemoteControlActive);
+
+  const wasRemoteControlActiveRef = useRef(false);
+  useEffect(() => {
+    if (isRemoteControlActive && !wasRemoteControlActiveRef.current) {
+      resetZoom();
+    }
+    wasRemoteControlActiveRef.current = isRemoteControlActive;
+  }, [isRemoteControlActive, resetZoom]);
+
+  const handleToggleFullscreen = (e?: React.MouseEvent) => {
+    e?.stopPropagation();
+    void toggleFullscreen().catch(error => console.warn('[Window] Fullscreen transition failed:', error));
+  };
+
+  const videoElementRef = useRef<HTMLVideoElement | null>(null);
+  const remoteCursorSync = remoteCursorStates[slot.peerId];
+  const remoteControl = useRemoteControl(
+    cardRef,
+    videoElementRef,
+    slot.peerId,
+    isRemoteControlEligible,
+    remoteViewerState,
+    remoteCursorSync,
+    remoteCursorImages,
+  );
+  const openPictureInPicture = () => {
+    const request = isTauri() ? pipService.openPip(slot.peerId, slot.senderName, slot.stream)
+      : openBrowserPictureInPicture(videoElementRef.current);
+    void request.catch(() => showToast(t('error.unknown'), 3500, 'error'));
+  };
+  const currentStreamRef = useRef(slot.stream);
+  currentStreamRef.current = slot.stream;
+  const currentVideoTracksKeyRef = useRef(videoTracksKey);
+  currentVideoTracksKeyRef.current = videoTracksKey;
+  const boundVideoTracksKeyRef = useRef<string | undefined>(undefined);
+
+  const pointer = useStreamPointer(cardRef, videoElementRef, slot.peerId, slot.pointerEligible !== false && !slot.isLocal && !inTray && !isPipActive && !!slot.stream && !remoteControl.active,
+    slot.stream, false, slot.pointerEligible !== false && !isPipActive && !!slot.stream && !(inTray && isSelectedFeatured) && (!slot.isLocal || showLocalPreview) && !remoteControl.active);
+
+
+  const cleanupVideoElement = useCallback((el: HTMLVideoElement | null) => {
+    if (!el) return;
+    try {
+      el.pause();
+      el.srcObject = null;
+      el.removeAttribute('src');
+      el.load();
+    } catch {}
+  }, []);
+
+  const videoRef = useCallback(
+    (el: HTMLVideoElement | null) => {
+      if (videoElementRef.current && videoElementRef.current !== el) {
+        cleanupVideoElement(videoElementRef.current);
+        boundVideoTracksKeyRef.current = undefined;
+      }
+      videoElementRef.current = el;
+
+      if (el) {
+        const stream = currentStreamRef.current;
+        if (stream) {
+          if (el.srcObject !== stream) {
+            boundVideoTracksKeyRef.current = currentVideoTracksKeyRef.current;
+            el.srcObject = stream;
+            el.play().catch(() => {});
+          } else if (el.paused) {
+            el.play().catch(() => {});
+          }
+          if (!slot.isLocal && el.readyState >= 2 && el.videoWidth > 0) {
+            setIsVideoReady(true);
+          }
+        } else {
+          boundVideoTracksKeyRef.current = undefined;
+          cleanupVideoElement(el);
+        }
+      }
+    },
+    [cleanupVideoElement, slot.isLocal]
+  );
+
+  // Stream replacement updates the existing node without detaching its React ref.
+  useLayoutEffect(() => {
+    const element = videoElementRef.current;
+    if (!element) return;
+    if (slot.stream && element.srcObject !== slot.stream) {
+      boundVideoTracksKeyRef.current = videoTracksKey;
+      if (!slot.isLocal) setIsVideoReady(false);
+      element.srcObject = slot.stream;
+      void element.play().catch(() => {});
+    } else if (slot.stream && boundVideoTracksKeyRef.current !== videoTracksKey) {
+      // replaceMediaTrack swaps the video track in-place without changing slot.stream identity.
+      boundVideoTracksKeyRef.current = videoTracksKey;
+      if (!slot.isLocal && element.readyState < 2) setIsVideoReady(false);
+      element.srcObject = null;
+      element.srcObject = slot.stream;
+      void element.play().catch(() => {});
+    } else if (!slot.stream && element.srcObject) {
+      boundVideoTracksKeyRef.current = undefined;
+      cleanupVideoElement(element);
+      if (!slot.isLocal) setIsVideoReady(false);
+    }
+  }, [slot.stream, slot.isLocal, videoTracksKey, cleanupVideoElement]);
+
+  useEffect(() => {
+    if (!slot.isLocal || !slot.stream) return;
+    const stream = slot.stream;
+    roomService.setCaptureConsumer(stream, 'local-preview', showLocalPreview);
+    return () => {
+      roomService.setCaptureConsumer(stream, 'local-preview', false);
+    };
+  }, [slot.isLocal, slot.stream, videoTracksKey, showLocalPreview]);
+
+  useEffect(() => {
+    const element = videoElementRef.current;
+    if (slot.isLocal || !slot.stream || !element) return;
+    return observeRemoteVideoStartup(element, {
+      mediaId: slot.peerId,
+      ready: () => setIsVideoReady(true),
+      recover: () => roomService.roomManager?.requestStream(slot.peerId),
+    });
+  }, [slot.stream, slot.isLocal, slot.peerId, isPipActive]);
+
+  useEffect(() => {
+    return () => {
+      if (videoElementRef.current) {
+        cleanupVideoElement(videoElementRef.current);
+        videoElementRef.current = null;
+      }
+    };
+  }, [cleanupVideoElement]);
+
+  const volumePrefKey = !slot.isLocal ? getStreamVolumePreferenceKey(slot) : undefined;
+
+  useEffect(() => {
+    if (!slot.isLocal && slot.stream) {
+      audioContextManager.attachPeerAudio(slot.peerId, slot.stream, volumePrefKey);
+      const st = audioContextManager.getPeerVolumeState(slot.peerId);
+      setVolume(st.volume);
+      setIsMuted(st.isMuted);
+      if (st.volume > 0) setLastVolume(st.volume);
+    }
+  }, [slot.isLocal, slot.peerId, slot.stream, audioTracksKey, isPipActive, volumePrefKey]);
+
+  useEffect(() => {
+    if (isPipActive) {
+      pipService.updateStream(slot.peerId, slot.stream);
+    }
+  }, [isPipActive, slot.peerId, slot.stream, videoTracksKey, audioTracksKey]);
+
+  useEffect(() => {
+    if (inTray || (!slot.isStreaming && slot.isLocal)) return;
+
+    let isMounted = true;
+    const fetchStats = async () => {
+      if (!isMounted) return;
+      const stats = await roomService.roomManager?.getPeerStats(slot.peerId);
+      if (!isMounted) return;
+      if (stats?.bitrateKbps !== null && stats?.bitrateKbps !== undefined) {
+        setLiveBitrate(stats.bitrateKbps);
+      }
+      if (stats?.fps !== null && stats?.fps !== undefined) {
+        setLiveFps(stats.fps);
+      }
+      if (stats?.height) {
+        setRemoteResolution(`${stats.height}p`);
+      }
+      if (stats?.pingMs !== null && stats?.pingMs !== undefined) {
+        setLivePing(stats.pingMs);
+      }
+    };
+
+    fetchStats();
+    const initialTimer = setTimeout(fetchStats, 600);
+    const interval = setInterval(fetchStats, 1500);
+    return () => {
+      isMounted = false;
+      clearTimeout(initialTimer);
+      clearInterval(interval);
+    };
+  }, [slot.isLocal, slot.peerId, slot.isStreaming, inTray]);
+
+  const handleCardClick = () => {
+    if (pointer.enabled || remoteControl.active) {
+      return;
+    }
+    if (didDragRef.current) {
+      didDragRef.current = false;
+      return;
+    }
+    if (zoom > 1.0) {
+      return;
+    }
+    if (typeof window !== 'undefined' && window.matchMedia('(hover: none)').matches) {
+      triggerMobileHud();
+    }
+    togglePin(slot.peerId);
+  };
+
+  const handleStopWatching = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    stopWatchingStream(slot.peerId);
+  };
+
+  const handleVolumeChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    e.stopPropagation();
+    const val = parseInt(e.target.value, 10);
+    setVolume(val);
+    setIsMuted(val === 0);
+    if (val > 0) setLastVolume(val);
+    audioContextManager.setPeerVolume(slot.peerId, val, val === 0, volumePrefKey);
+  };
+
+  const handleToggleMute = (e?: React.MouseEvent) => {
+    e?.stopPropagation();
+    if (isMuted || volume === 0) {
+      const targetVol = lastVolume || 100;
+      setVolume(targetVol);
+      setIsMuted(false);
+      audioContextManager.setPeerVolume(slot.peerId, targetVol, false, volumePrefKey);
+    } else {
+      setLastVolume(volume || 100);
+      setVolume(0);
+      setIsMuted(true);
+      audioContextManager.setPeerVolume(slot.peerId, 0, true, volumePrefKey);
+    }
+  };
+
+  const watchers = slot.watchers || [];
+
+  const localControllers = slot.isLocal
+    ? remoteControllers.filter((ctrl) => !slot.mediaId || ctrl.mediaId === slot.mediaId || ctrl.mediaId === 'default')
+    : [];
+  const [, setLocalActivityTick] = useState(0);
+
+  useEffect(() => {
+    if (localControllers.length === 0) return;
+    return roomService.subscribeRemoteControlActivity?.(() => setLocalActivityTick((n) => n + 1));
+  }, [localControllers.length]);
+
+  const layoutActions = useRoomCardLayoutActions();
+  const handleContextMenu = (event: React.MouseEvent) => {
+    if (remoteControl.active) return;
+    const actions: ContextMenuAction[] = [profileAction({ peerId: ownerPeerId, name: slot.senderName, isLocal: slot.isLocal, color: slot.color })];
+    if (!slot.isLocal) {
+      actions.push(...getUserVoiceActions({ peerId: ownerPeerId, publicKey: slot.ownerPublicKey, username: slot.senderName }));
+    }
+    if (layoutMode === 'spotlight' && inTray && !isSelectedFeatured) actions.push({ id: 'overlay', get label() { return t("message.1c2685f76e69"); },
+      icon: <PictureInPicture2 size={15} />, onSelect: () => roomService.overlayStream(slot.peerId) });
+    if (slot.isLocal && slot.mediaId) actions.push({ id: 'edit', get label() { return t("message.eb9fb0e94a23"); }, icon: <MonitorUp size={15} />,
+      onSelect: () => { roomService.editTransmission(slot.mediaId!); openModal('screenPicker'); } });
+    if (!isFeatured && !isSelectedFeatured) actions.push({ id: 'feature', get label() { return t("message.b384fe7c4b0e"); }, icon: <Focus size={15} />, onSelect: () => togglePin(slot.peerId) });
+    if (layoutMode === 'spotlight') actions.push({ id: 'grid', get label() { return t("message.2e00d3a9b870"); }, icon: <Grid2X2 size={15} />,
+      onSelect: returnToGrid });
+    if (isPipActive) actions.push({ id: 'restore', get label() { return t("message.5899ac52fbbf"); }, icon: <PictureInPicture2 size={15} />, onSelect: () => pipService.restoreFromPip(slot.peerId) });
+    else {
+      if (slot.isLocal) actions.push({ id: 'preview', get label() { return showLocalPreview ? t("message.696806b6cddb") : t("message.f281575f257e"); },
+        icon: showLocalPreview ? <EyeOff size={15} /> : <Eye size={15} />, onSelect: () => setShowLocalPreview(!showLocalPreview) });
+      else actions.push({ id: 'mute', get label() { return isMuted || volume === 0 ? t("message.5cfebda5d336") : t("message.70f507f2963f"); },
+        icon: isMuted ? <Volume2 size={15} /> : <VolumeX size={15} />, onSelect: () => handleToggleMute() });
+      if (!inTray) {
+        actions.push({ id: 'hud', get label() { return isHudPinned ? t("message.6bc8448647e0") : t("message.1572541abe33"); }, icon: <PanelsTopLeft size={15} />, onSelect: () => setIsHudPinned(!isHudPinned) });
+        if (zoom > 1) actions.push({ id: 'zoom', get label() { return t("message.2a1c7eafd8bb"); }, icon: <RotateCcw size={15} />, onSelect: resetZoom });
+        actions.push({ id: 'fullscreen', get label() { return isFullscreen ? t("message.cbe5019d4a64") : t("message.cdd35dea1ee3"); }, icon: <Maximize size={15} />, onSelect: () => handleToggleFullscreen() });
+      }
+      actions.push({ id: 'pip', get label() { return t("message.850d2cf3aafa"); }, icon: <PictureInPicture2 size={15} />,
+        disabled: !slot.stream || (!isTauri() && !document.pictureInPictureEnabled), onSelect: openPictureInPicture });
+    }
+    actions.push({ id: 'stop', get label() { return slot.isLocal ? t("message.6ef17b51fd93") : t("message.470b862fbd07"); }, icon: <Square size={15} />, separator: true,
+      onSelect: slot.isLocal ? () => { if (slot.mediaId) roomService.stopTransmission(slot.mediaId); } : () => stopWatchingStream(slot.peerId) });
+    openContextMenu(event, [...actions, ...layoutActions]);
+  };
+
+  const pingVal = !slot.isLocal ? (livePing ?? getPeerPing(slot.peerId)) : 0;
+  const pingNum = pingVal;
+  const pingStr = pingVal !== null && pingVal !== undefined ? `${pingVal} ms` : '-- ms';
+  const pingClass = pingNum !== null && pingNum !== undefined
+    ? (pingNum < 80 ? 'ping-good' : pingNum < 180 ? 'ping-medium' : 'ping-poor')
+    : 'ping-medium';
+
+  const signalingStatus = roomService.roomManager?.getSignalingStatus?.();
+  const transportTag = signalingStatus?.activeTransport
+    ? ` [${signalingStatus.activeTransport.toUpperCase()}]`
+    : '';
+
+  return (
+    <div
+      ref={cardRef}
+      className={`stream-card ${isFeatured ? 'featured' : ''} ${inTray ? 'in-tray' : ''} ${isSelectedFeatured ? 'selected-featured' : ''} ${zoom > 1.0 && !inTray ? 'is-zoomed' : ''} ${isDragging && !inTray ? 'is-dragging' : ''} ${!slot.isLocal && !inTray ? 'has-volume-controller' : ''} ${isHudPinned ? 'is-hud-pinned' : ''} ${activeTooltips > 0 || mobileHudVisible ? 'is-hud-active' : ''} ${pointer.enabled ? 'is-stream-pointer-active' : ''} ${remoteControl.active ? 'is-remote-control-active' : ''} ${isMobile ? 'is-mobile-stream' : ''} ${userSpeaking ? 'is-voice-speaking' : ''}`}
+      style={style}
+      data-peer-id={slot.peerId}
+      data-room-layout-id={layoutDraggable ? slot.peerId : undefined}
+      onClick={handleCardClick}
+      onContextMenu={handleContextMenu}
+      tabIndex={hidden ? -1 : 0}
+      aria-hidden={hidden || undefined}
+      inert={hidden || undefined}
+      onMouseDown={!inTray && !pointer.enabled && !remoteControl.active ? handleMouseDown : undefined}
+      onDoubleClick={!inTray && !pointer.enabled && !remoteControl.active ? handleDoubleClick : undefined}
+    >
+      <div
+        className="stream-video-viewport"
+        style={{
+          width: '100%',
+          height: '100%',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          overflow: 'hidden',
+          position: 'relative',
+        }}
+      >
+        {inTray && isSelectedFeatured ? (
+          <div className="tray-featured-placeholder">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <polygon points="5 3 19 12 5 21 5 3"/>
+            </svg>
+          </div>
+        ) : isPipActive ? (
+          <div className="pip-broadcaster-placeholder local-broadcaster-placeholder">
+            <div className="local-broadcaster-radar-pulse">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <rect x="2" y="3" width="20" height="14" rx="2" ry="2"/>
+                <rect x="11" y="9" width="9" height="7" rx="1.5"/>
+              </svg>
+            </div>
+            {!inTray && <span className="local-broadcaster-title">{t("message.e78c504525f4")}</span>}
+            {!inTray && (
+              <span className="local-broadcaster-subtitle">
+                {slot.isLocal ? t("message.40628576338c") : t("message.e368e80999d7", { v0: slot.senderName })}
+              </span>
+            )}
+            {!inTray && (
+              <button
+                type="button"
+                className="btn-toggle-local-preview btn-restore-from-pip"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  pipService.restoreFromPip(slot.peerId);
+                }}
+                aria-label={t("message.3fd671203587")}
+              >
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <polyline points="4 14 10 14 10 20"/>
+                  <polyline points="20 10 14 10 14 4"/>
+                  <line x1="14" y1="10" x2="21" y2="3"/>
+                  <line x1="3" y1="21" x2="10" y2="14"/>
+                </svg>
+                {t("message.690a35fa4990")}</button>
+            )}
+          </div>
+        ) : slot.isLocal && !showLocalPreview ? (
+          <div className="local-broadcaster-placeholder">
+            <div className="local-broadcaster-radar-pulse">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <rect x="2" y="3" width="20" height="14" rx="2" ry="2"/>
+                <line x1="8" y1="21" x2="16" y2="21"/>
+                <line x1="12" y1="17" x2="12" y2="21"/>
+              </svg>
+            </div>
+            {!inTray && <span className="local-broadcaster-title">{t("message.a6aa3bb90a7e")}</span>}
+            {!inTray && (
+              <span className="local-broadcaster-subtitle">
+                {currentResolution.label} • {formatFrameRate(currentFps)} {t("message.df393af690a7")}</span>
+            )}
+            {!inTray && (
+              <button
+                type="button"
+                className="btn-toggle-local-preview"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setShowLocalPreview(true);
+                }}
+                aria-label={t("message.e41d33bb8cb8")}
+              >
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8z"/>
+                  <circle cx="12" cy="12" r="3"/>
+                </svg>
+                {t("message.11023c669c46")}</button>
+            )}
+          </div>
+        ) : (
+          <>
+            <video
+              ref={videoRef}
+              className={`${pointer.enabled ? 'is-stream-pointer-active ' : ''}${pointer.cursorActive ? 'stream-pointer-active-cursor' : ''}`.trim() || undefined}
+              autoPlay
+              playsInline
+              muted
+              onLoadedData={() => {
+                if (!slot.isLocal && videoElementRef.current && videoElementRef.current.readyState >= 2 && videoElementRef.current.videoWidth > 0) {
+                  setIsVideoReady(true);
+                }
+              }}
+              onPlaying={() => {
+                if (!slot.isLocal && videoElementRef.current && videoElementRef.current.videoWidth > 0) {
+                  setIsVideoReady(true);
+                }
+              }}
+              onTimeUpdate={() => {
+                if (!slot.isLocal && videoElementRef.current && videoElementRef.current.currentTime > 0 && videoElementRef.current.videoWidth > 0) {
+                  setIsVideoReady(true);
+                }
+              }}
+              style={{
+                width: '100%',
+                height: '100%',
+                objectFit: 'contain',
+                transform: zoom > 1.0 && !inTray ? `translate3d(${pan.x}px, ${pan.y}px, 0px) scale(${zoom})` : 'none',
+                transformOrigin: 'center center',
+                transition: isDragging ? 'none' : 'transform 0.08s ease-out, opacity 0.2s ease-in',
+                willChange: zoom > 1.0 && !inTray ? 'transform' : 'auto',
+                opacity: isVideoReady || slot.isLocal ? 1 : 0,
+                cursor: remoteControl.cursorCss,
+              }}
+            />
+            {!isVideoReady && !slot.isLocal && (
+              <div className="local-broadcaster-placeholder" style={{ position: 'absolute', inset: 0, zIndex: 1 }}>
+                <div className="local-broadcaster-radar-pulse">
+                  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <rect x="2" y="3" width="20" height="14" rx="2" ry="2"/>
+                    <line x1="8" y1="21" x2="16" y2="21"/>
+                    <line x1="12" y1="17" x2="12" y2="21"/>
+                  </svg>
+                </div>
+                {!inTray && <span className="local-broadcaster-title">{t("message.863d929084c6")}</span>}
+                {!inTray && <span className="local-broadcaster-subtitle"><Nickname name={slot.senderName} peerId={slot.ownerPeerId ?? slot.peerId} isLocal={slot.isLocal} /></span>}
+              </div>
+            )}
+          </>
+        )}
+      </div>
+
+      {pointer.indicator}
+      {pointer.toolbar}
+
+      {(() => {
+        const cursorSync = remoteCursorSync;
+        const weAreActivelyDriving =
+          remoteControl.active &&
+          !remoteControl.hostBusy &&
+          Boolean(selfPeerId) &&
+          cursorSync?.actorPeerId === selfPeerId;
+        const showRemoteCursor =
+          !slot.isLocal &&
+          !inTray &&
+          !isPipActive &&
+          isVideoReady &&
+          Boolean(cursorSync?.active && cursorSync.visible && !cursorSync.embeddedInVideo) &&
+          !weAreActivelyDriving;
+        return (
+          <RemoteCursorOverlay
+            containerRef={cardRef}
+            videoRef={videoElementRef}
+            cursorSync={cursorSync}
+            cursorImages={remoteCursorImages}
+            visible={showRemoteCursor}
+            viewKey={`${zoom}:${pan.x}:${pan.y}`}
+          />
+        );
+      })()}
+
+      {remoteControl.active && !inTray && !isPipActive && (
+        <>
+          <RemoteControlElevationBanner
+            elevationBlocked={remoteControl.elevationBlocked}
+            adminEnabled={remoteControl.adminEnabled}
+            adminRequestPending={remoteControl.adminRequestPending}
+            onRequestAdmin={remoteControl.requestAdmin}
+            onCancelAdmin={remoteControl.cancelAdmin}
+            onOverlayHoverChange={remoteControl.setOverlayHovered}
+          />
+          <RemoteControlFloatingOverlay
+            persistKey={`${slot.peerId}:${slot.mediaId || 'default'}`}
+            containerRef={cardRef}
+            isFullscreen={isFullscreen}
+            onToggleFullscreen={handleToggleFullscreen}
+            onExitRemoteControl={remoteControl.exit}
+            immersive={remoteControl.immersive}
+            onToggleImmersive={remoteControl.toggleImmersive}
+            mouseLock={remoteControl.mouseLocked}
+            onToggleMouseLock={remoteControl.toggleManualMouseLock}
+            hostBusy={remoteControl.hostBusy}
+            elevationBlocked={remoteControl.elevationBlocked}
+            adminEnabled={remoteControl.adminEnabled}
+            adminRequestPending={remoteControl.adminRequestPending}
+            onRequestAdmin={remoteControl.requestAdmin}
+            onCancelAdmin={remoteControl.cancelAdmin}
+            mouseEnabled={remoteControl.mouseEnabled}
+            keyboardEnabled={remoteControl.keyboardEnabled}
+            gamepadEnabled={remoteControl.gamepadEnabled}
+            volume={volume}
+            isMuted={isMuted}
+            onVolumeChange={(val) => {
+              setVolume(val);
+              setIsMuted(val === 0);
+              if (val > 0) setLastVolume(val);
+              audioContextManager.setPeerVolume(slot.peerId, val, val === 0, volumePrefKey);
+            }}
+            onToggleMute={handleToggleMute}
+            onOverlayHoverChange={remoteControl.setOverlayHovered}
+            onOverlayMenuOpenChange={remoteControl.setOverlayMenuOpen}
+            qualityText={`${remoteResolution} ${formatFrameRate(liveFps)} FPS`}
+            liveBitrateKbps={liveBitrate}
+            configuredBitrateKbps={currentBitrate}
+            pingText={pingStr}
+            pingClass={pingClass}
+            transportTag={transportTag}
+            watchersCount={watchers.length}
+          />
+        </>
+      )}
+
+      {/* Featured badge when in tray */}
+      {inTray && isSelectedFeatured && (
+        <span className="selected-featured-badge">
+          <span className="selected-featured-badge-dot"></span>
+        </span>
+      )}
+
+      {/* Stats HUD on top of card - only when not in tray, not in PiP, and not in active remote control */}
+      {!inTray && !isPipActive && !remoteControl.active && (
+        <StreamStatsOverlay
+          qualityText={slot.isLocal ? `${currentResolution.label} ${formatFrameRate(currentFps)} FPS` : `${remoteResolution} ${formatFrameRate(liveFps)} FPS`}
+          liveBitrateKbps={liveBitrate}
+          configuredBitrateKbps={currentBitrate}
+          isLocal={slot.isLocal}
+          pingText={pingStr}
+          pingClass={pingClass}
+          transportTag={transportTag}
+          watchers={watchers}
+          isHudPinned={isHudPinned}
+          onTogglePinHud={() => setIsHudPinned((p) => !p)}
+          onTooltipOpenChange={handleTooltipOpenChange}
+        />
+    )}
+
+      {slot.isLocal && slot.isStreaming && localControllers.length > 0 && !inTray && !isPipActive && (
+        <RemoteControlOverlayHud
+          compact
+          items={roomService.getRemoteControlOverlayItemsForMedia?.(slot.mediaId || 'default') ?? []}
+        />
+      )}
+
+      {/* Stream stop actions share the tray control recipe. */}
+      {!remoteControl.active && ((!slot.isLocal && !isPipActive) || (slot.isLocal && slot.isStreaming)) && (
+        <button
+          type="button"
+          className={`btn btn-sm btn-stop-watch-stream ${slot.isLocal ? 'is-local-stop' : ''}`}
+          onClick={(event) => {
+            if (slot.isLocal) { event.stopPropagation(); if (slot.mediaId) void roomService.stopTransmission(slot.mediaId); }
+            else handleStopWatching(event);
+          }}
+          aria-label={slot.isLocal ? t("message.7fd6d14936f2") : t("message.b9a45228925c")}
+        >
+          <Square size={13} aria-hidden="true" />
+          {slot.isLocal ? t("message.6ef17b51fd93") : t("message.470b862fbd07")}
+        </button>
+      )}
+
+      {!remoteControl.active && (
+      <div className="stream-card-footer">
+        {/* User overlay at bottom-left */}
+        <div className="stream-card-overlay">
+          <ProfileAvatar peerId={slot.ownerPeerId ?? slot.peerId} name={slot.senderName}
+            isLocal={slot.isLocal} color={slot.color} className="stream-profile-avatar" />
+          <span className="stream-user-name"><Nickname name={slot.senderName} peerId={slot.ownerPeerId ?? slot.peerId} isLocal={slot.isLocal} />{slot.mediaLabel ? ` · ${slot.mediaLabel}` : ""}</span>
+          <PlatformBadge platform={slot.platform ?? (slot.isLocal ? getLocalPlatform() : 'desktop')} size={11} />
+          {slot.isLocal && <span className="badge-you">{t("message.a03099f135b1")}</span>}
+          {userInVoice && (
+            <span className={`participant-voice-badges${userSpeaking ? ' is-speaking' : ''}`}>
+              {userLocallyMuted && (
+                <Tooltip content={t('voice.statusLocallyMuted')} onOpenChange={handleTooltipOpenChange}>
+                  <span className="participant-voice-badge is-muted" aria-label={t('voice.statusLocallyMuted')}>
+                    <VolumeX size={11} aria-hidden="true" />
+                  </span>
+                </Tooltip>
+              )}
+              {userDeafened ? (
+                <Tooltip content={t('voice.statusDeafened')} onOpenChange={handleTooltipOpenChange}>
+                  <span className="participant-voice-badge is-deafened" aria-label={t('voice.statusDeafened')}>
+                    <HeadphoneOff size={11} aria-hidden="true" />
+                  </span>
+                </Tooltip>
+              ) : userMuted ? (
+                <Tooltip content={t('voice.statusMuted')} onOpenChange={handleTooltipOpenChange}>
+                  <span className="participant-voice-badge is-muted" aria-label={t('voice.statusMuted')}>
+                    <MicOff size={11} aria-hidden="true" />
+                  </span>
+                </Tooltip>
+              ) : (
+                <Tooltip content={userSpeaking ? t('voice.statusSpeaking') : t('voice.statusInVoice')} onOpenChange={handleTooltipOpenChange}>
+                  <span className={`participant-voice-badge${userSpeaking ? ' is-speaking' : ''}`} aria-label={userSpeaking ? t('voice.statusSpeaking') : t('voice.statusInVoice')}>
+                    <Mic size={11} aria-hidden="true" />
+                  </span>
+                </Tooltip>
+              )}
+            </span>
+          )}
+        </div>
+
+        {/* Bottom-right stream controls: Volume (remote only) + PiP + Fullscreen */}
+        {!inTray && !isPipActive && (
+          <div
+            className="stream-controls-group"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {slot.isLocal && showLocalPreview && (
+              <button
+                type="button"
+                className="btn-toggle-local-preview active"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setShowLocalPreview(false);
+                }}
+                aria-label={t("message.317f00cc68bc")}
+              >
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/>
+                  <line x1="1" y1="1" x2="23" y2="23"/>
+                </svg>
+                {t("message.c94490e9bdea")}</button>
+            )}
+            {!slot.isLocal && (
+              <div className="stream-volume-controller">
+                <Tooltip content={isMuted || volume === 0 ? t("message.5cfebda5d336") : t("message.70f507f2963f")}
+                  onOpenChange={handleTooltipOpenChange}>
+                  <button
+                    type="button"
+                    className="btn-stream-volume"
+                    onClick={handleToggleMute}
+                    aria-label={isMuted || volume === 0 ? t("message.5cfebda5d336") : t("message.70f507f2963f")}
+                  >
+                    {isMuted || volume === 0 ? (
+                      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/>
+                        <line x1="23" x2="17" y1="9" y2="15"/>
+                        <line x1="17" x2="23" y1="9" y2="15"/>
+                      </svg>
+                    ) : volume < 50 ? (
+                      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/>
+                        <path d="M15.54 8.46a5 5 0 0 1 0 7.07"/>
+                      </svg>
+                    ) : (
+                      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/>
+                        <path d="M15.54 8.46a5 5 0 0 1 0 7.07"/>
+                        <path d="M19.07 4.93a10 10 0 0 1 0 14.14"/>
+                      </svg>
+                    )}
+                  </button>
+                </Tooltip>
+
+                <div className="stream-volume-slider-box">
+                  <input autoComplete="off"
+                    type="range"
+                    min="0"
+                    max="100"
+                    value={isMuted ? 0 : volume}
+                    className="stream-volume-range"
+                    aria-label={t('message.78ba36d6b04f')}
+                    aria-orientation="vertical"
+                    onChange={handleVolumeChange}
+                    onClick={(e) => e.stopPropagation()}
+                  />
+                  <span className="stream-volume-percent">{isMuted ? '0%' : `${volume}%`}</span>
+                </div>
+              </div>
+            )}
+
+            {!slot.isLocal && slot.pointerEligible !== false && (
+              <StreamPointerToggle
+                enabled={pointer.enabled}
+                onToggle={pointer.toggle}
+                onTooltipOpenChange={handleTooltipOpenChange}
+              />
+            )}
+
+            {isRemoteControlEligible && (
+              <RemoteControlToggle
+                status={remoteControl.status}
+                onToggle={remoteControl.toggleRequest}
+                onTooltipOpenChange={handleTooltipOpenChange}
+              />
+            )}
+
+            {slot.isLocal && slot.isStreaming && slot.pointerEligible !== false && isTauri() && (
+              <Tooltip content={t('remoteControl.manageAction')} onOpenChange={handleTooltipOpenChange}>
+                <button
+                  type="button"
+                  className={`btn-stream-pin remote-control-manager-trigger ${localControllers.length > 0 ? 'active' : ''}`}
+                  aria-label={t('remoteControl.manageAction')}
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    openModal('remoteControlManager');
+                  }}
+                >
+                  <MonitorCog size={14} aria-hidden="true" />
+                  {localControllers.length > 0 && (
+                    <span className="remote-control-manager-count">{localControllers.length}</span>
+                  )}
+                </button>
+              </Tooltip>
+            )}
+
+            <Tooltip
+              content={t("message.365c67865e1c")}
+              onOpenChange={handleTooltipOpenChange}
+            >
+              <button
+                type="button"
+                className="btn-stream-pip"
+                id={`btn-stream-pip-${slot.peerId}`}
+                disabled={!isTauri() && !document.pictureInPictureEnabled}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  openPictureInPicture();
+                }}
+                aria-label={t("message.1f626fd80ce4")}
+              >
+                <svg
+                  width="14"
+                  height="14"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                >
+                  <rect x="2" y="3" width="20" height="14" rx="2" ry="2" />
+                  <rect x="11" y="9" width="9" height="7" rx="1.5" fill="currentColor" fillOpacity="0.25" />
+                </svg>
+              </button>
+            </Tooltip>
+
+            <Tooltip content={isFullscreen ? t("message.1ea619b7211d") : t("message.1dfa15614e9a")}
+              onOpenChange={handleTooltipOpenChange}>
+              <button
+                type="button"
+                className="btn-stream-fullscreen"
+                id={`btn-stream-fullscreen-${slot.peerId}`}
+                onClick={handleToggleFullscreen}
+                aria-label={isFullscreen ? t("message.1ea619b7211d") : t("message.1dfa15614e9a")}
+              >
+                {isFullscreen ? (
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <polyline points="4 14 10 14 10 20"/>
+                    <polyline points="20 10 14 10 14 4"/>
+                    <line x1="14" x2="21" y1="10" y2="3"/>
+                    <line x1="3" x2="10" y1="21" y2="14"/>
+                  </svg>
+                ) : (
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <polyline points="15 3 21 3 21 9"/>
+                    <polyline points="9 21 3 21 3 15"/>
+                    <line x1="21" x2="14" y1="3" y2="10"/>
+                    <line x1="3" x2="10" y1="21" y2="14"/>
+                  </svg>
+                )}
+              </button>
+            </Tooltip>
+          </div>
+        )}
+      </div>
+      )}
+
+      {/* Precision Zoom Control Bar (visible when zoom > 1.0, not in tray, not in PiP, and not in remote control) */}
+      {!inTray && !isPipActive && !remoteControl.active && (
+        <ZoomControlBar
+          zoom={zoom}
+          onZoomChange={setZoomDirect}
+          onStepZoom={stepZoomLevel}
+          onResetZoom={resetZoom}
+          hasVolumeControl={!slot.isLocal}
+        />
+      )}
+      {resizable && !isMobile && !isFullscreen && CARD_RESIZE_EDGES.map(edge => (
+        <span key={edge} aria-hidden="true" className={`room-card-edge room-card-edge-${edge}`} data-room-resize={edge} />
+      ))}
+      {children}
+    </div>
+  );
+};

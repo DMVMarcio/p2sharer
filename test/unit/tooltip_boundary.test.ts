@@ -1,6 +1,6 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
-import { calculateTooltipPosition } from '../../src/components/common/tooltip_utils.ts';
+import { calculateTooltipPosition } from '../../src/components/common/overlays/tooltip_utils.ts';
 
 describe('Tooltip Viewport Boundary & Overflow Prevention', () => {
   const viewport = { width: 1280, height: 720 };

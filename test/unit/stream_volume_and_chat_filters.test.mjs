@@ -178,8 +178,8 @@ test('chat filters classify notices and ChatPane filters messages interactively 
     const require = createRequire(import.meta.url);
     const bundle = await build({
       stdin: {
-        contents: `export { ChatPane } from './src/components/room/ChatPane.tsx';
-          export { ContextMenuProvider } from './src/components/common/ContextMenu.tsx';
+        contents: `export { ChatPane } from './src/components/room/chat/ChatPane.tsx';
+          export { ContextMenuProvider } from './src/components/common/overlays/ContextMenu.tsx';
           export { resetChatFilters } from './src/core/chat/chat_filters.ts';`,
         resolveDir: process.cwd(),
       },
@@ -192,7 +192,7 @@ test('chat filters classify notices and ChatPane filters messages interactively 
       plugins: [{
         name: 'chat-filter-fixture',
         setup(builder) {
-          builder.onResolve({ filter: /hooks\/useRoom$|hooks\/room\/useChatFileInput$|room\/ChatTransferCenter$|common\/EmojiComposerInput$/ }, (args) => ({
+          builder.onResolve({ filter: /hooks\/useRoom$|hooks\/room\/useChatFileInput$|room\/chat\/ChatTransferCenter$|common\/emoji\/EmojiComposerInput$/ }, (args) => ({
             path: args.path.split('/').at(-1),
             namespace: 'fixture',
           }));

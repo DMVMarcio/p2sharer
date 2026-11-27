@@ -6,7 +6,7 @@ import { AppWindow, Play, Monitor } from 'lucide-react';
 import { getRoomApp, listRoomApps, onRoomAppRegistryChange } from '../../apps/registry';
 import { RoomAppIcon } from '../../apps/RoomAppIcon';
 import { roomAppsService } from '../../apps/room_apps_service';
-import { ModalDialog } from '../common/ModalDialog';
+import { ModalDialog } from '../common/overlays/ModalDialog';
 import { useModal } from '../../hooks/useModal';
 import { showToast } from '../../hooks/useToast';
 

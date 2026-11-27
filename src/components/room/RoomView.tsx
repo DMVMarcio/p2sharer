@@ -3,17 +3,17 @@ import { useLocale } from '../../hooks/useLocale';
 import React, { useEffect, useRef, useState } from 'react';
 import { usePanelSize } from '../../hooks/ui/usePanelSize';
 import { PanelResizeHandle } from '../common/PanelResizeHandle';
-import { UnreadChatBadge } from './UnreadChatBadge';
-import { StreamHeaderBar } from './StreamHeaderBar';
-import { RoomVideoContainer } from './RoomVideoContainer';
+import { UnreadChatBadge } from './chat/UnreadChatBadge';
+import { StreamHeaderBar } from './stream/StreamHeaderBar';
+import { RoomVideoContainer } from './video/RoomVideoContainer';
 import { RoomSidebar } from './RoomSidebar';
 import { MobileRoomDock } from './MobileRoomDock';
-import { ChatFileRequests } from './ChatFileRequests';
+import { ChatFileRequests } from './chat/ChatFileRequests';
 import { useRoom } from '../../hooks/useRoom';
 import { useModal } from '../../hooks/useModal';
 import { useIsMobile } from '../../hooks/ui/useIsMobile';
 import { stateStore } from '../../core/state_store';
-import { TooltipButton } from '../common/TooltipButton';
+import { TooltipButton } from '../common/overlays/TooltipButton';
 import { AlertTriangle, Plus, X } from 'lucide-react';
 
 export const RoomView: React.FC = () => {

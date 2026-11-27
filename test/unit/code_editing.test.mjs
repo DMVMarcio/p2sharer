@@ -19,9 +19,9 @@ window.Range.prototype.getBoundingClientRect = () => new window.DOMRect();
 HTMLElement.prototype.scrollIntoView = () => {};
 
 const bundle = await build({ stdin: { contents: `
-  export { CodeBlockExtension } from './src/components/common/CodeBlockExtension.tsx';
-  export { CodeEditing } from './src/components/common/CodeEditing.ts';
-  export { EmojiComposerInput } from './src/components/common/EmojiComposerInput.tsx';
+  export { CodeBlockExtension } from './src/components/common/code/CodeBlockExtension.tsx';
+  export { CodeEditing } from './src/components/common/code/CodeEditing.ts';
+  export { EmojiComposerInput } from './src/components/common/emoji/EmojiComposerInput.tsx';
   export { ChatMessageContent } from './src/components/common/ChatMessageContent.tsx';
   export { setLanguage } from './src/i18n/index.ts';
 `, resolveDir: process.cwd() }, bundle: true, write: false, platform: 'node', format: 'esm', jsx: 'automatic',

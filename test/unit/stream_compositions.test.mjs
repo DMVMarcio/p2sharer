@@ -23,9 +23,9 @@ window.HTMLMediaElement.prototype.pause = () => {};
 window.HTMLMediaElement.prototype.load = () => {};
 const require = createRequire(import.meta.url);
 const bundle = await build({ stdin: { contents: `
-export * from './src/components/room/RoomVideoContainer.tsx';
-export * from './src/components/common/ContextMenu.tsx';
-export { StreamHeaderBar } from './src/components/room/StreamHeaderBar.tsx';
+export * from './src/components/room/video/RoomVideoContainer.tsx';
+export * from './src/components/common/overlays/ContextMenu.tsx';
+export { StreamHeaderBar } from './src/components/room/stream/StreamHeaderBar.tsx';
 export { stateStore } from './src/core/state_store.ts';
 export { roomService } from './src/services/room_service.ts';
 export { audioContextManager } from './src/audio/audio_context_manager.ts';

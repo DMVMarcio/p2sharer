@@ -1,13 +1,13 @@
 import { t } from '../../i18n';
 import { useLocale } from '../../hooks/useLocale';
-import { Select } from '../../components/common/Select';
+import { Select } from '../../components/common/inputs/Select';
 import React from 'react';
 import type { Editor } from '@tiptap/react';
 import { useEditorState } from '@tiptap/react';
 import { AlignCenter, AlignLeft, AlignRight, Bold, Code, Highlighter, ImagePlus, Italic, Link2,
   List, ListOrdered, Minus, Quote, Redo2, Strikethrough, Table2, TableColumnsSplit,
   TableRowsSplit, Trash2, Underline as UnderlineIcon, Undo2 } from 'lucide-react';
-import { TooltipButton } from '../../components/common/TooltipButton';
+import { TooltipButton } from '../../components/common/overlays/TooltipButton';
 
 interface Props { editor: Editor; onLink(): void; onImage?(): void; imageActive?: boolean; fileActions?: React.ReactNode }
 

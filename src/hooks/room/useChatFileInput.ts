@@ -7,7 +7,7 @@ import { getCurrentWebview } from '@tauri-apps/api/webview';
 import type { NativeChatFile } from '../../p2p/group_room';
 import { showToast } from '../useToast';
 import { pickBrowserFiles, registerBrowserFile } from '../../platform/web_files';
-import type { ChatOfferFile } from '../../components/room/ChatFileOfferDialog';
+import type { ChatOfferFile } from '../../components/room/chat/ChatFileOfferDialog';
 
 export function useChatFileInput(paneRef: RefObject<HTMLDivElement | null>) {
   const [files, setFiles] = useState<ChatOfferFile[]>([]);

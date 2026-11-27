@@ -26,11 +26,11 @@ import { t } from '../../i18n/index.ts';
 import { useLocale } from '../../hooks/useLocale.ts';
 import { useRoom } from '../../hooks/useRoom.ts';
 import { useDropdownPresence } from '../../hooks/presence/useDropdownPresence.ts';
-import { ProfileAvatar } from '../../components/common/ProfileAvatar.tsx';
-import { Select, type SelectOption } from '../../components/common/Select.tsx';
-import { Tooltip } from '../../components/common/Tooltip.tsx';
-import { TooltipButton } from '../../components/common/TooltipButton.tsx';
-import { ModalDialog } from '../../components/common/ModalDialog.tsx';
+import { ProfileAvatar } from '../../components/common/profile/ProfileAvatar.tsx';
+import { Select, type SelectOption } from '../../components/common/inputs/Select.tsx';
+import { Tooltip } from '../../components/common/overlays/Tooltip.tsx';
+import { TooltipButton } from '../../components/common/overlays/TooltipButton.tsx';
+import { ModalDialog } from '../../components/common/overlays/ModalDialog.tsx';
 import { ContentTransition } from '../../components/common/ContentTransition.tsx';
 import { boardGameSounds } from './board_game_sounds.ts';
 import {

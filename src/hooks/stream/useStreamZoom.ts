@@ -5,7 +5,7 @@ import {
   calculateFocalZoom,
   stepZoom,
   PanOffset,
-} from '../../components/room/zoom_utils';
+} from '../../components/room/stream/zoom_utils';
 
 export interface UseStreamZoomReturn {
   zoom: number;

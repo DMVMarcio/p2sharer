@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useId } from 'react';
-import { useModalDialogBehavior } from '../common/useModalDialogBehavior.ts';
+import { useModalDialogBehavior } from '../common/overlays/useModalDialogBehavior.ts';
 import { useModal } from '../../hooks/useModal.ts';
 import { useLocale } from '../../hooks/useLocale.ts';
 import { t } from '../../i18n/index.ts';

@@ -62,7 +62,7 @@ globalThis.previewUi = {
 };
 const bundle = await build({
   stdin: {
-    contents: "export { JoinRoomModal } from './src/components/modals/JoinRoomModal.tsx';",
+    contents: "export { JoinRoomModal } from './src/components/modals/room/JoinRoomModal.tsx';",
     resolveDir: process.cwd(),
   },
   bundle: true,

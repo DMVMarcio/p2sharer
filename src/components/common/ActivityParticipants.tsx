@@ -1,9 +1,9 @@
-import { ProfileAvatar } from './ProfileAvatar';
+import { ProfileAvatar } from './profile/ProfileAvatar';
 import { roomService } from '../../services/room_service';
 import { t } from '../../i18n';
 import { useLocale } from '../../hooks/useLocale';
 import React from 'react';
-import { Tooltip } from './Tooltip';
+import { Tooltip } from './overlays/Tooltip';
 
 export interface ActivityParticipant {
   id: string;

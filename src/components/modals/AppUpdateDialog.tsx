@@ -1,7 +1,7 @@
 import { localizeText, t } from '../../i18n';
 import { useLocale } from '../../hooks/useLocale';
 import { Download } from 'lucide-react';
-import { ModalDialog } from '../common/ModalDialog';
+import { ModalDialog } from '../common/overlays/ModalDialog';
 import { AppVersion } from '../common/AppVersion';
 import { useAppUpdates } from '../../hooks/useAppUpdates';
 import { appUpdates } from '../../services/app_updates';

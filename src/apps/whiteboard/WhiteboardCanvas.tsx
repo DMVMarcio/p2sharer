@@ -4,9 +4,9 @@ import {
   ImagePlus, ZoomIn, ZoomOut, Maximize2, FlipHorizontal, Grid, Trash2, CheckSquare,
   Maximize, Minimize, SlidersHorizontal,
 } from 'lucide-react';
-import { useContextMenu } from '../../components/common/ContextMenu';
-import { TooltipButton } from '../../components/common/TooltipButton';
-import { StreamPointerGlyph, type StreamPointerShape } from '../../components/room/StreamPointerGlyph';
+import { useContextMenu } from '../../components/common/overlays/ContextMenu';
+import { TooltipButton } from '../../components/common/overlays/TooltipButton';
+import { StreamPointerGlyph, type StreamPointerShape } from '../../components/room/stream/StreamPointerGlyph';
 import { WhiteboardLayerArt } from './WhiteboardLayerArt';
 import {
   BOARD_MAX_POINTS, DEFAULT_BOARD_LAYER, boardBrushWidth, boardLayerBounds, hitBoardLayer,

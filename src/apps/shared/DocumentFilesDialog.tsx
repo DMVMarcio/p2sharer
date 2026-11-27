@@ -1,9 +1,9 @@
 import { useEffect, useId, useRef, useState } from 'react';
 import { invoke } from '../../platform/commands.ts';
 import { FileText, Pencil, Trash2 } from 'lucide-react';
-import { ModalDialog } from '../../components/common/ModalDialog';
-import { TooltipButton } from '../../components/common/TooltipButton';
-import { Select } from '../../components/common/Select';
+import { ModalDialog } from '../../components/common/overlays/ModalDialog';
+import { TooltipButton } from '../../components/common/overlays/TooltipButton';
+import { Select } from '../../components/common/inputs/Select';
 import { getLanguage, localizeError, t } from '../../i18n';
 import { useLocale } from '../../hooks/useLocale';
 

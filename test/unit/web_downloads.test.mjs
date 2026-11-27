@@ -19,7 +19,7 @@ const catalog = { version: '1.4.4', platforms: [{ id: 'windows', artifacts: [
 const previousFetch = globalThis.fetch;
 let failed = false;
 globalThis.fetch = async () => new Response(failed ? '{}' : JSON.stringify(catalog), { status: failed ? 503 : 200 });
-const bundle = await build({ stdin: { contents: "export { DownloadPanel } from './src/components/common/DownloadPanel.tsx'; export { DownloadButton } from './src/components/common/DownloadButton.tsx';", resolveDir: process.cwd(), loader: 'tsx' }, bundle: true, write: false, format: 'esm', platform: 'node', jsx: 'automatic', plugins: [{ name: 'download-boundaries', setup(builder) {
+const bundle = await build({ stdin: { contents: "export { DownloadPanel } from './src/components/common/downloads/DownloadPanel.tsx'; export { DownloadButton } from './src/components/common/downloads/DownloadButton.tsx';", resolveDir: process.cwd(), loader: 'tsx' }, bundle: true, write: false, format: 'esm', platform: 'node', jsx: 'automatic', plugins: [{ name: 'download-boundaries', setup(builder) {
   builder.onResolve({ filter: /(?:^|\/)i18n$|\/useLocale$/ }, args => ({ path: args.path, namespace: 'fixture' }));
   builder.onLoad({ filter: /.*/, namespace: 'fixture' }, ({ path }) => ({ contents: path.endsWith('useLocale') ? 'export const useLocale = () => "en";' : 'export const t = key => key;' }));
   builder.onResolve({ filter: /^[^./]/ }, args => ({ path: import.meta.resolve(args.path), external: true }));

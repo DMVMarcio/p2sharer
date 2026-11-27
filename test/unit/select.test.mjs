@@ -15,7 +15,7 @@ globalThis.IS_REACT_ACT_ENVIRONMENT = true;
 window.matchMedia = () => ({ matches: false });
 HTMLElement.prototype.scrollIntoView = () => {};
 const require = createRequire(import.meta.url);
-const bundle = await build({ stdin: { contents: "export * from './src/components/common/Select.tsx'; export * from './src/components/common/ModalDialog.tsx';", resolveDir: process.cwd() },
+const bundle = await build({ stdin: { contents: "export * from './src/components/common/inputs/Select.tsx'; export * from './src/components/common/overlays/ModalDialog.tsx';", resolveDir: process.cwd() },
   bundle: true, write: false, format: 'esm', platform: 'node', jsx: 'automatic', plugins: [{ name: 'packages', setup(builder) {
     builder.onResolve({ filter: /^[^./]/ }, (args) => ({ path: pathToFileURL(require.resolve(args.path)).href, external: true }));
   } }] });

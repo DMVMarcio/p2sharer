@@ -2,8 +2,8 @@ import { t } from '../../i18n';
 import { useLocale } from '../../hooks/useLocale';
 import React from 'react';
 import { Captions, CaptionsOff, Maximize, Minimize, Pause, PictureInPicture2, Play, SkipBack, SkipForward, Volume2, VolumeX } from 'lucide-react';
-import { MediaSeekBar } from '../../components/common/MediaSeekBar';
-import { TooltipButton } from '../../components/common/TooltipButton';
+import { MediaSeekBar } from '../../components/common/media/MediaSeekBar';
+import { TooltipButton } from '../../components/common/overlays/TooltipButton';
 import { formatMediaTime } from '../../core/media/media_time';
 
 interface Props {

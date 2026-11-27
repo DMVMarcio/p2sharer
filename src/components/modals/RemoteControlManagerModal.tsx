@@ -17,11 +17,11 @@ import { useRoom } from '../../hooks/useRoom';
 import { useSortableGrid } from '../../hooks/ui/useSortableGrid';
 import { roomService } from '../../services/room_service';
 import { t } from '../../i18n';
-import { ModalDialog } from '../common/ModalDialog';
-import { Nickname } from '../common/Nickname';
-import { ProfileAvatar } from '../common/ProfileAvatar';
+import { ModalDialog } from '../common/overlays/ModalDialog';
+import { Nickname } from '../common/profile/Nickname';
+import { ProfileAvatar } from '../common/profile/ProfileAvatar';
 import { RemoteControlPermissionBadges } from '../common/RemoteControlPermissionBadges';
-import { Tooltip } from '../common/Tooltip';
+import { Tooltip } from '../common/overlays/Tooltip';
 import { VigemDriverBanner } from '../common/VigemDriverBanner';
 
 export const RemoteControlManagerModal: React.FC = () => {

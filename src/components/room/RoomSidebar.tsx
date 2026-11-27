@@ -4,10 +4,10 @@ import { useLocale } from '../../hooks/useLocale';
 import React from 'react';
 import { X } from 'lucide-react';
 import { stateStore } from '../../core/state_store';
-import { UnreadChatBadge } from './UnreadChatBadge';
+import { UnreadChatBadge } from './chat/UnreadChatBadge';
 import { useRoom } from '../../hooks/useRoom';
 import { useIsMobile } from '../../hooks/ui/useIsMobile';
-import { ChatPane } from './ChatPane';
+import { ChatPane } from './chat/ChatPane';
 import { ParticipantsPane } from './ParticipantsPane';
 
 export const RoomSidebar: React.FC = () => {

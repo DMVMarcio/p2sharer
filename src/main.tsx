@@ -1,15 +1,15 @@
 import { initializeAppRuntime } from './core/app_runtime';
-import { StreamPointerOverlay } from './components/room/StreamPointerOverlay';
+import { StreamPointerOverlay } from './components/room/stream/StreamPointerOverlay';
 import React from 'react';
 import { reactErrorHandlers } from './core/logger';
 import ReactDOM from 'react-dom/client';
 import App from './App';
-import { AppContextMenu } from './components/common/AppContextMenu';
+import { AppContextMenu } from './components/common/overlays/AppContextMenu';
 import '@fontsource-variable/plus-jakarta-sans/wght.css';
 import '@fontsource-variable/jetbrains-mono/wght.css';
 import './core/profile/nickname_fonts';
 import './style.css';
-import './components/room/stream_pointer.css';
+import './components/room/stream/stream_pointer.css';
 import './apps/apps.css';
 import { initializeLanguage } from './i18n';
 

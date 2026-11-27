@@ -19,10 +19,10 @@ import { createYouTubePlayer, loadYouTubePlayerApi, reconcileYouTubePlayer, setY
 import { advanceYouTubeQueue, canAdvanceYouTubeQueue, moveYouTubeQueueEntry, importYouTubeQueue, appendYouTubeQueue } from './youtube_queue';
 import { YouTubeSavedQueuesDialog } from './YouTubeSavedQueuesDialog';
 import { YouTubeControls } from './YouTubeControls';
-import { Tooltip } from '../../components/common/Tooltip';
-import { TooltipButton } from '../../components/common/TooltipButton';
+import { Tooltip } from '../../components/common/overlays/Tooltip';
+import { TooltipButton } from '../../components/common/overlays/TooltipButton';
 import { ActivityAvatar, type ActivityParticipant } from '../../components/common/ActivityParticipants';
-import { ActivityToast } from '../../components/common/ActivityToast';
+import { ActivityToast } from '../../components/common/feedback/ActivityToast';
 import { useRoom } from '../../hooks/useRoom';
 import { describeYouTubeActivity, describeAutomaticYouTubeActivity } from './youtube_activity';
 import { validYouTubePipCommand, validYouTubePipSettings, youtubePipEvent, youtubePipPeerId,

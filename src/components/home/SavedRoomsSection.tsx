@@ -10,12 +10,12 @@ import { showToast } from '../../hooks/useToast';
 import { homeRoomPresence } from '../../services/home_room_presence';
 import { roomService } from '../../services/room_service';
 import { ActivityParticipants } from '../common/ActivityParticipants';
-import { useContextMenu } from '../common/ContextMenu';
-import { EditSavedRoomDialog } from '../modals/EditSavedRoomDialog';
+import { useContextMenu } from '../common/overlays/ContextMenu';
+import { EditSavedRoomDialog } from '../modals/room/EditSavedRoomDialog';
 import { orderSavedRooms } from '../../core/room/saved_room_order';
 import { useSortableGrid } from '../../hooks/ui/useSortableGrid';
-import { ModalDialog } from '../common/ModalDialog';
-import { TooltipButton } from '../common/TooltipButton';
+import { ModalDialog } from '../common/overlays/ModalDialog';
+import { TooltipButton } from '../common/overlays/TooltipButton';
 
 export const SavedRoomsSection: React.FC = () => {
   useLocale();

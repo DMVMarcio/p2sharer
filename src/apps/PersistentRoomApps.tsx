@@ -3,7 +3,7 @@ import { useLocale } from '../hooks/useLocale';
 import React, { useCallback, useMemo } from 'react';
 import type { RoomAppInstance } from './types';
 import { RoomAppCard } from './RoomAppCard';
-import { usePersistentSlotPlacements } from '../components/room/usePersistentSlotPlacements';
+import { usePersistentSlotPlacements } from '../components/room/video/usePersistentSlotPlacements';
 
 interface Props {
   instances: RoomAppInstance[];

@@ -5,9 +5,9 @@ import {
   Wand2, Blend, Sparkles, Droplets, Highlighter, Grid3x3, Flame, FlipHorizontal,
   Trash2, CheckSquare, SquareDashedMousePointer, ChevronDown,
 } from 'lucide-react';
-import { TooltipButton } from '../../components/common/TooltipButton';
-import { useContextMenu } from '../../components/common/ContextMenu';
-import { IntegerSlider } from '../../components/common/IntegerSlider';
+import { TooltipButton } from '../../components/common/overlays/TooltipButton';
+import { useContextMenu } from '../../components/common/overlays/ContextMenu';
+import { IntegerSlider } from '../../components/common/inputs/IntegerSlider';
 import { t } from '../../i18n';
 import type { BoardBrushType, BoardSymmetryMode, BoardTool } from './whiteboard_scene';
 import { drawBrushPreviewCanvas } from './whiteboard_brushes';

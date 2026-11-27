@@ -5,7 +5,7 @@ import { MessageSquare, Users, AppWindow, Monitor, Square, Settings2, Mic, MicOf
 import { stateStore } from '../../core/state_store';
 import { useRoom } from '../../hooks/useRoom';
 import { useModal } from '../../hooks/useModal';
-import { UnreadChatBadge } from './UnreadChatBadge';
+import { UnreadChatBadge } from './chat/UnreadChatBadge';
 import { roomService } from '../../services/room_service';
 
 export const MobileRoomDock: React.FC = () => {

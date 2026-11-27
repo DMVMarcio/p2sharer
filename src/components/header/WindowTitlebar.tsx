@@ -4,7 +4,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { invoke, isTauri } from '@tauri-apps/api/core';
 import { getCurrentWindow } from '@tauri-apps/api/window';
 import { Minus, Square, Copy, X } from 'lucide-react';
-import { Tooltip } from '../common/Tooltip';
+import { Tooltip } from '../common/overlays/Tooltip';
 import logoImg from '../../assets/logo.png';
 import { AppUpdateButton } from './AppUpdateButton';
 import { useStore } from '../../hooks/useStore';

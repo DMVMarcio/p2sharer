@@ -1,6 +1,6 @@
 import { describe, it, beforeEach, after } from 'node:test';
 import assert from 'node:assert/strict';
-import { getScreenSkeletonCount, getSkeletonCountForTab } from '../../src/components/modals/screen_picker_utils.ts';
+import { getScreenSkeletonCount, getSkeletonCountForTab } from '../../src/components/modals/capture/screen_picker_utils.ts';
 
 const previousStorage = Object.getOwnPropertyDescriptor(globalThis, 'localStorage');
 const values = new Map<string, string>();

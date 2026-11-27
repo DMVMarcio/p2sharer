@@ -33,9 +33,9 @@ const mocks = {
   toast: 'export const showToast = () => {};',
 };
 const require = createRequire(import.meta.url);
-const bundle = await build({ stdin: { contents: `export { ChatFileOfferDialog } from './src/components/room/ChatFileOfferDialog.tsx';
-export { ChatFileAttachment } from './src/components/room/ChatFileAttachment.tsx';
-export { ChatTransferCenter } from './src/components/room/ChatTransferCenter.tsx';
+const bundle = await build({ stdin: { contents: `export { ChatFileOfferDialog } from './src/components/room/chat/ChatFileOfferDialog.tsx';
+export { ChatFileAttachment } from './src/components/room/chat/ChatFileAttachment.tsx';
+export { ChatTransferCenter } from './src/components/room/chat/ChatTransferCenter.tsx';
 export { SavedRoomsSection } from './src/components/home/SavedRoomsSection.tsx';`, resolveDir: process.cwd() },
   bundle: true, write: false, format: 'esm', platform: 'node', jsx: 'automatic', plugins: [{ name: 'fixture', setup(builder) {
     builder.onResolve({ filter: /\/(saved_rooms|useRoom|room_service|ContextMenu|EditSavedRoomDialog|useSortableGrid|useToast)$/ }, args => ({

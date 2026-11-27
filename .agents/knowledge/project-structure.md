@@ -7,9 +7,9 @@ Verified reference for **where files live and how they are composed** in P2Share
 ## 1. Folder Map & Logic
 | Path | Purpose / what belongs here | Organization |
 | :--- | :--- | :--- |
-| `src/components/common/` | Canonical, reusable UI controls (`Select`, `ModalDialog`, `Tooltip`, `ContextMenu`, emoji, toasts…) shared by 2+ surfaces. See the control catalog in `knowledge/frontend-ui-state.md`. | Flat, one component per PascalCase file |
-| `src/components/room/` | Room surface: video cards/slots, chat, participants, stream overlays (pointer, drawing, zoom), voice and remote-control UI. Room-only hooks and helpers may live here (`usePersistentSlotPlacements.ts`, `zoom_utils.ts`, `stream_*.css`). | Flat by surface |
-| `src/components/modals/`, `header/`, `home/` | Modal dialogs and settings panes; window header; home screen. | Flat by surface |
+| `src/components/common/` | Canonical, reusable UI controls shared by 2+ surfaces (see the control catalog in `knowledge/frontend-ui-state.md`), grouped by family: `inputs/` (`Select`, choice cards, color pickers, sliders), `overlays/` (context menus, tooltips, modal/fullscreen dialogs, text-editing actions), `feedback/` (toasts, status notices), `emoji/`, `code/` (code blocks and editing), `media/` (previews, seek bar, volume, loading overlay), `profile/` (avatars, nicknames, profile image/banner editors), `downloads/`, and `diagnostics/`. Small standalone pieces stay at the root. | By control family |
+| `src/components/room/` | Room surface. The root holds the room shell (`RoomView`, `RoomSidebar`, `MobileRoomDock`, participants); areas live in `chat/` (chat pane, file transfer UI, filters, notices), `video/` (video cards/slots, layout context, PiP view), `stream/` (stream overlays, pointer, drawing, zoom, stats, watchers), `remote_control/`, and `voice/`. Area-only hooks, helpers, and CSS sit next to their components. | By room area |
+| `src/components/modals/`, `header/`, `home/` | Modal dialogs (with `settings/` for the settings modal and its panes, `room/` for create/join/edit/security/invite dialogs, and `capture/` for screen and browser capture pickers); window header; home screen. | By surface |
 | `src/apps/` | Room app framework at the root: `registry.ts` (registers apps), `room_apps_service.ts`, `models.ts` (shared `RoomAppModel` contract and update encoding; each app's model lives in its folder, e.g. `notepad/notepad_model.ts`), `types.ts`, the app window/card/slot components, and `apps.css`. | Framework files flat at the root |
 | `src/apps/<app>/` | One folder per app: `whiteboard/`, `notepad/`, `browser/`, `youtube/`, `twitch/`, `tunnels/`. Each holds the app's view (`<Name>App.tsx`), its private components and hooks, engines/models/renderers (`<app>_*.ts`), and its CSS. | By app |
 | `src/apps/games/` | Shared board-game infrastructure (lobby, planning overlay, `board_game_*`, timers, sounds, `games.css`) with one subfolder per game: `chess/`, `checkers/`, `tictactoe/` (`<Name>App.tsx` + engine). | By game |
@@ -42,7 +42,7 @@ Verified reference for **where files live and how they are composed** in P2Share
 7. Event handlers
 8. Early returns, then JSX
 
-Reference files: `src/components/room/WatchersTooltipContent.tsx`, `src/components/common/Select.tsx`.
+Reference files: `src/components/room/stream/WatchersTooltipContent.tsx`, `src/components/common/inputs/Select.tsx`.
 
 ### Hook — `src/hooks/**/use*.ts`, surface-local `use*.ts`
 1. Imports
@@ -75,7 +75,7 @@ Fixtures and setup → one observable behavior per test (arrange → act → ass
 ## 3. Naming & Colocation
 - **File names**: React components and app views `PascalCase.tsx`; hooks `useCamelCase.ts`; everything else `snake_case.ts` / `snake_case.rs` / `snake_case.css`.
 - **Exports**: named exports; no barrel files.
-- **Colocation**: surface-specific hooks, helpers, and CSS sit next to their surface (e.g., `src/components/room/usePersistentSlotPlacements.ts`, `src/apps/whiteboard/useWhiteboardViewport.ts`). Move them to `src/hooks/` or `src/core/` only once a second surface needs them.
+- **Colocation**: surface-specific hooks, helpers, and CSS sit next to their surface (e.g., `src/components/room/video/usePersistentSlotPlacements.ts`, `src/apps/whiteboard/useWhiteboardViewport.ts`). Move them to `src/hooks/` or `src/core/` only once a second surface needs them.
 - **Page-specific components & hooks**: P2Sharer has no route pages; its "pages" are surfaces (home, room, settings modals) and room apps. A surface or app's private components and hooks stay in that surface's or app's folder; promote them to `src/components/common/` or `src/hooks/` only when a second surface uses them.
 - **Room apps**: an app's view, hooks, engine/model, renderers, and CSS live in `src/apps/<app>/` and keep the app's name prefix. A new app gets its own folder with the same layout and is registered in `src/apps/registry.ts`. Code needed by a second app moves to `src/apps/shared/`.
 
@@ -104,6 +104,5 @@ Budgets are higher than the generic defaults because many existing files are lar
 
 ## 6. Known Structure Debt
 Observed, not yet fixed. Restructure gradually: small in-scope moves happen inside a task; larger moves are proposed to the user and committed separately as `refactor(structure)` with `git mv`.
-- `src/components/common/` (62) and `src/components/room/` (51) are past the folder threshold; chat (`Chat*`), stream overlays (`Stream*`), and remote control (`RemoteControl*`) are candidate subfolders of `room/`.
-- Oversized files: `src/style.css` (~12,000 lines after its first Prettier format), `src/p2p/group_room.ts` (~5,700), `src/services/room_service.ts` (~2,500), `src/apps/whiteboard/whiteboard_canvas2d.ts` (~2,200), `src/apps/whiteboard/WhiteboardCanvas.tsx` (~1,800), `src/hooks/stream/useRemoteControl.ts` (~1,500), `src/components/modals/SettingsModal.tsx` (~1,300).
+- Oversized files: `src/style.css` (~12,000 lines after its first Prettier format), `src/p2p/group_room.ts` (~5,700), `src/services/room_service.ts` (~2,500), `src/apps/whiteboard/whiteboard_canvas2d.ts` (~2,200), `src/apps/whiteboard/WhiteboardCanvas.tsx` (~1,800), `src/hooks/stream/useRemoteControl.ts` (~1,500), `src/components/modals/settings/SettingsModal.tsx` (~1,300).
 - `src-tauri/src/` is flat with ~70 modules; `video_*`, `browser_*`, and `virtual_network*` are candidates for module directories.

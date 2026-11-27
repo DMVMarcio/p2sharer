@@ -2,7 +2,7 @@ import React from 'react';
 import { Gamepad2, Keyboard, Mouse, Shield } from 'lucide-react';
 import type { ControllerInputActivity } from '../../core/stream/remote_control_activity';
 import { t } from '../../i18n';
-import { Tooltip } from './Tooltip';
+import { Tooltip } from './overlays/Tooltip';
 
 export type RemoteControlPermissionKey = 'mouseEnabled' | 'keyboardEnabled' | 'gamepadEnabled';
 

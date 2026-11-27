@@ -3,7 +3,7 @@ import { t } from '../../i18n';
 import { useLocale } from '../../hooks/useLocale';
 import { useAppUpdates } from '../../hooks/useAppUpdates';
 import { appUpdates } from '../../services/app_updates';
-import { Tooltip } from '../common/Tooltip';
+import { Tooltip } from '../common/overlays/Tooltip';
 
 export function AppUpdateButton() {
   useLocale();

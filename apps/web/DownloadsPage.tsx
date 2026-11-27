@@ -1,5 +1,5 @@
 import { WebsiteLink } from '../../src/components/common/WebsiteLink';
-import { DownloadPanel } from '../../src/components/common/DownloadPanel';
+import { DownloadPanel } from '../../src/components/common/downloads/DownloadPanel';
 import { ArrowUpRight } from 'lucide-react';
 import { useLocale } from '../../src/hooks/useLocale';
 import { t } from '../../src/i18n';

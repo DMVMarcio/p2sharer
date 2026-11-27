@@ -40,8 +40,8 @@ import {
   type TwitchPlayerInstance,
 } from './twitch_player';
 import { describeTwitchActivity } from './twitch_activity';
-import { TooltipButton } from '../../components/common/TooltipButton';
-import { ActivityToast } from '../../components/common/ActivityToast';
+import { TooltipButton } from '../../components/common/overlays/TooltipButton';
+import { ActivityToast } from '../../components/common/feedback/ActivityToast';
 import { useRoom } from '../../hooks/useRoom';
 import { type ActivityParticipant } from '../../components/common/ActivityParticipants';
 

@@ -9,7 +9,7 @@ import React, { act } from 'react';
 test('shared dialogs trap focus, protect busy work and drafts, and dismiss child menus before their parent', async () => {
   const require = createRequire(import.meta.url);
   const bundle = await build({
-    stdin: { contents: "export { useModalDialogBehavior } from './src/components/common/useModalDialogBehavior';",
+    stdin: { contents: "export { useModalDialogBehavior } from './src/components/common/overlays/useModalDialogBehavior';",
       resolveDir: fileURLToPath(new URL('../../', import.meta.url)) },
     bundle: true, write: false, format: 'esm', platform: 'node',
     plugins: [{ name: 'shared-react', setup(builder) {
@@ -87,7 +87,7 @@ test('shared dialogs trap focus, protect busy work and drafts, and dismiss child
 test('a successful footer close requested during busy work waits for idle and completes once', async context => {
   const require = createRequire(import.meta.url);
   const bundle = await build({
-    stdin: { contents: "export { ModalDialog } from './src/components/common/ModalDialog';",
+    stdin: { contents: "export { ModalDialog } from './src/components/common/overlays/ModalDialog';",
       resolveDir: fileURLToPath(new URL('../../', import.meta.url)) },
     bundle: true, write: false, format: 'esm', platform: 'node', jsx: 'automatic',
     plugins: [{ name: 'fixtures', setup(builder) {

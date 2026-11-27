@@ -11,7 +11,7 @@ for (const key of ['window', 'document', 'HTMLElement', 'FileReader', 'Blob', 'R
 const bundle = await build({
   stdin: {
     contents: `
-      export { getChatMessageActions } from './src/components/room/chat_message_actions.tsx';
+      export { getChatMessageActions } from './src/components/room/chat/chat_message_actions.tsx';
       export { imageSrcToBase64, copyImageToClipboard } from './src/core/ui/image_clipboard.ts';
     `,
     resolveDir: process.cwd(),

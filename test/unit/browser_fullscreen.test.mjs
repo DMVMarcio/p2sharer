@@ -52,7 +52,7 @@ test('fullscreen remains operable under StrictMode and uses the canonical dialog
   const require = createRequire(import.meta.url);
   const bundle = await build({ stdin: { contents: `
     export { useNativeFullscreen } from './src/hooks/media/useNativeFullscreen';
-    export { FullscreenDialog } from './src/components/common/FullscreenDialog';`, resolveDir: process.cwd() },
+    export { FullscreenDialog } from './src/components/common/overlays/FullscreenDialog';`, resolveDir: process.cwd() },
     bundle: true, write: false, format: 'esm', platform: 'node', jsx: 'automatic',
     plugins: [{ name: 'native-fullscreen-fixture', setup(builder) {
       builder.onResolve({filter:/^@tauri-apps\/api\/(core|window)$/}, args => ({path:args.path, namespace:'fixture'}));

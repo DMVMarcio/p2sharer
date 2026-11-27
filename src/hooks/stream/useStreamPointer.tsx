@@ -3,8 +3,8 @@ import { emitTo, listen } from '@tauri-apps/api/event';
 import { STREAM_DRAWING_MAX_POINTS, streamPointerPosition, validStreamPointerState, type StreamDrawing, type StreamPointerState, type StreamPointerPacket } from '../../core/stream/stream_pointer';
 import { roomService } from '../../services/room_service';
 import { streamPointerView, type StreamPointerScene } from '../../services/stream_pointer_view';
-import { StreamDrawingToolbar, type DrawingSettings } from '../../components/room/StreamDrawingToolbar';
-import { StreamPointerVideoLayer } from '../../components/room/StreamPointerVideoLayer';
+import { StreamDrawingToolbar, type DrawingSettings } from '../../components/room/stream/StreamDrawingToolbar';
+import { StreamPointerVideoLayer } from '../../components/room/stream/StreamPointerVideoLayer';
 
 let activePointerSurface: HTMLElement | null = null;
 

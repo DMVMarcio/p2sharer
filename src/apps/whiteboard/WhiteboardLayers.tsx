@@ -5,9 +5,9 @@ import {
   Copy, Merge, Eraser, CornerDownRight, Grid2x2Check, FlipHorizontal2, FlipVertical2,
 } from 'lucide-react';
 import { CollapsibleRegion } from '../../components/common/CollapsibleRegion';
-import { IntegerSlider } from '../../components/common/IntegerSlider';
-import { Select } from '../../components/common/Select';
-import { TooltipButton } from '../../components/common/TooltipButton';
+import { IntegerSlider } from '../../components/common/inputs/IntegerSlider';
+import { Select } from '../../components/common/inputs/Select';
+import { TooltipButton } from '../../components/common/overlays/TooltipButton';
 import { useSortableGrid } from '../../hooks/ui/useSortableGrid';
 import { t } from '../../i18n';
 import { BOARD_BLEND_MODES, type BoardBlendMode, type BoardLayer, type BoardShape } from './whiteboard_scene';

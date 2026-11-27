@@ -133,7 +133,7 @@ test('ContextMenu slider updates live 0-200% value without dismissing and suppor
 
   const require = createRequire(import.meta.url);
   const bundle = await build({
-    stdin: { contents: "export * from './src/components/common/ContextMenu.tsx';", resolveDir: process.cwd() },
+    stdin: { contents: "export * from './src/components/common/overlays/ContextMenu.tsx';", resolveDir: process.cwd() },
     bundle: true,
     write: false,
     format: 'esm',
@@ -349,7 +349,7 @@ test('VoiceControlsBar opens input and output VoiceQuickPopover cleanly without 
 
   const require = createRequire(import.meta.url);
   const bundle = await build({
-    stdin: { contents: "export { VoiceControlsBar } from './src/components/room/VoiceControlsBar.tsx';", resolveDir: process.cwd() },
+    stdin: { contents: "export { VoiceControlsBar } from './src/components/room/voice/VoiceControlsBar.tsx';", resolveDir: process.cwd() },
     bundle: true,
     write: false,
     format: 'esm',
@@ -535,7 +535,7 @@ test('voice shortcuts default to unassigned, bind in Shortcuts & Keyboard settin
     stdin: {
       contents: `
         export * from './src/services/voice_shortcuts.ts';
-        export { KeybindingsSettingsPane } from './src/components/modals/KeybindingsSettingsPane.tsx';
+        export { KeybindingsSettingsPane } from './src/components/modals/settings/KeybindingsSettingsPane.tsx';
         export * from './src/core/ui/input_bindings.ts';
       `,
       resolveDir: process.cwd(),

@@ -27,7 +27,7 @@ globalThis.lanUiSave = record => records.push(record);
 globalThis.lanUiJoin = (...args) => joined.push(args);
 
 const bundle = await build({
-  stdin: { contents: `export { CreateRoomModal } from './src/components/modals/CreateRoomModal.tsx';`, resolveDir: process.cwd() },
+  stdin: { contents: `export { CreateRoomModal } from './src/components/modals/room/CreateRoomModal.tsx';`, resolveDir: process.cwd() },
   bundle: true, write: false, format: 'esm', platform: 'node', jsx: 'automatic',
   plugins: [{ name: 'lan-ui-fixture', setup(builder) {
     builder.onResolve({ filter: /useModal$|useRoom|useToast|saved_rooms|@tauri-apps\/api\/core/ }, args => ({ path: args.path, namespace: 'lan-fixture' }));

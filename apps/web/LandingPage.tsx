@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, type CSSProperties } from 'react';
 import { Outlet, useLocation } from 'react-router';
 import { WebsiteLink } from '../../src/components/common/WebsiteLink';
-import { DownloadButton } from '../../src/components/common/DownloadButton';
+import { DownloadButton } from '../../src/components/common/downloads/DownloadButton';
 import { SiteFooter } from './SiteFooter';
 import {
   ArrowUpRight,
@@ -22,7 +22,7 @@ import { useAppTheme } from '../../src/hooks/useAppTheme';
 import { useLocale } from '../../src/hooks/useLocale';
 import { t, getLanguage, setLanguage } from '../../src/i18n';
 import { LANGUAGE_OPTIONS } from '../../src/i18n/language';
-import { Select } from '../../src/components/common/Select';
+import { Select } from '../../src/components/common/inputs/Select';
 import logo from '../../src/assets/logo.png';
 import { HeroRoomPreview } from './landing/HeroRoomPreview';
 import { FilesDemo, MeetingsDemo, PlayCreateDemo, RemoteDemo, Showcase, StreamDemo, WatchDemo, type Tone } from './landing/Showcase';

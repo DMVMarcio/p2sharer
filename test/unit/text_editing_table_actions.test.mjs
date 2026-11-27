@@ -12,7 +12,7 @@ test('text editing actions provide table submenus and row/column mutations when 
   const result = await build({
     stdin: {
       contents: `
-        export { getTextEditingActions } from './src/components/common/text_editing_actions.tsx';
+        export { getTextEditingActions } from './src/components/common/overlays/text_editing_actions.tsx';
       `,
       resolveDir: process.cwd(),
       sourcefile: 'text_editing_table_entry.tsx',

@@ -2,10 +2,10 @@
    P2Sharer shared interface tokens and surfaces
    ========================================================================== */
 
-@import './components/common/MediaVolumeControl.css';
-@import './components/common/ChoiceCards.css';
-@import './components/common/Downloads.css';
-@import './components/common/CodeBlock.css';
+@import './components/common/media/MediaVolumeControl.css';
+@import './components/common/inputs/ChoiceCards.css';
+@import './components/common/downloads/Downloads.css';
+@import './components/common/code/CodeBlock.css';
 
 :root {
   /* Fonts */

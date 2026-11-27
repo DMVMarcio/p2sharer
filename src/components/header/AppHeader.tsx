@@ -1,6 +1,6 @@
-import { DownloadButton } from '../common/DownloadButton';
-import { Nickname } from '../common/Nickname';
-import { ProfileAvatar } from '../common/ProfileAvatar';
+import { DownloadButton } from '../common/downloads/DownloadButton';
+import { Nickname } from '../common/profile/Nickname';
+import { ProfileAvatar } from '../common/profile/ProfileAvatar';
 import { t } from '../../i18n';
 import { useLocale } from '../../hooks/useLocale';
 import React, { useEffect, useState } from 'react';
@@ -17,9 +17,9 @@ import { parseRoomInvite } from '../../core/room/room_invite';
 import { roomInviteLink } from '../../core/room/room_deep_links';
 import { savedRooms, type SavedRoom } from '../../core/room/saved_rooms';
 import { AppUpdateButton } from './AppUpdateButton';
-import { useContextMenu } from '../common/ContextMenu';
-import { profileAction } from '../common/profile_actions';
-import { TooltipButton } from '../common/TooltipButton';
+import { useContextMenu } from '../common/overlays/ContextMenu';
+import { profileAction } from '../common/profile/profile_actions';
+import { TooltipButton } from '../common/overlays/TooltipButton';
 import { useClipboardFeedback } from '../../hooks/ui/useClipboardFeedback';
 
 export const AppHeader: React.FC<{ showUpdate?: boolean; homeScrolled?: boolean; onLeaveRoom: () => void }> = ({ showUpdate = true, homeScrolled = false, onLeaveRoom }) => {

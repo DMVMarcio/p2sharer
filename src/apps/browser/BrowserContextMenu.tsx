@@ -1,5 +1,5 @@
 import { useEffect, type RefObject } from 'react';
-import { useContextMenu, type ContextMenuAction } from '../../components/common/ContextMenu';
+import { useContextMenu, type ContextMenuAction } from '../../components/common/overlays/ContextMenu';
 import { t } from '../../i18n';
 import type { BrowserModel } from './browser_model';
 import { BROWSER_WIDTH, BROWSER_HEIGHT } from './browser_protocol';

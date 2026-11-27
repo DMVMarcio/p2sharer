@@ -1,11 +1,11 @@
 import React from 'react';
 import ReactMarkdown from 'react-markdown';
-import { HighlightedCodeBlock } from './HighlightedCodeBlock';
+import { HighlightedCodeBlock } from './code/HighlightedCodeBlock';
 import remarkGfm from 'remark-gfm';
 import { safeChatUrl } from '../../core/chat/chat_links';
 import { EmojiPack } from '../../core/emoji/emoji_preferences';
 import { modalManager } from '../../hooks/useModal';
-import { EmojiText } from './EmojiText';
+import { EmojiText } from './emoji/EmojiText';
 import { getEmojiIndex } from '../../core/emoji/emoji_catalog';
 import { stateStore } from '../../core/state_store';
 import { roomService } from '../../services/room_service';

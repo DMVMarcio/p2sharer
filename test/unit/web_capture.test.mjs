@@ -23,7 +23,7 @@ const media = { getUserMedia(options) { fixture.cameraRequests.push(options); re
   return fixture.failPicker ? Promise.reject(new DOMException('Permission denied', 'NotAllowedError')) : Promise.resolve(stream);
 } };
 Object.defineProperty(navigator, 'mediaDevices', { configurable: true, value: media });
-const bundle = await build({ stdin: { contents: "export { BrowserCaptureModal } from './src/components/modals/BrowserCaptureModal.tsx';", resolveDir: process.cwd() },
+const bundle = await build({ stdin: { contents: "export { BrowserCaptureModal } from './src/components/modals/capture/BrowserCaptureModal.tsx';", resolveDir: process.cwd() },
   bundle: true, write: false, format: 'esm', platform: 'node', jsx: 'automatic', plugins: [{ name: 'web-capture-boundaries', setup(builder) {
     builder.onResolve({ filter: /room_service$|state_store$|useModal$|camera_devices$|i18n$|useLocale$/ }, args => ({ path: args.path.split('/').at(-1), namespace: 'fixture' }));
     builder.onLoad({ filter: /.*/, namespace: 'fixture' }, ({ path }) => ({ contents: {

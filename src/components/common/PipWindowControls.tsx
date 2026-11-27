@@ -4,7 +4,7 @@ import { getCurrentWindow } from '@tauri-apps/api/window';
 import { Copy, Minus, Square } from 'lucide-react';
 import { t } from '../../i18n';
 import { useLocale } from '../../hooks/useLocale';
-import { Tooltip } from './Tooltip';
+import { Tooltip } from './overlays/Tooltip';
 
 /** Native caption actions shared by stream and app PiP headers. */
 export function PipWindowControls({ fullscreen = false, onTooltipOpenChange }: {

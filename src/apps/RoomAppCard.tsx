@@ -8,11 +8,11 @@ import { roomAppsService } from './room_apps_service';
 import { useRoom } from '../hooks/useRoom';
 import { ArrowLeft, MoreHorizontal, SquareX, Focus, Play, ExternalLink } from 'lucide-react';
 import { useAppWindow } from './useAppWindow';
-import { isContextMenuEditor, useContextMenu, type ContextMenuAction } from '../components/common/ContextMenu';
+import { isContextMenuEditor, useContextMenu, type ContextMenuAction } from '../components/common/overlays/ContextMenu';
 import { RoomAppIcon } from './RoomAppIcon';
 import { ActivityParticipants } from '../components/common/ActivityParticipants';
-import { Tooltip } from '../components/common/Tooltip';
-import { useRoomCardLayoutActions } from '../components/room/RoomCardLayoutContext';
+import { Tooltip } from '../components/common/overlays/Tooltip';
+import { useRoomCardLayoutActions } from '../components/room/video/RoomCardLayoutContext';
 
 const views = new Map<string, React.LazyExoticComponent<React.ComponentType<RoomAppViewProps>>>();
 function viewFor(kind: string) {

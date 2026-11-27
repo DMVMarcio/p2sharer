@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef } from 'react';
 import { useBlocker, useLocation, useNavigate } from 'react-router';
 import App from '../../src/App';
-import { AppContextMenu } from '../../src/components/common/AppContextMenu';
+import { AppContextMenu } from '../../src/components/common/overlays/AppContextMenu';
 import { initializeAppRuntime } from '../../src/core/app_runtime';
 import { stateStore } from '../../src/core/state_store';
 import { roomCodeFromPath } from '../../src/core/room/web_room_links';
@@ -10,7 +10,7 @@ import { roomService } from '../../src/services/room_service';
 import type { WebRoomNavigation } from '../../src/services/web_room_navigation';
 import { tryDesktopRoomInvite } from '../../src/platform/desktop_room_invite';
 import '../../src/core/profile/nickname_fonts';
-import '../../src/components/room/stream_pointer.css';
+import '../../src/components/room/stream/stream_pointer.css';
 import '../../src/apps/apps.css';
 
 initializeAppRuntime();

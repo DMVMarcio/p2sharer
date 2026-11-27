@@ -36,8 +36,8 @@ globalThis.IS_REACT_ACT_ENVIRONMENT = true;
 const require = createRequire(import.meta.url);
 const bundle = await build({
   stdin: {
-    contents: `export { ApplicationSettings } from './src/components/modals/ApplicationSettings.tsx';
-    export { SettingsModal } from './src/components/modals/SettingsModal.tsx';
+    contents: `export { ApplicationSettings } from './src/components/modals/settings/ApplicationSettings.tsx';
+    export { SettingsModal } from './src/components/modals/settings/SettingsModal.tsx';
     export { ProfileModal } from './src/components/modals/ProfileModal.tsx';
     export { ReleaseNotesDialog } from './src/components/modals/ReleaseNotesDialog.tsx';
     export { getLanguage, setLanguage } from './src/i18n/index.ts';
