@@ -275,7 +275,10 @@ function geometryBounds(s: BoardShape) {
     const pt = s.points[0] ?? { x: 0, y: 0 };
     const fontSize = s.fontSize ?? Math.max(14, s.width * 2);
     const lines = (s.text ?? '').split('\n');
-    const maxChars = Math.max(1, ...lines.map(l => l.length));
+    let maxChars = 1;
+    for (let i = 0; i < lines.length; i++) {
+      if (lines[i].length > maxChars) maxChars = lines[i].length;
+    }
     return {
       x: pt.x,
       y: pt.y,
@@ -285,8 +288,15 @@ function geometryBounds(s: BoardShape) {
   }
   if (s.tool === 'bucket' || s.tool === 'clear') {
     if (s.clipPolygon?.length) {
-      const xs = s.clipPolygon.map(p => p.x), ys = s.clipPolygon.map(p => p.y);
-      return { x: Math.min(...xs), y: Math.min(...ys), width: Math.max(...xs) - Math.min(...xs), height: Math.max(...ys) - Math.min(...ys) };
+      let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+      for (let i = 0; i < s.clipPolygon.length; i++) {
+        const p = s.clipPolygon[i];
+        if (p.x < minX) minX = p.x;
+        if (p.x > maxX) maxX = p.x;
+        if (p.y < minY) minY = p.y;
+        if (p.y > maxY) maxY = p.y;
+      }
+      return { x: minX, y: minY, width: maxX - minX, height: maxY - minY };
     }
     const a = s.points[0] ?? { x: 0, y: 0 };
     const b = s.points[1] ?? a;
@@ -295,8 +305,15 @@ function geometryBounds(s: BoardShape) {
     }
     return { x: a.x, y: a.y, width: 1, height: 1 };
   }
-  const xs = s.points.map(p => p.x), ys = s.points.map(p => p.y);
-  return { x: Math.min(...xs), y: Math.min(...ys), width: Math.max(...xs) - Math.min(...xs), height: Math.max(...ys) - Math.min(...ys) };
+  let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+  for (let i = 0; i < s.points.length; i++) {
+    const p = s.points[i];
+    if (p.x < minX) minX = p.x;
+    if (p.x > maxX) maxX = p.x;
+    if (p.y < minY) minY = p.y;
+    if (p.y > maxY) maxY = p.y;
+  }
+  return { x: minX, y: minY, width: maxX - minX, height: maxY - minY };
 }
 
 export function shapeBounds(s: BoardShape) {
@@ -692,6 +709,17 @@ export function hitBoardShape(s: BoardShape, point: BoardPoint, tolerance: numbe
     return p.x >= b.x - margin && p.y >= b.y - margin && p.x <= b.x + b.width + margin && p.y <= b.y + b.height + margin;
   }
   if (s.tool === 'brush' || s.tool === 'line') {
+    let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+    for (let i = 0; i < s.points.length; i++) {
+      const pt = s.points[i];
+      if (pt.x < minX) minX = pt.x;
+      if (pt.x > maxX) maxX = pt.x;
+      if (pt.y < minY) minY = pt.y;
+      if (pt.y > maxY) maxY = pt.y;
+    }
+    if (p.x < minX - margin || p.x > maxX + margin || p.y < minY - margin || p.y > maxY + margin) {
+      return false;
+    }
     const points = brushHitPoints(s);
     return points.length === 1 ? segmentDistance(p, points[0], points[0]) <= margin
       : points.slice(1).some((b, i) => segmentDistance(p, points[i], b) <= margin);
@@ -718,19 +746,27 @@ export function hitBoardLayer(shapes: BoardShape[], layer: BoardLayer, point: Bo
 }
 
 export function boardLayerBounds(shapes: BoardShape[], layer: BoardLayer) {
-  const active: BoardShape[] = [];
-  for (const s of shapes) {
+  let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+  let hasActive = false;
+  for (let i = 0; i < shapes.length; i++) {
+    const s = shapes[i];
     if ((s.layerId ?? DEFAULT_BOARD_LAYER) !== layer.id || s.hidden) continue;
     if (s.tool === 'clear' && !s.clipPolygon?.length) {
-      active.length = 0;
+      minX = Infinity; minY = Infinity; maxX = -Infinity; maxY = -Infinity;
+      hasActive = false;
       continue;
     }
-    if (s.tool !== 'eraser' && s.tool !== 'clear') active.push(s);
+    if (s.tool !== 'eraser' && s.tool !== 'clear') {
+      const b = shapeBounds(s);
+      if (b.x < minX) minX = b.x;
+      if (b.y < minY) minY = b.y;
+      if (b.x + b.width > maxX) maxX = b.x + b.width;
+      if (b.y + b.height > maxY) maxY = b.y + b.height;
+      hasActive = true;
+    }
   }
-  const boxes = active.map(shapeBounds);
-  if (!boxes.length) return null;
-  const x = Math.min(...boxes.map(b => b.x)), y = Math.min(...boxes.map(b => b.y));
-  return { x: x + layer.x, y: y + layer.y, width: Math.max(...boxes.map(b => b.x + b.width)) - x, height: Math.max(...boxes.map(b => b.y + b.height)) - y };
+  if (!hasActive) return null;
+  return { x: minX + layer.x, y: minY + layer.y, width: maxX - minX, height: maxY - minY };
 }
 
 export function shapeTransform(s: BoardShape): string {

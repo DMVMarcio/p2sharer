@@ -1,4 +1,4 @@
-import { useId, useRef, useState } from 'react';
+import { memo, useId, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import {
   GripVertical, Plus, Pencil, Eye, EyeOff, Lock, Unlock, Trash2, Layers, ChevronRight,
@@ -13,8 +13,9 @@ import { t } from '../i18n';
 import { BOARD_BLEND_MODES, type BoardBlendMode, type BoardLayer, type BoardShape } from './whiteboard_scene';
 import { WhiteboardColorPanel } from './WhiteboardColorPanel';
 import { WhiteboardLayerPreview } from './WhiteboardLayerPreview';
+import type { WhiteboardStudioCompositor } from './whiteboard_webgl';
 
-export function WhiteboardLayers({
+export const WhiteboardLayers = memo(function WhiteboardLayers({
   layers,
   shapes,
   active,
@@ -28,6 +29,10 @@ export function WhiteboardLayers({
   onFlipLayer,
   onReorder,
   imageHref,
+  studio,
+  engineActive = false,
+  boardWidth = 1920,
+  boardHeight = 1080,
   color,
   secondaryColor,
   recentColors,
@@ -52,6 +57,10 @@ export function WhiteboardLayers({
   onFlipLayer?(id: string, axis: 'x' | 'y'): void;
   onReorder(ids: string[]): void;
   imageHref?: (hash: string) => string | undefined;
+  studio?: WhiteboardStudioCompositor | null;
+  engineActive?: boolean;
+  boardWidth?: number;
+  boardHeight?: number;
   color?: string;
   secondaryColor?: string;
   recentColors?: readonly string[];
@@ -276,7 +285,16 @@ export function WhiteboardLayers({
                   aria-pressed={active === id}
                   onClick={() => onActivate(id)}
                 >
-                  <WhiteboardLayerPreview shapes={shapes} layer={layer} imageHref={imageHref} />
+                  <WhiteboardLayerPreview
+                    shapes={shapes}
+                    layers={layers}
+                    layer={layer}
+                    imageHref={imageHref}
+                    studio={studio}
+                    engineActive={engineActive}
+                    boardWidth={boardWidth}
+                    boardHeight={boardHeight}
+                  />
                 </TooltipButton>
                 <div className="whiteboard-layer-body">
                   {renaming === id ? (
@@ -359,4 +377,4 @@ export function WhiteboardLayers({
       )}
     </aside>
   );
-}
+});

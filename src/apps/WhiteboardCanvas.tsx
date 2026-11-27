@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useId, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useId, useRef, useState, type RefObject } from 'react';
 import type { PointerEvent as ReactPointerEvent } from 'react';
 import {
   ImagePlus, ZoomIn, ZoomOut, Maximize2, FlipHorizontal, Grid, Trash2, CheckSquare,
@@ -6,7 +6,7 @@ import {
 } from 'lucide-react';
 import { useContextMenu } from '../components/common/ContextMenu';
 import { TooltipButton } from '../components/common/TooltipButton';
-import { StreamPointerGlyph } from '../components/room/StreamPointerGlyph';
+import { StreamPointerGlyph, type StreamPointerShape } from '../components/room/StreamPointerGlyph';
 import { WhiteboardLayerArt } from './WhiteboardLayerArt';
 import {
   BOARD_MAX_POINTS, DEFAULT_BOARD_LAYER, boardBrushWidth, boardLayerBounds, hitBoardLayer,
@@ -15,7 +15,7 @@ import {
 import type { BoardCursor, WhiteboardModel } from './whiteboard_model';
 import type { BoardSettings } from './WhiteboardToolbar';
 import { computeFloodMask, selectionMaskToPolygon } from './whiteboard_raster';
-import { WhiteboardCanvas2DRenderer } from './whiteboard_canvas2d';
+import type { WhiteboardStudioCompositor } from './whiteboard_webgl';
 import { t } from '../i18n';
 import {
   boardContains, boardResizeHandles, clampBoardPoint, containBoardLayer,
@@ -41,8 +41,22 @@ type Gesture = {
   viewport: BoardViewport;
   stabilizer?: BrushStabilizer;
 };
-type ResizePreview = { id: string; layer: BoardLayer; shapes: BoardShape[]; bounds: BoardBox };
+type ResizePreview = { id: string; layer: BoardLayer; shapes: BoardShape[]; fromBounds: BoardBox; bounds: BoardBox };
 type TextDraft = { x: number; y: number; layerId: string; value: string };
+
+function toolToCursorShape(tool: string): StreamPointerShape {
+  if (tool === 'hand') return 'hand';
+  if (tool === 'move') return 'move';
+  if (tool === 'eyedropper') return 'eyedropper';
+  if (tool === 'bucket') return 'bucket';
+  if (tool === 'text') return 'text';
+  if (tool === 'selectRect') return 'selectRect';
+  if (tool === 'selectEllipse') return 'selectEllipse';
+  if (tool === 'lasso') return 'lasso';
+  if (tool === 'wand') return 'wand';
+  if (tool === 'pointer') return 'pointer';
+  return 'brush';
+}
 
 function constrainShapeEndpoints(
   start: BoardPoint,
@@ -121,12 +135,14 @@ function buildRectPolygon(a: BoardPoint, b: BoardPoint): BoardPoint[] {
 
 export function WhiteboardCanvas({
   model,
+  studio,
+  engineActive,
+  onEngineActiveChange,
   activeLayer,
   settings,
   spaceHeld = false,
   altHeld = false,
-  viewport,
-  onViewport,
+  viewportRef,
   selected,
   onSelect,
   selectionPolygon = null,
@@ -143,12 +159,14 @@ export function WhiteboardCanvas({
   onPasteImage,
 }: {
   model: WhiteboardModel;
+  studio: WhiteboardStudioCompositor;
+  engineActive: boolean;
+  onEngineActiveChange(active: boolean): void;
   activeLayer: string;
   settings: BoardSettings;
   spaceHeld?: boolean;
   altHeld?: boolean;
-  viewport: BoardViewport;
-  onViewport(viewport: BoardViewport): void;
+  viewportRef: RefObject<BoardViewport>;
   selected: string | null;
   onSelect(id: string | null): void;
   selectionPolygon?: BoardPoint[] | null;
@@ -165,26 +183,168 @@ export function WhiteboardCanvas({
   onPasteImage?(): void;
 }) {
   const root = useRef<HTMLDivElement>(null), clipId = useId();
-  const rasterCanvasRef = useRef<HTMLCanvasElement>(null);
-  const canvas2dRendererRef = useRef(new WhiteboardCanvas2DRenderer());
-  const [canvas2dActive, setCanvas2dActive] = useState(false);
+  const viewportCanvasRef = useRef<HTMLCanvasElement>(null);
+  const overlayGroupRef = useRef<SVGGElement>(null);
+  const remoteCursorsRef = useRef<HTMLDivElement>(null);
+  const localCursorElRef = useRef<HTMLDivElement>(null);
+  const zoomHintRef = useRef<HTMLSpanElement>(null);
+  const textDraftRef = useRef<HTMLTextAreaElement>(null);
+  const selectionRectRef = useRef<SVGRectElement>(null);
+  const selectionHandleRefs = useRef<Array<SVGRectElement | null>>([]);
+  const marqueeOuterRef = useRef<SVGPolygonElement>(null);
+  const marqueeInnerRef = useRef<SVGPolygonElement>(null);
+  const symVRef = useRef<SVGLineElement>(null);
+  const symHRef = useRef<SVGLineElement>(null);
+  const gridMajorPathRef = useRef<SVGPathElement>(null);
+  const gridPixelPathRef = useRef<SVGPathElement>(null);
+
   const menu = useContextMenu();
   const { width: boardWidth, height: boardHeight, backgroundColor, transparent } = model.canvasSettings;
-  const navigation = useWhiteboardViewport(root, viewport, onViewport, boardWidth, boardHeight);
+
   const gesture = useRef<Gesture | null>(null);
   const [draft, setDraft] = useState<BoardShape | null>(null);
   const [selectionDraft, setSelectionDraft] = useState<BoardPoint[] | null>(null);
   const [textDraft, setTextDraft] = useState<TextDraft | null>(null);
+  const textDraftStateRef = useRef<TextDraft | null>(null);
+  textDraftStateRef.current = textDraft;
   const [moving, setMoving] = useState<BoardLayer | null>(null);
   const [resizing, setResizing] = useState<ResizePreview | null>(null);
-  const [cursor, setCursor] = useState<Cursor | null>(null);
-  const [cursorScreen, setCursorScreen] = useState<BoardPoint | null>(null);
+
+  const liveDraftRef = useRef<BoardShape | null>(null);
+  const liveMovingRef = useRef<BoardLayer | null>(null);
+  const liveResizingRef = useRef<ResizePreview | null>(null);
+  const liveRafRef = useRef<number | null>(null);
+  const loupeRafRef = useRef<number | null>(null);
+
+  const [localCursorMeta, setLocalCursorMeta] = useState<{
+    visible: boolean;
+    shape: StreamPointerShape;
+    color: string;
+    showLoupe: boolean;
+  }>({ visible: false, shape: 'pointer', color: settings.color, showLoupe: false });
+  const localCursorMetaRef = useRef(localCursorMeta);
+  localCursorMetaRef.current = localCursorMeta;
+  const localCursorPosRef = useRef<{ screen: BoardPoint; world: BoardPoint; worldWidth: number } | null>(null);
+  const [, setLoupeTick] = useState(0);
+
   const [mirrorView, setMirrorView] = useState(false);
+  const mirrorViewRef = useRef(mirrorView);
+  mirrorViewRef.current = mirrorView;
   const [showGrid, setShowGrid] = useState(false);
+  const showGridRef = useRef(showGrid);
+  showGridRef.current = showGrid;
+  const [gridPixelLevel, setGridPixelLevel] = useState(false);
+  const gridPixelLevelRef = useRef(gridPixelLevel);
+  gridPixelLevelRef.current = gridPixelLevel;
+
   const physicalScreen = useRef<BoardPoint | null>(null);
-  const current = useRef({ settings, compact, spaceHeld, altHeld });
-  current.current = { settings, compact, spaceHeld, altHeld };
+  const current = useRef({ settings, compact, spaceHeld, altHeld, engineActive });
+  current.current = { settings, compact, spaceHeld, altHeld, engineActive };
   const lastSent = useRef(0), latestCursor = useRef<Cursor | null>(null);
+
+  const updateSelectionOverlayDom = (box: BoardBox | null, zoom: number) => {
+    if (!box) return;
+    if (selectionRectRef.current) {
+      selectionRectRef.current.setAttribute('x', String(box.x));
+      selectionRectRef.current.setAttribute('y', String(box.y));
+      selectionRectRef.current.setAttribute('width', String(box.width));
+      selectionRectRef.current.setAttribute('height', String(box.height));
+      selectionRectRef.current.setAttribute('stroke-width', String(1.25 / zoom));
+      selectionRectRef.current.setAttribute('stroke-dasharray', `${4 / zoom} ${3 / zoom}`);
+    }
+    const handles = boardResizeHandles(box);
+    for (let i = 0; i < handles.length; i++) {
+      const el = selectionHandleRefs.current[i];
+      if (!el) continue;
+      const item = handles[i];
+      el.setAttribute('x', String(item.x - 4.5 / zoom));
+      el.setAttribute('y', String(item.y - 4.5 / zoom));
+      el.setAttribute('width', String(9 / zoom));
+      el.setAttribute('height', String(9 / zoom));
+      el.setAttribute('rx', String(2 / zoom));
+      el.setAttribute('stroke-width', String(1.5 / zoom));
+    }
+  };
+
+  const applyViewportToDom = (view: BoardViewport) => {
+    viewportRef.current = view;
+    studio.present(view, mirrorViewRef.current);
+
+    if (overlayGroupRef.current) {
+      overlayGroupRef.current.setAttribute('transform', `translate(${view.x} ${view.y}) scale(${view.zoom})`);
+    }
+    if (remoteCursorsRef.current) {
+      remoteCursorsRef.current.style.transform = `translate(${view.x}px, ${view.y}px) scale(${view.zoom})`;
+      const children = remoteCursorsRef.current.children;
+      for (let i = 0; i < children.length; i++) {
+        const el = children[i] as HTMLElement;
+        el.style.transform = `scale(${1 / view.zoom})`;
+        const rawW = Number(el.dataset.worldWidth);
+        if (rawW > 0) {
+          const brush = el.querySelector('.stream-pointer-brush') as HTMLElement | null;
+          if (brush) {
+            const d = `${rawW * view.zoom}px`;
+            brush.style.width = d;
+            brush.style.height = d;
+          }
+        }
+      }
+    }
+    if (zoomHintRef.current) {
+      zoomHintRef.current.textContent = `${Math.round(view.zoom * 100)}%`;
+    }
+    if (localCursorElRef.current && localCursorPosRef.current && localCursorMetaRef.current.shape === 'brush') {
+      const brush = localCursorElRef.current.querySelector('.stream-pointer-brush') as HTMLElement | null;
+      if (brush) {
+        const d = `${localCursorPosRef.current.worldWidth * view.zoom}px`;
+        brush.style.width = d;
+        brush.style.height = d;
+      }
+    }
+    if (textDraftRef.current && textDraftStateRef.current) {
+      textDraftRef.current.style.left = `${view.x + textDraftStateRef.current.x * view.zoom}px`;
+      textDraftRef.current.style.top = `${view.y + textDraftStateRef.current.y * view.zoom}px`;
+      textDraftRef.current.style.fontSize = `${Math.max(12, (current.current.settings.fontSize ?? 28) * view.zoom)}px`;
+    }
+    if (marqueeOuterRef.current) {
+      marqueeOuterRef.current.setAttribute('stroke-width', String(1.5 / view.zoom));
+    }
+    if (marqueeInnerRef.current) {
+      marqueeInnerRef.current.setAttribute('stroke-width', String(1.5 / view.zoom));
+      marqueeInnerRef.current.setAttribute('stroke-dasharray', `${5 / view.zoom} ${5 / view.zoom}`);
+    }
+    if (symVRef.current) {
+      symVRef.current.setAttribute('stroke-width', String(1.25 / view.zoom));
+      symVRef.current.setAttribute('stroke-dasharray', `${6 / view.zoom} ${4 / view.zoom}`);
+    }
+    if (symHRef.current) {
+      symHRef.current.setAttribute('stroke-width', String(1.25 / view.zoom));
+      symHRef.current.setAttribute('stroke-dasharray', `${6 / view.zoom} ${4 / view.zoom}`);
+    }
+    if (gridMajorPathRef.current) {
+      gridMajorPathRef.current.setAttribute('stroke-width', String(1 / view.zoom));
+    }
+    if (gridPixelPathRef.current) {
+      gridPixelPathRef.current.setAttribute('stroke-width', String(0.75 / view.zoom));
+    }
+    if (selectionRectRef.current) {
+      const x = Number(selectionRectRef.current.getAttribute('x'));
+      const y = Number(selectionRectRef.current.getAttribute('y'));
+      const w = Number(selectionRectRef.current.getAttribute('width'));
+      const h = Number(selectionRectRef.current.getAttribute('height'));
+      if (Number.isFinite(x) && Number.isFinite(y) && Number.isFinite(w) && Number.isFinite(h)) {
+        updateSelectionOverlayDom({ x, y, width: w, height: h }, view.zoom);
+      }
+    }
+    if (showGridRef.current) {
+      const nextPixel = view.zoom >= 5;
+      if (nextPixel !== gridPixelLevelRef.current) {
+        setGridPixelLevel(nextPixel);
+      }
+    }
+  };
+
+  const navigation = useWhiteboardViewport(root, viewportRef.current, applyViewportToDom, boardWidth, boardHeight);
 
   const screenPoint = (event: { clientX: number; clientY: number }): BoardPoint => {
     const bounds = root.current!.getBoundingClientRect();
@@ -195,7 +355,68 @@ export function WhiteboardCanvas({
     return { x: (p.x - view.x) / view.zoom, y: (p.y - view.y) / view.zoom };
   };
 
-  // Decode cached base64 PNG images into model.raster.decodedImages and canvas2dRenderer when running in a browser context
+  const getDraftsByLayer = (includeLocalDraft = true): Map<string, BoardShape[]> => {
+    const draftsByLayer = new Map<string, BoardShape[]>();
+    for (const [id, c] of model.cursors) {
+      if (id !== actor && c.draft) {
+        const lid = c.draft.layerId ?? DEFAULT_BOARD_LAYER;
+        const arr = draftsByLayer.get(lid) ?? [];
+        arr.push(c.draft);
+        draftsByLayer.set(lid, arr);
+      }
+    }
+    if (includeLocalDraft) {
+      const activeDraft = liveDraftRef.current ?? draft;
+      if (activeDraft) {
+        const lid = activeDraft.layerId ?? DEFAULT_BOARD_LAYER;
+        const arr = draftsByLayer.get(lid) ?? [];
+        arr.push(activeDraft);
+        draftsByLayer.set(lid, arr);
+      }
+    }
+    return draftsByLayer;
+  };
+
+  const syncAndPresentScene = (includeLocalDraft = true) => {
+    if (!current.current.engineActive) return;
+    const ok = studio.syncScene(
+      model.layers,
+      model.shapes,
+      getDraftsByLayer(includeLocalDraft),
+      liveMovingRef.current ?? moving,
+      liveResizingRef.current ?? resizing,
+      boardWidth,
+      boardHeight,
+      backgroundColor,
+      transparent,
+    );
+    if (ok) {
+      studio.present(navigation.current.current, mirrorViewRef.current);
+    }
+  };
+
+  const scheduleLiveSceneFlush = () => {
+    if (liveRafRef.current === null) {
+      liveRafRef.current = requestAnimationFrame(() => {
+        liveRafRef.current = null;
+        syncAndPresentScene(true);
+      });
+    }
+  };
+
+  // Attach WebGL2 / Canvas2D viewport presenter once on mount
+  useLayoutEffect(() => {
+    const canvasEl = viewportCanvasRef.current;
+    if (!canvasEl) return;
+    const ok = studio.attachCanvas(canvasEl);
+    onEngineActiveChange(ok);
+    if (ok && root.current) {
+      studio.resizeViewport(root.current.clientWidth || 800, root.current.clientHeight || 500, window.devicePixelRatio || 1);
+      syncAndPresentScene(true);
+    }
+  }, [studio]);
+
+  // Decode cached base64 PNG images into model.raster.decodedImages and studio
   useEffect(() => {
     if (typeof document === 'undefined') return;
     for (const [hash, raw] of model.images) {
@@ -204,7 +425,7 @@ export function WhiteboardCanvas({
       const img = new Image();
       img.onload = () => {
         try {
-          canvas2dRendererRef.current.registerImage(hash, img);
+          studio.registerImage(hash, img);
           const w = img.naturalWidth || img.width || 1;
           const h = img.naturalHeight || img.height || 1;
           const c = document.createElement('canvas');
@@ -215,32 +436,86 @@ export function WhiteboardCanvas({
           ctx.drawImage(img, 0, 0, w, h);
           const imageData = ctx.getImageData(0, 0, w, h);
           model.raster.registerDecodedImage(hash, { width: w, height: h, data: imageData.data });
+          syncAndPresentScene(true);
         } catch { /* ignore in mock environments */ }
       };
       img.src = `data:image/png;base64,${raw}`;
     }
-  }, [model, model.images.size]);
+  }, [model, model.images.size, studio]);
 
   const publish = (value: Cursor | null, screen: BoardPoint | null = physicalScreen.current, force = false) => {
     const wire = value?.draft && value.draft.points.length > BOARD_MAX_POINTS
       ? { ...value, draft: { ...value.draft, points: value.draft.points.slice(-BOARD_MAX_POINTS) } }
       : value;
     latestCursor.current = wire;
-    setCursor(value);
-    setCursorScreen(value ? screen : null);
+
+    if (!value || !screen || current.current.compact) {
+      localCursorPosRef.current = null;
+      if (localCursorMetaRef.current.visible) {
+        setLocalCursorMeta(prev => prev.visible ? { ...prev, visible: false, showLoupe: false } : prev);
+      }
+    } else {
+      const shape = toolToCursorShape(value.tool);
+      const showLoupe = value.tool === 'eyedropper';
+      const zoom = navigation.current.current.zoom;
+      localCursorPosRef.current = { screen, world: { x: value.x, y: value.y }, worldWidth: value.width };
+
+      if (localCursorElRef.current) {
+        localCursorElRef.current.style.left = `${screen.x}px`;
+        localCursorElRef.current.style.top = `${screen.y}px`;
+        if (shape === 'brush') {
+          const brush = localCursorElRef.current.querySelector('.stream-pointer-brush') as HTMLElement | null;
+          if (brush) {
+            const d = `${value.width * zoom}px`;
+            brush.style.width = d;
+            brush.style.height = d;
+          }
+        }
+      }
+
+      const prevMeta = localCursorMetaRef.current;
+      if (!prevMeta.visible || prevMeta.shape !== shape || prevMeta.color !== value.color || prevMeta.showLoupe !== showLoupe) {
+        setLocalCursorMeta({ visible: true, shape, color: value.color, showLoupe });
+      } else if (showLoupe) {
+        if (current.current.engineActive) {
+          if (loupeRafRef.current === null) {
+            loupeRafRef.current = requestAnimationFrame(() => {
+              loupeRafRef.current = null;
+              setLoupeTick(n => n + 1);
+            });
+          }
+        } else {
+          setLoupeTick(n => n + 1);
+        }
+      }
+    }
+
     if (force || performance.now() - lastSent.current >= 40) {
       model.presence(wire);
       lastSent.current = performance.now();
     }
   };
+
   const leave = () => { physicalScreen.current = null; publish(null, null, true); };
   const cancel = () => {
     navigation.stop();
+    if (liveRafRef.current !== null) {
+      cancelAnimationFrame(liveRafRef.current);
+      liveRafRef.current = null;
+    }
+    if (loupeRafRef.current !== null) {
+      cancelAnimationFrame(loupeRafRef.current);
+      loupeRafRef.current = null;
+    }
     gesture.current = null;
+    liveDraftRef.current = null;
+    liveMovingRef.current = null;
+    liveResizingRef.current = null;
     setDraft(null);
     setSelectionDraft(null);
     setMoving(null);
     setResizing(null);
+    syncAndPresentScene(false);
     leave();
   };
 
@@ -274,18 +549,25 @@ export function WhiteboardCanvas({
     let measured = false;
     const center = () => {
       const w = root.current?.clientWidth || 800, h = root.current?.clientHeight || 500;
+      if (current.current.engineActive) {
+        studio.resizeViewport(w, h, window.devicePixelRatio || 1);
+      }
       const zoom = compact ? Math.min(w / boardWidth, h / boardHeight) : 1;
       navigation.set({ x: w / 2 - (boardWidth * zoom) / 2, y: h / 2 - (boardHeight * zoom) / 2, zoom });
     };
     center();
     const observer = new ResizeObserver(() => {
+      const w = root.current?.clientWidth || 800, h = root.current?.clientHeight || 500;
+      if (current.current.engineActive) {
+        studio.resizeViewport(w, h, window.devicePixelRatio || 1);
+      }
       if (compact || !measured) center();
       else navigation.set(navigation.current.current);
       measured = true;
     });
     if (root.current) observer.observe(root.current);
     return () => observer.disconnect();
-  }, [model, identity, compact, onViewport, boardWidth, boardHeight]);
+  }, [model, identity, compact, boardWidth, boardHeight, studio]);
 
   useEffect(() => {
     if (!spaceHeld && gesture.current?.spacePan) {
@@ -305,41 +587,26 @@ export function WhiteboardCanvas({
         color: settings.color,
       }, screen);
     }
-  }, [spaceHeld, altHeld, viewport.x, viewport.y, viewport.zoom, settings.tool, settings.width, settings.color, compact]);
+  }, [spaceHeld, altHeld, settings.tool, settings.width, settings.color, compact]);
 
-  // Render scene onto the hardware-accelerated 2D pixel canvas at exact board resolution
+  // Stage A + Stage B sync ONLY when scene data, drafts, or visual settings change (never on pan/zoom/cursor)
   useLayoutEffect(() => {
-    const canvasEl = rasterCanvasRef.current;
-    if (!canvasEl) return;
-    const draftsByLayer = new Map<string, BoardShape[]>();
-    for (const [id, c] of model.cursors) {
-      if (id !== actor && c.draft) {
-        const lid = c.draft.layerId ?? DEFAULT_BOARD_LAYER;
-        const arr = draftsByLayer.get(lid) ?? [];
-        arr.push(c.draft);
-        draftsByLayer.set(lid, arr);
-      }
-    }
-    if (draft) {
-      const lid = draft.layerId ?? DEFAULT_BOARD_LAYER;
-      const arr = draftsByLayer.get(lid) ?? [];
-      arr.push(draft);
-      draftsByLayer.set(lid, arr);
-    }
-    const ok = canvas2dRendererRef.current.renderScene(
-      canvasEl,
-      model.layers,
-      model.shapes,
-      draftsByLayer,
-      moving,
-      resizing,
-      boardWidth,
-      boardHeight,
-      backgroundColor,
-      transparent,
-    );
-    if (ok !== canvas2dActive) setCanvas2dActive(ok);
-  });
+    syncAndPresentScene(true);
+  }, [
+    studio,
+    engineActive,
+    model,
+    model.revision,
+    model.cursorRevision,
+    boardWidth,
+    boardHeight,
+    backgroundColor,
+    transparent,
+    mirrorView,
+    draft,
+    moving,
+    resizing,
+  ]);
 
   useEffect(() => {
     const element = root.current;
@@ -354,7 +621,7 @@ export function WhiteboardCanvas({
     };
     element.addEventListener('wheel', wheel, { passive: false });
     return () => element.removeEventListener('wheel', wheel);
-  }, [model, onViewport]);
+  }, [model]);
 
   const commitTextDraft = () => {
     if (!textDraft) return;
@@ -396,56 +663,39 @@ export function WhiteboardCanvas({
     if (px < 0 || py < 0 || px >= boardWidth || py >= boardHeight) {
       return transparent ? '#ffffff' : backgroundColor;
     }
-    if (canvas2dActive && rasterCanvasRef.current) {
-      try {
-        const ctx = rasterCanvasRef.current.getContext('2d');
-        if (ctx) {
-          const data = ctx.getImageData(px, py, 1, 1).data;
-          if (data[3] === 0) return transparent ? '#ffffff' : backgroundColor;
-          return `#${data[0].toString(16).padStart(2, '0')}${data[1].toString(16).padStart(2, '0')}${data[2].toString(16).padStart(2, '0')}`;
-        }
-      } catch { /* fall back to software rasterizer */ }
+    if (current.current.engineActive) {
+      const sampled = studio.samplePixel(
+        x,
+        y,
+        model.layers,
+        model.shapes,
+        getDraftsByLayer(true),
+        liveMovingRef.current ?? moving,
+        liveResizingRef.current ?? resizing,
+      );
+      if (sampled) return sampled;
     }
     return model.sampleColor(x, y, true, activeLayer);
   };
 
   const sampleLoupePatch = (centerX: number, centerY: number): { grid: string[]; centerHex: string; px: number; py: number } => {
     const radius = 4;
-    const size = radius * 2 + 1;
+    if (current.current.engineActive) {
+      const patch = studio.samplePatch(
+        centerX,
+        centerY,
+        radius,
+        model.layers,
+        model.shapes,
+        getDraftsByLayer(true),
+        liveMovingRef.current ?? moving,
+        liveResizingRef.current ?? resizing,
+      );
+      if (patch) return patch;
+    }
     const cx = Math.max(0, Math.min(boardWidth - 1, Math.floor(centerX)));
     const cy = Math.max(0, Math.min(boardHeight - 1, Math.floor(centerY)));
     const grid: string[] = [];
-    if (canvas2dActive && rasterCanvasRef.current) {
-      try {
-        const ctx = rasterCanvasRef.current.getContext('2d');
-        if (ctx) {
-          const sx = Math.max(0, cx - radius);
-          const sy = Math.max(0, cy - radius);
-          const ex = Math.min(boardWidth, cx + radius + 1);
-          const ey = Math.min(boardHeight, cy + radius + 1);
-          const sw = Math.max(1, ex - sx);
-          const sh = Math.max(1, ey - sy);
-          const img = ctx.getImageData(sx, sy, sw, sh).data;
-          for (let dy = -radius; dy <= radius; dy++) {
-            const y = cy + dy;
-            for (let dx = -radius; dx <= radius; dx++) {
-              const x = cx + dx;
-              if (x < 0 || y < 0 || x >= boardWidth || y >= boardHeight) {
-                grid.push(transparent ? 'transparent' : backgroundColor);
-              } else {
-                const idx = ((y - sy) * sw + (x - sx)) * 4;
-                const r = img[idx], g = img[idx + 1], b = img[idx + 2], a = img[idx + 3];
-                if (a === 0) grid.push(transparent ? 'transparent' : backgroundColor);
-                else grid.push(`#${r.toString(16).padStart(2, '0')}${g.toString(16).padStart(2, '0')}${b.toString(16).padStart(2, '0')}`);
-              }
-            }
-          }
-          const centerCell = grid[Math.floor((size * size) / 2)] || settings.color;
-          const centerHex = centerCell === 'transparent' ? (transparent ? '#ffffff' : backgroundColor) : centerCell;
-          return { grid, centerHex, px: cx, py: cy };
-        }
-      } catch { /* fall back to software rasterizer */ }
-    }
     const centerHex = model.sampleColor(cx, cy, true, activeLayer);
     for (let dy = -radius; dy <= radius; dy++) {
       const y = cy + dy;
@@ -467,6 +717,7 @@ export function WhiteboardCanvas({
     if (compact) return;
     const screen = screenPoint(event), g = gesture.current;
     physicalScreen.current = screen;
+    const viewNow = navigation.current.current;
     let point = worldPoint(screen), drawing: BoardShape | undefined;
     if (g && g.pointer === event.pointerId) {
       if (g.mode === 'pan') {
@@ -491,18 +742,37 @@ export function WhiteboardCanvas({
           boardHeight,
         );
         g.layer = layer;
-        setMoving(layer);
+        if (current.current.engineActive) {
+          liveMovingRef.current = layer;
+          updateSelectionOverlayDom(boardLayerBounds(model.shapes, layer), viewNow.zoom);
+          scheduleLiveSceneFlush();
+        } else {
+          setMoving(layer);
+        }
       } else if (g.mode === 'resize' && g.original && g.handle && g.initialBounds) {
         const nextBounds = resizeBoardBounds(g.initialBounds, g.handle, point, event.shiftKey, boardWidth, boardHeight);
         g.targetBounds = nextBounds;
         const preview = scaleBoardLayer(g.original, model.shapes, g.initialBounds, nextBounds);
         g.layer = preview.layer;
-        setResizing({ id: g.original.id, layer: preview.layer, shapes: preview.shapes, bounds: nextBounds });
+        const resizeObj: ResizePreview = {
+          id: g.original.id,
+          layer: preview.layer,
+          shapes: preview.shapes,
+          fromBounds: g.initialBounds,
+          bounds: nextBounds,
+        };
+        if (current.current.engineActive) {
+          liveResizingRef.current = resizeObj;
+          updateSelectionOverlayDom(nextBounds, viewNow.zoom);
+          scheduleLiveSceneFlush();
+        } else {
+          setResizing(resizeObj);
+        }
       } else if (g.mode === 'select' && g.selectionPoints) {
         const clamped = clampBoardPoint(point, boardWidth, boardHeight);
         if (settings.tool === 'lasso') {
           const prev = g.selectionPoints[g.selectionPoints.length - 1];
-          if (Math.hypot(clamped.x - prev.x, clamped.y - prev.y) >= 2 / viewport.zoom) {
+          if (Math.hypot(clamped.x - prev.x, clamped.y - prev.y) >= 2 / viewNow.zoom) {
             g.selectionPoints = [...g.selectionPoints, clamped];
           }
           setSelectionDraft(g.selectionPoints);
@@ -556,7 +826,7 @@ export function WhiteboardCanvas({
               points = [origin, local];
             } else {
               lastLocal = local;
-              if (Math.hypot(local.x - points[points.length - 1].x, local.y - points[points.length - 1].y) >= .5 / viewport.zoom) {
+              if (Math.hypot(local.x - points[points.length - 1].x, local.y - points[points.length - 1].y) >= .5 / viewNow.zoom) {
                 points = [...points, local];
               } else if (local.p !== undefined && (points[points.length - 1].p === undefined || Math.abs(local.p - points[points.length - 1].p!) >= 0.02)) {
                 points = [...points.slice(0, -1), { ...points[points.length - 1], p: local.p }];
@@ -572,7 +842,12 @@ export function WhiteboardCanvas({
         }
         drawing = { ...g.draft, points };
         g.draft = drawing;
-        setDraft(drawing);
+        if (current.current.engineActive) {
+          liveDraftRef.current = drawing;
+          scheduleLiveSceneFlush();
+        } else {
+          setDraft(drawing);
+        }
         point = { x: lastLocal.x + g.layer.x, y: lastLocal.y + g.layer.y };
       }
     }
@@ -605,11 +880,12 @@ export function WhiteboardCanvas({
     event.preventDefault();
     event.stopPropagation();
     root.current?.focus();
+    const view = navigation.current.current;
     const screen = screenPoint(event), point = worldPoint(screen);
     if (spaceHeld) {
       navigation.stop();
       root.current?.setPointerCapture(event.pointerId);
-      gesture.current = { pointer: event.pointerId, mode: 'pan', spacePan: true, start: screen, viewport: navigation.current.current };
+      gesture.current = { pointer: event.pointerId, mode: 'pan', spacePan: true, start: screen, viewport: view };
       update(event);
       return;
     }
@@ -622,21 +898,21 @@ export function WhiteboardCanvas({
       }
       navigation.stop();
       root.current?.setPointerCapture(event.pointerId);
-      gesture.current = { pointer: event.pointerId, mode: 'eyedropper', start: point, viewport };
+      gesture.current = { pointer: event.pointerId, mode: 'eyedropper', start: point, viewport: view };
       return;
     }
 
     const layer = model.layers.find(l => l.id === activeLayer);
 
-    // Ctrl-drag temporary layer move from any tool (like Photoshop/FireAlpaca)
+    // Ctrl-drag temporary layer move from any tool
     if (event.button === 0 && (event.ctrlKey || event.metaKey) && settings.tool !== 'pointer') {
-      const hitCtrl = [...model.layers].reverse().find(l => !l.hidden && !l.locked && hitBoardLayer(model.shapes, l, point, 5 / viewport.zoom)) ??
+      const hitCtrl = [...model.layers].reverse().find(l => !l.hidden && !l.locked && hitBoardLayer(model.shapes, l, point, 5 / view.zoom)) ??
         (layer && !layer.hidden && !layer.locked ? layer : undefined);
       if (hitCtrl) {
         navigation.stop();
         root.current?.setPointerCapture(event.pointerId);
         onSelect(hitCtrl.id);
-        gesture.current = { pointer: event.pointerId, mode: 'move', start: point, original: hitCtrl, layer: hitCtrl, viewport };
+        gesture.current = { pointer: event.pointerId, mode: 'move', start: point, original: hitCtrl, layer: hitCtrl, viewport: view };
         update(event);
         return;
       }
@@ -689,7 +965,7 @@ export function WhiteboardCanvas({
         mode: 'select',
         start: startPt,
         selectionPoints: [startPt],
-        viewport,
+        viewport: view,
       };
       setSelectionDraft([startPt]);
       return;
@@ -702,7 +978,7 @@ export function WhiteboardCanvas({
       return;
     }
 
-    // Paint Bucket tool (Flood Fill on click)
+    // Paint Bucket tool
     if (event.button === 0 && settings.tool === 'bucket') {
       if (!boardContains(point, boardWidth, boardHeight) || !layer || layer.locked || layer.hidden) return;
       try {
@@ -773,7 +1049,7 @@ export function WhiteboardCanvas({
     const activeSelected = model.layers.find(l => l.id === selected && !l.hidden && !l.locked);
     const activeBounds = activeSelected ? boardLayerBounds(model.shapes, activeSelected) : null;
     const handle = settings.tool === 'pointer' && event.button === 0 && activeBounds
-      ? hitBoardResizeHandle(activeBounds, point, 10 / viewport.zoom)
+      ? hitBoardResizeHandle(activeBounds, point, 10 / view.zoom)
       : null;
     if (handle && activeSelected && activeBounds) {
       gesture.current = {
@@ -785,22 +1061,22 @@ export function WhiteboardCanvas({
         layer: activeSelected,
         initialBounds: activeBounds,
         targetBounds: activeBounds,
-        viewport,
+        viewport: view,
       };
       update(event);
       return;
     }
     const hit = settings.tool === 'pointer' && event.button === 0
-      ? [...model.layers].reverse().find(l => hitBoardLayer(model.shapes, l, point, 5 / viewport.zoom)) ??
+      ? [...model.layers].reverse().find(l => hitBoardLayer(model.shapes, l, point, 5 / view.zoom)) ??
         (activeSelected && activeBounds && point.x >= activeBounds.x && point.x <= activeBounds.x + activeBounds.width &&
           point.y >= activeBounds.y && point.y <= activeBounds.y + activeBounds.height ? activeSelected : undefined)
       : undefined;
     if (event.button === 1 || (settings.tool === 'pointer' && !hit)) {
-      gesture.current = { pointer: event.pointerId, mode: 'pan', start: screen, viewport: navigation.current.current };
+      gesture.current = { pointer: event.pointerId, mode: 'pan', start: screen, viewport: view };
       if (event.button === 0) onSelect(null);
     } else if (hit) {
       onSelect(hit.id);
-      gesture.current = { pointer: event.pointerId, mode: 'move', start: point, original: hit, layer: hit, viewport };
+      gesture.current = { pointer: event.pointerId, mode: 'move', start: point, original: hit, layer: hit, viewport: view };
     } else if (
       settings.tool !== 'pointer' &&
       settings.tool !== 'image' &&
@@ -863,10 +1139,15 @@ export function WhiteboardCanvas({
         localStart: local,
         layer,
         draft: shape,
-        viewport,
+        viewport: view,
         stabilizer: ['brush', 'eraser'].includes(settings.tool) ? new BrushStabilizer(local, event.timeStamp) : undefined,
       };
-      setDraft(shape);
+      if (current.current.engineActive) {
+        liveDraftRef.current = shape;
+        scheduleLiveSceneFlush();
+      } else {
+        setDraft(shape);
+      }
     }
     update(event);
   };
@@ -875,6 +1156,11 @@ export function WhiteboardCanvas({
     const g = gesture.current;
     if (!g || g.pointer !== event.pointerId) return;
     update(event, true);
+    if (liveRafRef.current !== null) {
+      cancelAnimationFrame(liveRafRef.current);
+      liveRafRef.current = null;
+    }
+    let committed = false;
     try {
       if (g.mode === 'select') {
         const pts = g.selectionPoints ?? [];
@@ -883,9 +1169,11 @@ export function WhiteboardCanvas({
         const live = g.layer && model.layers.find(l => l.id === g.layer!.id);
         if (g.mode === 'draw' && g.draft && live && !live.locked && !live.hidden && live.x === g.layer!.x && live.y === g.layer!.y) {
           model.put(g.draft);
+          committed = true;
         }
         if (g.mode === 'move' && g.layer && live && live === g.original && (live.x !== g.layer.x || live.y !== g.layer.y)) {
           model.updateLayer(g.layer);
+          committed = true;
         }
         if (
           g.mode === 'resize' &&
@@ -901,16 +1189,25 @@ export function WhiteboardCanvas({
             g.initialBounds.height !== g.targetBounds.height)
         ) {
           model.resizeLayer(g.original.id, g.initialBounds, g.targetBounds);
+          committed = true;
         }
       }
     } catch (error) {
       onError(error);
     }
     gesture.current = null;
-    setDraft(null);
-    setSelectionDraft(null);
-    setMoving(null);
-    setResizing(null);
+    liveDraftRef.current = null;
+    liveMovingRef.current = null;
+    liveResizingRef.current = null;
+    if (!current.current.engineActive) {
+      setDraft(null);
+      setSelectionDraft(null);
+      setMoving(null);
+      setResizing(null);
+    } else {
+      if (g.mode === 'select') setSelectionDraft(null);
+      if (!committed) syncAndPresentScene(false);
+    }
     if (root.current?.hasPointerCapture(event.pointerId)) root.current.releasePointerCapture(event.pointerId);
     publish({
       ...worldPoint(screenPoint(event)),
@@ -920,53 +1217,37 @@ export function WhiteboardCanvas({
     }, screenPoint(event), true);
   };
 
+  const view = navigation.current.current;
   const selectedLayer = model.layers.find(l => l.id === selected && !l.hidden);
-  const bounds = resizing && selectedLayer && resizing.id === selectedLayer.id
-    ? resizing.bounds
+  const activeMoving = liveMovingRef.current ?? moving;
+  const activeResizing = liveResizingRef.current ?? resizing;
+  const bounds = activeResizing && selectedLayer && activeResizing.id === selectedLayer.id
+    ? activeResizing.bounds
     : selectedLayer
-      ? boardLayerBounds(model.shapes, moving ?? selectedLayer)
+      ? boardLayerBounds(model.shapes, activeMoving ?? selectedLayer)
       : null;
 
-  const cursorGlyph = (id: string, c: Cursor, own = false) => (
+  const cursorGlyph = (id: string, c: Cursor) => (
     <StreamPointerGlyph
       key={id}
-      name={own ? '' : participantName(id)}
+      name={participantName(id)}
       color={c.color}
-      interpolate={!own}
-      shape={
-        c.tool === 'hand'
-          ? 'hand'
-          : c.tool === 'move'
-            ? 'move'
-            : c.tool === 'eyedropper'
-              ? 'eyedropper'
-              : c.tool === 'bucket'
-                ? 'bucket'
-                : c.tool === 'text'
-                  ? 'text'
-                  : c.tool === 'selectRect'
-                    ? 'selectRect'
-                    : c.tool === 'selectEllipse'
-                      ? 'selectEllipse'
-                      : c.tool === 'lasso'
-                        ? 'lasso'
-                        : c.tool === 'wand'
-                          ? 'wand'
-                          : c.tool === 'pointer'
-                            ? 'pointer'
-                            : 'brush'
-      }
-      diameter={c.width * viewport.zoom}
+      interpolate
+      shape={toolToCursorShape(c.tool)}
+      diameter={c.width * view.zoom}
+      worldWidth={c.width}
       style={{
-        left: own ? cursorScreen?.x : c.x,
-        top: own ? cursorScreen?.y : c.y,
-        ...(!own ? { transform: `scale(${1 / viewport.zoom})`, transformOrigin: '0 0' } : {}),
+        left: c.x,
+        top: c.y,
+        transform: `scale(${1 / view.zoom})`,
+        transformOrigin: '0 0',
       }}
     />
   );
 
   const imageHref = (hash: string) => model.imageUrl(hash);
   const activeSelectionPoly = selectionDraft ?? selectionPolygon;
+  const hasLiveDraft = Boolean(liveDraftRef.current ?? draft);
 
   return (
     <div
@@ -1004,112 +1285,108 @@ export function WhiteboardCanvas({
         }
       }}
     >
-      <div
-        className="whiteboard-raster-stage"
+      <canvas
+        ref={viewportCanvasRef}
+        className="whiteboard-viewport-canvas"
         aria-hidden="true"
-        style={{
-          transform: `translate(${viewport.x}px, ${viewport.y}px) scale(${viewport.zoom})`,
-          width: boardWidth,
-          height: boardHeight,
-        }}
-      >
-        <canvas
-          ref={rasterCanvasRef}
-          width={boardWidth}
-          height={boardHeight}
-          className={`whiteboard-raster-canvas ${showGrid ? 'show-grid' : ''}`}
-        />
-      </div>
+      />
 
       <svg className="whiteboard-art" aria-hidden="true">
         <defs>
           <clipPath id={clipId}>
             <rect width={boardWidth} height={boardHeight} />
           </clipPath>
-          <filter id="wb-filter-pencil" x="-10%" y="-10%" width="120%" height="120%">
-            <feTurbulence type="fractalNoise" baseFrequency="0.75" numOctaves="3" result="grain" />
-            <feColorMatrix type="matrix" values="0 0 0 0 0  0 0 0 0 0  0 0 0 0 0  0 0 0 -0.58 1.18" in="grain" result="tooth" />
-            <feComposite in="SourceGraphic" in2="tooth" operator="in" />
-          </filter>
-          <filter id="wb-filter-watercolor" x="-15%" y="-15%" width="130%" height="130%">
-            <feTurbulence type="turbulence" baseFrequency="0.035" numOctaves="2" result="wash" />
-            <feDisplacementMap in="SourceGraphic" in2="wash" scale="2.4" xChannelSelector="R" yChannelSelector="G" />
-          </filter>
+          {!engineActive && (
+            <>
+              <filter id="wb-filter-pencil" x="-10%" y="-10%" width="120%" height="120%">
+                <feTurbulence type="fractalNoise" baseFrequency="0.75" numOctaves="3" result="grain" />
+                <feColorMatrix type="matrix" values="0 0 0 0 0  0 0 0 0 0  0 0 0 0 0  0 0 0 -0.58 1.18" in="grain" result="tooth" />
+                <feComposite in="SourceGraphic" in2="tooth" operator="in" />
+              </filter>
+              <filter id="wb-filter-watercolor" x="-15%" y="-15%" width="130%" height="130%">
+                <feTurbulence type="turbulence" baseFrequency="0.035" numOctaves="2" result="wash" />
+                <feDisplacementMap in="SourceGraphic" in2="wash" scale="2.4" xChannelSelector="R" yChannelSelector="G" />
+              </filter>
+            </>
+          )}
         </defs>
-        <g transform={`translate(${viewport.x} ${viewport.y}) scale(${viewport.zoom})`}>
+        <g ref={overlayGroupRef} transform={`translate(${view.x} ${view.y}) scale(${view.zoom})`}>
           <rect
             className="whiteboard-paper"
             width={boardWidth}
             height={boardHeight}
-            fill={canvas2dActive ? 'none' : (transparent ? 'none' : backgroundColor)}
+            fill={engineActive ? 'none' : (transparent ? 'none' : backgroundColor)}
+            stroke={engineActive ? 'none' : undefined}
           />
           <g clipPath={`url(#${clipId})`}>
-            <g className="whiteboard-svg-layers" opacity={canvas2dActive ? 0 : undefined}>
-              {(() => {
-                const visibleLayers = model.layers.filter(l => !l.hidden);
-                let currentBaseLayerId: string | null = null;
-                let currentBaseView: BoardLayer | null = null;
-                let currentBaseShapes: BoardShape[] = [];
-                return visibleLayers.map((layer, idx) => {
-                  const view = resizing?.id === layer.id ? resizing.layer : moving?.id === layer.id ? moving : layer;
-                  const shapes = resizing?.id === layer.id ? resizing.shapes : model.shapes.filter(s => (s.layerId ?? DEFAULT_BOARD_LAYER) === layer.id);
-                  const drafts = [...model.cursors]
-                    .filter(([id, c]) => id !== actor && c.draft && (c.draft.layerId ?? DEFAULT_BOARD_LAYER) === layer.id && !shapes.some(s => s.id === c.draft!.id))
-                    .map(([, c]) => c.draft!);
-                  const allShapes = [...shapes, ...drafts, ...(draft?.layerId === layer.id ? [draft] : [])];
-                  const layerOpacity = (view.opacity ?? 100) / 100;
-                  const isClipped = Boolean(view.clipping) && currentBaseLayerId !== null && currentBaseView !== null;
-                  if (!view.clipping) {
-                    currentBaseLayerId = layer.id;
-                    currentBaseView = view;
-                    currentBaseShapes = allShapes;
-                  }
-                  const needsClipDef = !view.clipping && visibleLayers.slice(idx + 1).some(next => next.clipping);
-                  const clipMaskId = isClipped ? `${clipId}-layerclip-${currentBaseLayerId}` : undefined;
-                  return (
-                    <g key={layer.id}>
-                      {needsClipDef && (
-                        <defs>
-                          <mask
-                            id={`${clipId}-layerclip-${layer.id}`}
-                            maskUnits="userSpaceOnUse"
-                            x={-16000}
-                            y={-10000}
-                            width={48000}
-                            height={30000}
-                            style={{ maskType: 'alpha' }}
-                          >
-                            <g transform={`translate(${view.x} ${view.y})`}>
-                              <WhiteboardLayerArt
-                                shapes={currentBaseShapes}
-                                imageHref={imageHref}
-                                canvasWidth={boardWidth}
-                                canvasHeight={boardHeight}
-                              />
-                            </g>
-                          </mask>
-                        </defs>
-                      )}
-                      <g
-                        data-board-layer={layer.id}
-                        mask={clipMaskId ? `url(#${clipMaskId})` : undefined}
-                        transform={`translate(${view.x} ${view.y})`}
-                        opacity={layerOpacity < 1 ? layerOpacity : undefined}
-                        style={view.blendMode && view.blendMode !== 'normal' ? { mixBlendMode: view.blendMode } : undefined}
-                      >
-                        <WhiteboardLayerArt
-                          shapes={allShapes}
-                          imageHref={imageHref}
-                          canvasWidth={boardWidth}
-                          canvasHeight={boardHeight}
-                          alphaLock={Boolean(view.alphaLock)}
-                        />
+            {!engineActive && (
+              <g className="whiteboard-svg-layers">
+                {(() => {
+                  const visibleLayers = model.layers.filter(l => !l.hidden);
+                  let currentBaseLayerId: string | null = null;
+                  let currentBaseView: BoardLayer | null = null;
+                  let currentBaseShapes: BoardShape[] = [];
+                  return visibleLayers.map((layer, idx) => {
+                    const layerView = resizing?.id === layer.id ? resizing.layer : moving?.id === layer.id ? moving : layer;
+                    const shapes = resizing?.id === layer.id ? resizing.shapes : model.shapes.filter(s => (s.layerId ?? DEFAULT_BOARD_LAYER) === layer.id);
+                    const drafts = [...model.cursors]
+                      .filter(([id, c]) => id !== actor && c.draft && (c.draft.layerId ?? DEFAULT_BOARD_LAYER) === layer.id && !shapes.some(s => s.id === c.draft!.id))
+                      .map(([, c]) => c.draft!);
+                    const allShapes = [...shapes, ...drafts, ...(draft?.layerId === layer.id ? [draft] : [])];
+                    const layerOpacity = (layerView.opacity ?? 100) / 100;
+                    const isClipped = Boolean(layerView.clipping) && currentBaseLayerId !== null && currentBaseView !== null;
+                    if (!layerView.clipping) {
+                      currentBaseLayerId = layer.id;
+                      currentBaseView = layerView;
+                      currentBaseShapes = allShapes;
+                    }
+                    const needsClipDef = !layerView.clipping && visibleLayers.slice(idx + 1).some(next => next.clipping);
+                    const clipMaskId = isClipped ? `${clipId}-layerclip-${currentBaseLayerId}` : undefined;
+                    return (
+                      <g key={layer.id}>
+                        {needsClipDef && (
+                          <defs>
+                            <mask
+                              id={`${clipId}-layerclip-${layer.id}`}
+                              maskUnits="userSpaceOnUse"
+                              x={-16000}
+                              y={-10000}
+                              width={48000}
+                              height={30000}
+                              style={{ maskType: 'alpha' }}
+                            >
+                              <g transform={`translate(${layerView.x} ${layerView.y})`}>
+                                <WhiteboardLayerArt
+                                  shapes={currentBaseShapes}
+                                  imageHref={imageHref}
+                                  canvasWidth={boardWidth}
+                                  canvasHeight={boardHeight}
+                                />
+                              </g>
+                            </mask>
+                          </defs>
+                        )}
+                        <g
+                          data-board-layer={layer.id}
+                          mask={clipMaskId ? `url(#${clipMaskId})` : undefined}
+                          transform={`translate(${layerView.x} ${layerView.y})`}
+                          opacity={layerOpacity < 1 ? layerOpacity : undefined}
+                          style={layerView.blendMode && layerView.blendMode !== 'normal' ? { mixBlendMode: layerView.blendMode } : undefined}
+                        >
+                          <WhiteboardLayerArt
+                            shapes={allShapes}
+                            imageHref={imageHref}
+                            canvasWidth={boardWidth}
+                            canvasHeight={boardHeight}
+                            alphaLock={Boolean(layerView.alphaLock)}
+                          />
+                        </g>
                       </g>
-                    </g>
-                  );
-                });
-              })()}
-            </g>
+                    );
+                  });
+                })()}
+              </g>
+            )}
 
             {showGrid && (
               <g className="whiteboard-pixel-grid-overlay" pointerEvents="none">
@@ -1121,13 +1398,14 @@ export function WhiteboardCanvas({
                     patternUnits="userSpaceOnUse"
                   >
                     <path
+                      ref={gridMajorPathRef}
                       d="M 16 0 L 0 0 0 16"
                       fill="none"
                       stroke="rgba(100, 116, 139, 0.36)"
-                      strokeWidth={1 / viewport.zoom}
+                      strokeWidth={1 / view.zoom}
                     />
                   </pattern>
-                  {viewport.zoom >= 5 && (
+                  {(gridPixelLevel || view.zoom >= 5) && (
                     <pattern
                       id={`${clipId}-grid-pixel`}
                       width={1}
@@ -1135,15 +1413,16 @@ export function WhiteboardCanvas({
                       patternUnits="userSpaceOnUse"
                     >
                       <path
+                        ref={gridPixelPathRef}
                         d="M 1 0 L 0 0 0 1"
                         fill="none"
                         stroke="rgba(148, 163, 184, 0.28)"
-                        strokeWidth={0.75 / viewport.zoom}
+                        strokeWidth={0.75 / view.zoom}
                       />
                     </pattern>
                   )}
                 </defs>
-                {viewport.zoom >= 5 && (
+                {(gridPixelLevel || view.zoom >= 5) && (
                   <rect width={boardWidth} height={boardHeight} fill={`url(#${clipId}-grid-pixel)`} />
                 )}
                 <rect width={boardWidth} height={boardHeight} fill={`url(#${clipId}-grid-major)`} />
@@ -1154,24 +1433,26 @@ export function WhiteboardCanvas({
               <g className="whiteboard-symmetry-guides">
                 {(settings.symmetry === 'vertical' || settings.symmetry === 'quad' || settings.symmetry === 'radial') && (
                   <line
+                    ref={symVRef}
                     x1={boardWidth / 2}
                     y1={0}
                     x2={boardWidth / 2}
                     y2={boardHeight}
                     stroke="var(--accent-color)"
-                    strokeWidth={1.25 / viewport.zoom}
-                    strokeDasharray={`${6 / viewport.zoom} ${4 / viewport.zoom}`}
+                    strokeWidth={1.25 / view.zoom}
+                    strokeDasharray={`${6 / view.zoom} ${4 / view.zoom}`}
                   />
                 )}
                 {(settings.symmetry === 'horizontal' || settings.symmetry === 'quad' || settings.symmetry === 'radial') && (
                   <line
+                    ref={symHRef}
                     x1={0}
                     y1={boardHeight / 2}
                     x2={boardWidth}
                     y2={boardHeight / 2}
                     stroke="var(--accent-color)"
-                    strokeWidth={1.25 / viewport.zoom}
-                    strokeDasharray={`${6 / viewport.zoom} ${4 / viewport.zoom}`}
+                    strokeWidth={1.25 / view.zoom}
+                    strokeDasharray={`${6 / view.zoom} ${4 / view.zoom}`}
                   />
                 )}
               </g>
@@ -1180,47 +1461,51 @@ export function WhiteboardCanvas({
             {!compact && activeSelectionPoly && activeSelectionPoly.length >= 2 && (
               <g className="whiteboard-selection-marquee">
                 <polygon
+                  ref={marqueeOuterRef}
                   points={activeSelectionPoly.map(p => `${p.x},${p.y}`).join(' ')}
                   fill="rgba(59, 130, 246, 0.08)"
                   fillRule="evenodd"
                   stroke="#ffffff"
-                  strokeWidth={1.5 / viewport.zoom}
+                  strokeWidth={1.5 / view.zoom}
                 />
                 <polygon
+                  ref={marqueeInnerRef}
                   className="whiteboard-marching-ants"
                   points={activeSelectionPoly.map(p => `${p.x},${p.y}`).join(' ')}
                   fill="none"
                   stroke="#2563eb"
-                  strokeWidth={1.5 / viewport.zoom}
-                  strokeDasharray={`${5 / viewport.zoom} ${5 / viewport.zoom}`}
+                  strokeWidth={1.5 / view.zoom}
+                  strokeDasharray={`${5 / view.zoom} ${5 / view.zoom}`}
                 />
               </g>
             )}
 
-            {!compact && !draft && bounds && (
+            {!compact && !hasLiveDraft && bounds && (
               <g className="whiteboard-selection-box">
                 <rect
+                  ref={selectionRectRef}
                   x={bounds.x}
                   y={bounds.y}
                   width={bounds.width}
                   height={bounds.height}
                   fill="none"
                   stroke="var(--accent-color)"
-                  strokeWidth={1.25 / viewport.zoom}
-                  strokeDasharray={`${4 / viewport.zoom} ${3 / viewport.zoom}`}
+                  strokeWidth={1.25 / view.zoom}
+                  strokeDasharray={`${4 / view.zoom} ${3 / view.zoom}`}
                 />
-                {selectedLayer && !selectedLayer.locked && boardResizeHandles(bounds).map(item => (
+                {selectedLayer && !selectedLayer.locked && boardResizeHandles(bounds).map((item, idx) => (
                   <rect
                     key={item.handle}
+                    ref={el => { selectionHandleRefs.current[idx] = el; }}
                     data-resize-handle={item.handle}
-                    x={item.x - 4.5 / viewport.zoom}
-                    y={item.y - 4.5 / viewport.zoom}
-                    width={9 / viewport.zoom}
-                    height={9 / viewport.zoom}
-                    rx={2 / viewport.zoom}
+                    x={item.x - 4.5 / view.zoom}
+                    y={item.y - 4.5 / view.zoom}
+                    width={9 / view.zoom}
+                    height={9 / view.zoom}
+                    rx={2 / view.zoom}
                     fill="#ffffff"
                     stroke="var(--accent-color)"
-                    strokeWidth={1.5 / viewport.zoom}
+                    strokeWidth={1.5 / view.zoom}
                   />
                 ))}
               </g>
@@ -1231,15 +1516,16 @@ export function WhiteboardCanvas({
 
       {!compact && textDraft && (
         <textarea
+          ref={textDraftRef}
           autoComplete="off"
           autoFocus
           className="whiteboard-text-input"
           aria-label={t('whiteboard.text')}
           value={textDraft.value}
           style={{
-            left: viewport.x + textDraft.x * viewport.zoom,
-            top: viewport.y + textDraft.y * viewport.zoom,
-            fontSize: Math.max(12, (settings.fontSize ?? 28) * viewport.zoom),
+            left: view.x + textDraft.x * view.zoom,
+            top: view.y + textDraft.y * view.zoom,
+            fontSize: Math.max(12, (settings.fontSize ?? 28) * view.zoom),
             color: settings.color,
           }}
           onPointerDown={e => e.stopPropagation()}
@@ -1259,23 +1545,39 @@ export function WhiteboardCanvas({
 
       <div className="whiteboard-cursors" aria-hidden="true">
         <div
+          ref={remoteCursorsRef}
           className="whiteboard-remote-cursors"
-          style={{ transform: `translate(${viewport.x}px, ${viewport.y}px) scale(${viewport.zoom})` }}
+          style={{ transform: `translate(${view.x}px, ${view.y}px) scale(${view.zoom})` }}
         >
           {[...model.cursors].filter(([id]) => id !== actor).map(([id, c]) => cursorGlyph(id, c))}
         </div>
-        {!compact && cursor && cursorGlyph(name, cursor, true)}
-        {!compact && cursor && cursorScreen && cursor.tool === 'eyedropper' && (() => {
-          const patch = sampleLoupePatch(cursor.x, cursor.y);
+        {!compact && localCursorMeta.visible && localCursorPosRef.current && (
+          <StreamPointerGlyph
+            key={name}
+            innerRef={localCursorElRef}
+            name=""
+            color={localCursorMeta.color}
+            interpolate={false}
+            shape={localCursorMeta.shape}
+            diameter={localCursorPosRef.current.worldWidth * view.zoom}
+            style={{
+              left: localCursorPosRef.current.screen.x,
+              top: localCursorPosRef.current.screen.y,
+            }}
+          />
+        )}
+        {!compact && localCursorMeta.visible && localCursorMeta.showLoupe && localCursorPosRef.current && (() => {
+          const { screen, world } = localCursorPosRef.current;
+          const patch = sampleLoupePatch(world.x, world.y);
           const stageW = root.current?.clientWidth || 800;
-          const flipX = cursorScreen.x + 128 > stageW;
-          const flipY = cursorScreen.y - 122 < 12;
+          const flipX = screen.x + 128 > stageW;
+          const flipY = screen.y - 122 < 12;
           return (
             <div
               className="whiteboard-eyedropper-loupe"
               style={{
-                left: flipX ? cursorScreen.x - 114 : cursorScreen.x + 18,
-                top: flipY ? cursorScreen.y + 18 : cursorScreen.y - 114,
+                left: flipX ? screen.x - 114 : screen.x + 18,
+                top: flipY ? screen.y + 18 : screen.y - 114,
               }}
             >
               <div
@@ -1314,7 +1616,7 @@ export function WhiteboardCanvas({
           >
             <ZoomOut size={13} />
           </TooltipButton>
-          <span className="whiteboard-navigation-hint">{Math.round(viewport.zoom * 100)}%</span>
+          <span ref={zoomHintRef} className="whiteboard-navigation-hint">{Math.round(view.zoom * 100)}%</span>
           <TooltipButton
             tooltip={t('whiteboard.zoomIn')}
             aria-label={t('whiteboard.zoomIn')}
@@ -1348,7 +1650,13 @@ export function WhiteboardCanvas({
             aria-label={t('whiteboard.pixelGrid')}
             aria-pressed={showGrid}
             className={`room-app-notepad-tool whiteboard-hud-btn ${showGrid ? 'active' : ''}`}
-            onClick={() => setShowGrid(v => !v)}
+            onClick={() => {
+              setShowGrid(v => {
+                const next = !v;
+                if (next) setGridPixelLevel(navigation.current.current.zoom >= 5);
+                return next;
+              });
+            }}
           >
             <Grid size={13} />
           </TooltipButton>

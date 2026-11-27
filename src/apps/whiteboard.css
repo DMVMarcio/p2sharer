@@ -147,21 +147,8 @@
 
 .whiteboard-canvas { flex: 1; min-width: 0; position: relative; overflow: hidden; touch-action: none; user-select: none;
   background: var(--bg-app); }
-.whiteboard-canvas.is-mirrored .whiteboard-raster-stage,
 .whiteboard-canvas.is-mirrored .whiteboard-art { transform: scaleX(-1); transform-origin: 50% 50%; }
-.whiteboard-raster-stage {
-  position: absolute; top: 0; left: 0; transform-origin: 0 0; pointer-events: none;
-  background-image:
-    linear-gradient(45deg, #e2e8f0 25%, transparent 25%),
-    linear-gradient(-45deg, #e2e8f0 25%, transparent 25%),
-    linear-gradient(45deg, transparent 75%, #e2e8f0 75%),
-    linear-gradient(-45deg, transparent 75%, #e2e8f0 75%);
-  background-size: 20px 20px;
-  background-position: 0 0, 0 10px, 10px -10px, -10px 0;
-  background-color: #f8fafc;
-  box-shadow: 0 4px 18px rgba(0, 0, 0, 0.28);
-}
-.whiteboard-raster-canvas { display: block; width: 100%; height: 100%; image-rendering: pixelated; pointer-events: none; }
+.whiteboard-viewport-canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; pointer-events: none; }
 .whiteboard-paper { stroke: #d1d5db; stroke-width: 1px; vector-effect: non-scaling-stroke; }
 .whiteboard-canvas.virtual-cursor { cursor: none; }
 .whiteboard-canvas:focus-visible { outline: 2px solid var(--accent-color); outline-offset: -2px; }

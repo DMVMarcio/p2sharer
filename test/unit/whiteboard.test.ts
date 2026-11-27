@@ -337,3 +337,45 @@ test('raster engine paints real pixels across brush families, flood fill, select
     assert.deepEqual(b.model.shapes, a.model.shapes);
   } finally { a.model.destroy(); b.model.destroy(); }
 });
+
+test('model caches shapes, layers, and serialized content across reads and invalidates cleanly on mutations, undo, and redo', () => {
+  const a = peer('a');
+  try {
+    const rev0 = a.model.revision;
+    const c0 = a.model.content;
+    assert.equal(a.model.content, c0);
+    assert.equal(a.model.shapes, a.model.shapes);
+    assert.equal(a.model.layers, a.model.layers);
+
+    a.model.put(shape({ tool: 'brush', points: [{ x: 10, y: 10 }, { x: 40, y: 40 }] }));
+    assert.ok(a.model.revision > rev0);
+    const c1 = a.model.content;
+    assert.notEqual(c1, c0);
+    assert.equal(a.model.content, c1);
+
+    a.model.undo();
+    assert.equal(a.model.shapes.length, 0);
+    assert.equal(a.model.content, c0);
+
+    a.model.redo();
+    assert.equal(a.model.shapes.length, 1);
+    assert.equal(a.model.content, c1);
+
+    // Cursor updates advance cursorRevision without invalidating content or scene revision
+    const revBeforeCursor = a.model.revision;
+    const cursorRevBefore = a.model.cursorRevision;
+    a.model.setParticipants(['b']);
+    a.model.apply({ cursor: { x: 50, y: 60, tool: 'brush', width: 12, color: '#3b82f6' } }, 'b', false);
+    assert.equal(a.model.revision, revBeforeCursor);
+    assert.ok(a.model.cursorRevision > cursorRevBefore);
+    assert.equal(a.model.content, c1);
+
+    // Local fast-path put enforces shape validation and bounds consistently
+    assert.throws(() => a.model.put(shape({ width: NaN })));
+
+    // hitBoardShape bbox early-out rejects far clicks while preserving exact hits on multi-point strokes
+    const stroke = shape({ tool: 'brush', brushType: 'pencil', width: 6, points: [{ x: 100, y: 100 }, { x: 150, y: 120 }, { x: 200, y: 100 }] });
+    assert.equal(hitBoardShape(stroke, { x: 10, y: 10 }, 4), false);
+    assert.equal(hitBoardShape(stroke, { x: 150, y: 118 }, 4), true);
+  } finally { a.model.destroy(); }
+});

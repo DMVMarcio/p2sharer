@@ -70,10 +70,22 @@ export class WhiteboardModel implements RoomAppModel {
   private destroyed = false;
   private expiry: ReturnType<typeof setInterval>;
   private context: RoomAppModelContext;
+  private _revision = 0;
+  private _cursorRevision = 0;
+  private _shapesCache: BoardShape[] | null = null;
+  private _layersCache: BoardLayer[] | null = null;
+  private _canvasCache: BoardCanvasSettings | null = null;
+  private _contentCache: string | null = null;
+  private _approxJsonBytes = 0;
 
   constructor(context: RoomAppModelContext) {
     this.context = context;
     this.document.on('update', (update: Uint8Array, origin: unknown) => {
+      this._shapesCache = null;
+      this._layersCache = null;
+      this._canvasCache = null;
+      this._contentCache = null;
+      this._revision++;
       if (origin !== 'remote') context.emit({ update: encodeUpdate(update) });
       context.changed();
     });
@@ -86,49 +98,78 @@ export class WhiteboardModel implements RoomAppModel {
         if (pending.until < Date.now() && !pending.validating) this.pendingImages.delete(hash);
       }
       if (this.pendingImages.size < 4) this.requestWaitingImages();
-      if (changed) context.changed();
+      if (changed) {
+        this._cursorRevision++;
+        context.changed();
+      }
     }, 1000);
     (this.expiry as unknown as { unref?: () => void }).unref?.();
   }
 
+  get revision(): number {
+    return this._revision;
+  }
+  get cursorRevision(): number {
+    return this._cursorRevision;
+  }
+
   get shapes(): BoardShape[] {
-    return [...this.objects.values()].sort((a, b) => a.order - b.order || a.id.localeCompare(b.id));
+    if (!this._shapesCache) {
+      this._shapesCache = [...this.objects.values()].sort((a, b) => a.order - b.order || a.id.localeCompare(b.id));
+    }
+    return this._shapesCache;
   }
   get layers(): BoardLayer[] {
-    const layers = [...this.layerMap.values()].filter(l => !l.deleted);
-    if (!this.layerMap.size) layers.push(this.fallbackLayer);
-    return layers.sort((a, b) => a.order - b.order || a.id.localeCompare(b.id));
+    if (!this._layersCache) {
+      const layers = [...this.layerMap.values()].filter(l => !l.deleted);
+      if (!this.layerMap.size) layers.push(this.fallbackLayer);
+      this._layersCache = layers.sort((a, b) => a.order - b.order || a.id.localeCompare(b.id));
+    }
+    return this._layersCache;
   }
   get canvasSettings(): BoardCanvasSettings {
-    const raw = this.metadata.get('canvas');
-    if (raw) {
-      try {
-        const parsed = JSON.parse(raw);
-        if (validBoardCanvasSettings(parsed)) return parsed;
-      } catch { /* fallback */ }
+    if (!this._canvasCache) {
+      const raw = this.metadata.get('canvas');
+      if (raw) {
+        try {
+          const parsed = JSON.parse(raw);
+          if (validBoardCanvasSettings(parsed)) {
+            this._canvasCache = parsed;
+            return this._canvasCache;
+          }
+        } catch { /* fallback */ }
+      }
+      this._canvasCache = defaultBoardCanvasSettings();
     }
-    return defaultBoardCanvasSettings();
+    return this._canvasCache;
   }
   get identity(): { id: string; name: string } | null {
     const id = this.metadata.get('id'), name = this.metadata.get('name');
     return boardId(id) && name ? { id, name } : null;
   }
   get content(): string {
-    const activeShapes = this.shapes.filter(s => this.layers.some(l => l.id === (s.layerId ?? DEFAULT_BOARD_LAYER)));
-    const usedImages: Record<string, string> = {};
-    for (const s of activeShapes) {
-      if (s.tool === 'image' && s.imageHash && this.images.has(s.imageHash)) {
-        usedImages[s.imageHash] = this.images.get(s.imageHash)!;
+    if (!this._contentCache) {
+      const layers = this.layers;
+      const activeLayerIds = new Set(layers.map(l => l.id));
+      const activeShapes = this.shapes.filter(s => activeLayerIds.has(s.layerId ?? DEFAULT_BOARD_LAYER));
+      const usedImages: Record<string, string> = {};
+      for (const s of activeShapes) {
+        if (s.tool === 'image' && s.imageHash && this.images.has(s.imageHash)) {
+          usedImages[s.imageHash] = this.images.get(s.imageHash)!;
+        }
       }
+      const rawCanvas = this.metadata.get('canvas');
+      const serialized = JSON.stringify({
+        version: 2,
+        shapes: activeShapes,
+        layers,
+        ...(Object.keys(usedImages).length ? { images: usedImages } : {}),
+        ...(rawCanvas ? { canvas: this.canvasSettings } : {}),
+      });
+      this._contentCache = serialized;
+      this._approxJsonBytes = serialized.length;
     }
-    const rawCanvas = this.metadata.get('canvas');
-    return JSON.stringify({
-      version: 2,
-      shapes: activeShapes,
-      layers: this.layers,
-      ...(Object.keys(usedImages).length ? { images: usedImages } : {}),
-      ...(rawCanvas ? { canvas: this.canvasSettings } : {}),
-    });
+    return this._contentCache;
   }
 
   getLayerPixels(layerId: string, drafts?: readonly BoardShape[]): Uint8ClampedArray {
@@ -181,6 +222,8 @@ export class WhiteboardModel implements RoomAppModel {
     }
     this.images.set(hash, clean);
     this.imageSizes.set(hash, clean.length);
+    this._contentCache = null;
+    this._revision++;
   }
 
   setIdentity(id: string, name: string): void {
@@ -190,9 +233,9 @@ export class WhiteboardModel implements RoomAppModel {
 
   setCanvasSettings(settings: BoardCanvasSettings): void {
     if (!validBoardCanvasSettings(settings)) throw new Error('whiteboard.invalidFile');
-    this.transact(doc => {
+    this.transactLocal(doc => {
       doc.getMap('file').set('canvas', JSON.stringify(settings));
-    });
+    }, { deltaBytes: 128 });
   }
 
   private validDocument(doc: Y.Doc): boolean {
@@ -219,6 +262,39 @@ export class WhiteboardModel implements RoomAppModel {
     } finally { candidate.destroy(); }
   }
 
+  private transactLocal(
+    action: (doc: Y.Doc) => void,
+    options: {
+      addedShapes?: number;
+      addedLayers?: number;
+      activeLayerDelta?: number;
+      deltaBytes?: number;
+      resetApprox?: boolean;
+    } = {},
+  ): void {
+    const nextShapes = this.objects.size + (options.addedShapes ?? 0);
+    const nextTotalLayers = Math.max(1, this.layerMap.size) + (options.addedLayers ?? 0);
+    const nextActiveLayers = this.layers.length + (options.activeLayerDelta ?? 0);
+    if (nextShapes > BOARD_MAX_SHAPES || nextTotalLayers > 128 || nextActiveLayers > 64) {
+      throw new Error('whiteboard.limit');
+    }
+    if (this._approxJsonBytes === 0 && (this.objects.size > 0 || this.layerMap.size > 0)) {
+      this._approxJsonBytes = JSON.stringify({ version: 2, shapes: this.shapes, layers: this.layers }).length;
+    }
+    const delta = options.deltaBytes ?? 0;
+    if (this._approxJsonBytes + delta > 3_200_000) {
+      this.transact(action);
+      this._approxJsonBytes = JSON.stringify({ version: 2, shapes: this.shapes, layers: this.layers }).length;
+      return;
+    }
+    this.document.transact(() => action(this.document), LOCAL);
+    if (options.resetApprox) {
+      this._approxJsonBytes = 0;
+    } else {
+      this._approxJsonBytes = Math.max(0, this._approxJsonBytes + delta);
+    }
+  }
+
   put(shape: BoardShape): void {
     const layerId = shape.layerId ?? DEFAULT_BOARD_LAYER;
     const layer = this.layers.find(l => l.id === layerId);
@@ -243,11 +319,15 @@ export class WhiteboardModel implements RoomAppModel {
     } else {
       segments.push(shape);
     }
-    this.transact(doc => {
+    if (!segments.every(validBoardShape)) throw new Error('whiteboard.limit');
+    const addedShapes = segments.filter(item => !this.objects.has(item.id)).length;
+    const addedLayers = this.layerMap.size === 0 ? 1 : 0;
+    const deltaBytes = JSON.stringify(segments).length;
+    this.transactLocal(doc => {
       if (!doc.getMap('layers').size) doc.getMap('layers').set(DEFAULT_BOARD_LAYER, defaultBoardLayer());
       const shapesMap = doc.getMap('shapes');
       for (const item of segments) shapesMap.set(item.id, item);
-    });
+    }, { addedShapes, addedLayers, deltaBytes });
   }
 
   pasteImage(image: WhiteboardImageRecord, box: BoardBox, layerId: string, newLayerName?: string): string {
@@ -278,13 +358,22 @@ export class WhiteboardModel implements RoomAppModel {
       hidden: false,
       locked: false,
     };
-    this.transact(doc => {
+    const newLayer = newLayerName
+      ? { ...defaultBoardLayer(), id: layerId, name: newLayerName.trim(), order: maxLayerOrder + 1 }
+      : null;
+    if (!validBoardShape(shape) || (newLayer && !validBoardLayer(newLayer))) {
+      throw new Error('whiteboard.limit');
+    }
+    this.transactLocal(doc => {
       const layers = doc.getMap('layers');
       if (!layers.size) layers.set(DEFAULT_BOARD_LAYER, defaultBoardLayer());
-      if (newLayerName) {
-        layers.set(layerId, { ...defaultBoardLayer(), id: layerId, name: newLayerName.trim(), order: maxLayerOrder + 1 });
-      }
+      if (newLayer) layers.set(layerId, newLayer);
       doc.getMap('shapes').set(shape.id, shape);
+    }, {
+      addedShapes: 1,
+      addedLayers: (this.layerMap.size === 0 ? 1 : 0) + (newLayer && !this.layerMap.has(layerId) ? 1 : 0),
+      activeLayerDelta: newLayer && !this.layers.some(l => l.id === layerId) ? 1 : 0,
+      deltaBytes: 512,
     });
     if (this.context.localView) {
       this.context.emit({ localImage: { hash: image.hash, data: raw } });
@@ -296,13 +385,14 @@ export class WhiteboardModel implements RoomAppModel {
     const layer = this.layers.find(l => l.id === id);
     if (!layer || layer.locked || layer.hidden) return;
     const { layer: nextLayer, shapes: nextShapes } = scaleBoardLayer(layer, this.shapes, from, to);
-    this.transact(doc => {
+    if (!validBoardLayer(nextLayer) || !nextShapes.every(validBoardShape)) throw new Error('whiteboard.limit');
+    this.transactLocal(doc => {
       const layers = doc.getMap('layers');
       if (!layers.size) layers.set(DEFAULT_BOARD_LAYER, defaultBoardLayer());
       layers.set(nextLayer.id, nextLayer);
       const shapesMap = doc.getMap('shapes');
       for (const s of nextShapes) shapesMap.set(s.id, s);
-    });
+    }, { deltaBytes: 128 });
   }
 
   flipLayer(id: string, axis: 'x' | 'y'): void {
@@ -310,13 +400,14 @@ export class WhiteboardModel implements RoomAppModel {
     if (!layer || layer.locked || layer.hidden) return;
     const { width, height } = this.canvasSettings;
     const { layer: nextLayer, shapes: nextShapes } = flipBoardLayer(layer, this.shapes, axis, width, height);
-    this.transact(doc => {
+    if (!validBoardLayer(nextLayer) || !nextShapes.every(validBoardShape)) throw new Error('whiteboard.limit');
+    this.transactLocal(doc => {
       const layers = doc.getMap('layers');
       if (!layers.size) layers.set(DEFAULT_BOARD_LAYER, defaultBoardLayer());
       layers.set(nextLayer.id, nextLayer);
       const shapesMap = doc.getMap('shapes');
       for (const s of nextShapes) shapesMap.set(s.id, s);
-    });
+    }, { deltaBytes: 128 });
   }
 
   clearLayer(id: string, clipPolygon?: BoardPoint[]): void {
@@ -376,21 +467,32 @@ export class WhiteboardModel implements RoomAppModel {
     }
     const newLayerOrder = (updatedOrders.get(id) ?? 0) + 1;
 
-    this.transact(doc => {
+    const newLayer: BoardLayer = {
+      ...source,
+      id: newId,
+      name: name.trim().slice(0, 80),
+      order: newLayerOrder,
+      locked: false,
+    };
+    if (!validBoardLayer(newLayer) || !clonedShapes.every(validBoardShape)) {
+      throw new Error('whiteboard.limit');
+    }
+    const deltaBytes = JSON.stringify(clonedShapes).length + 256;
+
+    this.transactLocal(doc => {
       const layerMap = doc.getMap<BoardLayer>('layers');
       if (!layerMap.size) layerMap.set(DEFAULT_BOARD_LAYER, defaultBoardLayer());
       for (const l of layers) {
         layerMap.set(l.id, { ...l, order: updatedOrders.get(l.id) ?? l.order });
       }
-      layerMap.set(newId, {
-        ...source,
-        id: newId,
-        name: name.trim().slice(0, 80),
-        order: newLayerOrder,
-        locked: false,
-      });
+      layerMap.set(newId, newLayer);
       const shapesMap = doc.getMap<BoardShape>('shapes');
       for (const cs of clonedShapes) shapesMap.set(cs.id, cs);
+    }, {
+      addedShapes: clonedShapes.length,
+      addedLayers: (this.layerMap.size === 0 ? 1 : 0) + 1,
+      activeLayerDelta: 1,
+      deltaBytes,
     });
     return newId;
   }
@@ -407,58 +509,70 @@ export class WhiteboardModel implements RoomAppModel {
     const upperOpacityFactor = (upper.opacity ?? 100) / 100;
     const upperShapes = this.shapes.filter(s => (s.layerId ?? DEFAULT_BOARD_LAYER) === upper.id);
     let nextOrder = (this.shapes[this.shapes.length - 1]?.order ?? 0) + 1;
+    const updatedShapes = upperShapes.map(s => {
+      const mergedOpacity = Math.max(1, Math.min(100, Math.round((s.opacity ?? 100) * upperOpacityFactor)));
+      return {
+        ...s,
+        layerId: lower.id,
+        x: Math.round((s.x + dx) * 100) / 100,
+        y: Math.round((s.y + dy) * 100) / 100,
+        opacity: mergedOpacity,
+        order: nextOrder++,
+      };
+    });
+    if (!updatedShapes.every(validBoardShape)) throw new Error('whiteboard.limit');
 
-    this.transact(doc => {
+    this.transactLocal(doc => {
       const layerMap = doc.getMap<BoardLayer>('layers');
       if (!layerMap.size) layerMap.set(DEFAULT_BOARD_LAYER, defaultBoardLayer());
       layerMap.set(upper.id, { ...upper, deleted: true });
       const shapesMap = doc.getMap<BoardShape>('shapes');
-      for (const s of upperShapes) {
-        const mergedOpacity = Math.max(1, Math.min(100, Math.round((s.opacity ?? 100) * upperOpacityFactor)));
-        shapesMap.set(s.id, {
-          ...s,
-          layerId: lower.id,
-          x: Math.round((s.x + dx) * 100) / 100,
-          y: Math.round((s.y + dy) * 100) / 100,
-          opacity: mergedOpacity,
-          order: nextOrder++,
-        });
-      }
-    });
+      for (const s of updatedShapes) shapesMap.set(s.id, s);
+    }, { activeLayerDelta: -1, deltaBytes: 128 });
     return lower.id;
   }
 
   addLayer(name: string): string {
     const id = crypto.randomUUID();
-    this.transact(doc => {
+    const newLayer: BoardLayer = {
+      ...defaultBoardLayer(),
+      id,
+      name: name.trim(),
+      order: Math.max(...this.layers.map(l => l.order)) + 1,
+    };
+    if (!validBoardLayer(newLayer)) throw new Error('whiteboard.limit');
+    this.transactLocal(doc => {
       const layers = doc.getMap('layers');
       if (!layers.size) layers.set(DEFAULT_BOARD_LAYER, defaultBoardLayer());
-      layers.set(id, { ...defaultBoardLayer(), id, name: name.trim(), order: Math.max(...this.layers.map(l => l.order)) + 1 });
-    });
+      layers.set(id, newLayer);
+    }, { addedLayers: (this.layerMap.size === 0 ? 1 : 0) + 1, activeLayerDelta: 1, deltaBytes: 256 });
     return id;
   }
   updateLayer(layer: BoardLayer): void {
-    this.transact(doc => {
+    if (!validBoardLayer(layer)) throw new Error('whiteboard.limit');
+    this.transactLocal(doc => {
       const layers = doc.getMap('layers');
       if (!layers.size) layers.set(DEFAULT_BOARD_LAYER, defaultBoardLayer());
       layers.set(layer.id, layer);
-    });
+    }, { addedLayers: this.layerMap.has(layer.id) ? 0 : 1, deltaBytes: 64 });
   }
   removeLayer(id: string): void {
     const layer = this.layers.find(l => l.id === id);
     if (!layer || layer.locked || this.layers.length <= 1) return;
-    this.transact(doc => {
+    this.transactLocal(doc => {
       doc.getMap('layers').set(id, { ...layer, deleted: true });
       const shapes = doc.getMap<BoardShape>('shapes');
       for (const [key, shape] of shapes) if ((shape.layerId ?? DEFAULT_BOARD_LAYER) === id) shapes.delete(key);
-    });
+    }, { activeLayerDelta: -1, resetApprox: true });
   }
   reorderLayers(ids: string[]): void {
     const layers = this.layers;
     if (ids.length !== layers.length || new Set(ids).size !== layers.length || ids.some(id => !layers.some(l => l.id === id))) return;
-    this.transact(doc => { ids.forEach((id, order) => doc.getMap('layers').set(id, { ...layers.find(l => l.id === id)!, order })); });
+    this.transactLocal(doc => { ids.forEach((id, order) => doc.getMap('layers').set(id, { ...layers.find(l => l.id === id)!, order })); });
   }
-  remove(id: string): void { this.transact(doc => doc.getMap('shapes').delete(id)); }
+  remove(id: string): void {
+    this.transactLocal(doc => doc.getMap('shapes').delete(id), { resetApprox: true });
+  }
   replace(content: string, id: string, name: string): void {
     const file = parseBoardFile(content);
     if (!boardId(id) || !name.trim() || name.length > 80) throw new Error('whiteboard.invalidFile');
@@ -486,16 +600,24 @@ export class WhiteboardModel implements RoomAppModel {
       else meta.delete('canvas');
     });
     this._raster?.clear();
+    this._approxJsonBytes = 0;
     this.history.clear();
   }
-  undo(): void { this.history.undo(); this.context.changed(); }
-  redo(): void { this.history.redo(); this.context.changed(); }
+  undo(): void { this._approxJsonBytes = 0; this.history.undo(); this.context.changed(); }
+  redo(): void { this._approxJsonBytes = 0; this.history.redo(); this.context.changed(); }
   presence(cursor: Omit<BoardCursor, 'seenAt'> | null): void {
     this.context.emit({ cursor });
   }
   setParticipants(participants: string[]): void {
     this.participants = new Set(participants);
-    for (const actor of this.cursors.keys()) if (!this.participants.has(actor)) this.cursors.delete(actor);
+    let cursorChanged = false;
+    for (const actor of this.cursors.keys()) {
+      if (!this.participants.has(actor)) {
+        this.cursors.delete(actor);
+        cursorChanged = true;
+      }
+    }
+    if (cursorChanged) this._cursorRevision++;
     for (const [hash, pending] of this.pendingImages) {
       if (pending.peer && !this.participants.has(pending.peer) && !pending.validating) this.pendingImages.delete(hash);
     }
@@ -623,14 +745,22 @@ export class WhiteboardModel implements RoomAppModel {
   }
 
   private acceptCursor(value: unknown, actor: string): void {
-    if (value === null) { if (this.cursors.delete(actor)) this.context.changed(); return; }
+    if (value === null) {
+      if (this.cursors.delete(actor)) {
+        this._cursorRevision++;
+        this.context.changed();
+      }
+      return;
+    }
     const c = value as BoardCursor;
     if (!c || !boardCoordinate(c.x) || !boardCoordinate(c.y) || !CURSOR_TOOLS.includes(c.tool) ||
       !Number.isFinite(c.width) || c.width < 1 || c.width > 2000 || typeof c.color !== 'string' || !/^#[\da-f]{6}$/i.test(c.color) ||
       (c.draft !== undefined && !validBoardShape(c.draft))) return;
     const previous = this.cursors.get(actor);
     if (previous && Date.now() - previous.seenAt < 25) return;
-    this.cursors.set(actor, { ...c, seenAt: Date.now() }); this.context.changed();
+    this.cursors.set(actor, { ...c, seenAt: Date.now() });
+    this._cursorRevision++;
+    this.context.changed();
   }
 
   apply(payload: unknown, actor: string, fromSnapshot: boolean): void {
@@ -669,6 +799,7 @@ export class WhiteboardModel implements RoomAppModel {
       Y.applyUpdate(candidate, Y.encodeStateAsUpdate(this.document));
       Y.applyUpdate(candidate, update);
       if (this.validDocument(candidate)) {
+        this._approxJsonBytes = 0;
         Y.applyUpdate(this.document, update, 'remote');
         this.requestWaitingImages(actor);
       }

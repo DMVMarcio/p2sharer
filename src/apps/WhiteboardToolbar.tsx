@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type ReactNode } from 'react';
+import { memo, useEffect, useRef, useState, type ReactNode } from 'react';
 import {
   Brush, Pencil, Pen, Eraser, MousePointer2, Square, Circle, Minus, ImagePlus,
   Undo2, Redo2, PaintBucket, Pipette, Type, BoxSelect, Lasso,
@@ -99,7 +99,7 @@ function DropdownSlider({
   );
 }
 
-export function WhiteboardToolbar({
+export const WhiteboardToolbar = memo(function WhiteboardToolbar({
   settings,
   onChange,
   canUndo,
@@ -610,4 +610,4 @@ export function WhiteboardToolbar({
       )}
     </div>
   );
-}
+});

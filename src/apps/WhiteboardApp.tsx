@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { getCurrentWebview } from '@tauri-apps/api/webview';
 import { ModalDialog } from '../components/common/ModalDialog';
 import { Select } from '../components/common/Select';
@@ -13,6 +13,7 @@ import { DEFAULT_BOARD_LAYER, type BoardLayer, type BoardPoint, type BoardTool }
 import { WhiteboardToolbar, type BoardSettings } from './WhiteboardToolbar';
 import { WhiteboardLayers } from './WhiteboardLayers';
 import { WhiteboardCanvas } from './WhiteboardCanvas';
+import { WhiteboardStudioCompositor } from './whiteboard_webgl';
 import { CANVAS_PRESETS, containBoardLayer, type BoardViewport } from './whiteboard_interaction';
 import { prepareWhiteboardImage, readClipboardImageDataUrl } from './whiteboard_image';
 import { boardError, useWhiteboardFiles } from './useWhiteboardFiles';
@@ -132,12 +133,17 @@ export function WhiteboardApp({ instanceId, compact = false }: { instanceId: str
 
   const [activeLayer, setActiveLayer] = useState(DEFAULT_BOARD_LAYER);
   const [selected, setSelected] = useState<string | null>(null);
-  const [viewport, setViewport] = useState<BoardViewport>({ x: 60, y: 60, zoom: 1 });
+  const viewportRef = useRef<BoardViewport>({ x: 60, y: 60, zoom: 1 });
+  const studioRef = useRef<WhiteboardStudioCompositor | null>(null);
+  if (!studioRef.current) studioRef.current = new WhiteboardStudioCompositor();
+  useEffect(() => () => studioRef.current?.dispose(), []);
+  const [engineActive, setEngineActive] = useState(false);
   const { ref: fullscreenRef, fullscreen, toggleFullscreen } = useElementFullscreen<HTMLDivElement>();
   compact = compact && !fullscreen;
   const files = useWhiteboardFiles(model, instanceId);
 
-  const error = (reason: unknown) => showToast(boardError(reason), 3500, 'error');
+  const error = useCallback((reason: unknown) => showToast(boardError(reason), 3500, 'error'), []);
+  const imageHref = useCallback((hash: string) => model?.imageUrl(hash), [model]);
   const updateLayer = (layer: BoardLayer) => { try { model?.updateLayer(layer); } catch (reason) { error(reason); } };
   const select = (id: string | null) => { setSelected(id); if (id) setActiveLayer(id); };
   const remove = (id: string) => { try { model?.removeLayer(id); setSelected(null); } catch (reason) { error(reason); } };
@@ -298,14 +304,15 @@ export function WhiteboardApp({ instanceId, compact = false }: { instanceId: str
       const { width: boardWidth, height: boardHeight } = model.canvasSettings;
       const canvasEl = fullscreenRef.current?.querySelector('.whiteboard-canvas') as HTMLElement | null;
       const rect = canvasEl?.getBoundingClientRect();
-      const viewW = (canvasEl?.clientWidth || 800) / viewport.zoom;
-      const viewH = (canvasEl?.clientHeight || 500) / viewport.zoom;
+      const vp = viewportRef.current;
+      const viewW = (canvasEl?.clientWidth || 800) / vp.zoom;
+      const viewH = (canvasEl?.clientHeight || 500) / vp.zoom;
       const centerX = dropPoint && rect
-        ? Math.max(0, Math.min(boardWidth, (dropPoint.clientX - rect.left - viewport.x) / viewport.zoom))
-        : Math.max(0, Math.min(boardWidth, (-viewport.x) / viewport.zoom + viewW / 2));
+        ? Math.max(0, Math.min(boardWidth, (dropPoint.clientX - rect.left - vp.x) / vp.zoom))
+        : Math.max(0, Math.min(boardWidth, (-vp.x) / vp.zoom + viewW / 2));
       const centerY = dropPoint && rect
-        ? Math.max(0, Math.min(boardHeight, (dropPoint.clientY - rect.top - viewport.y) / viewport.zoom))
-        : Math.max(0, Math.min(boardHeight, (-viewport.y) / viewport.zoom + viewH / 2));
+        ? Math.max(0, Math.min(boardHeight, (dropPoint.clientY - rect.top - vp.y) / vp.zoom))
+        : Math.max(0, Math.min(boardHeight, (-vp.y) / vp.zoom + viewH / 2));
       const maxW = Math.min(boardWidth * 0.8, Math.max(240, viewW * 0.65));
       const maxH = Math.min(boardHeight * 0.8, Math.max(240, viewH * 0.65));
       const scale = Math.min(1, maxW / image.width, maxH / image.height);
@@ -500,12 +507,14 @@ export function WhiteboardApp({ instanceId, compact = false }: { instanceId: str
           )}
           <WhiteboardCanvas
             model={model}
+            studio={studioRef.current}
+            engineActive={engineActive}
+            onEngineActiveChange={setEngineActive}
             activeLayer={currentLayer}
             settings={settings}
             spaceHeld={spaceHeld}
             altHeld={altHeld}
-            viewport={viewport}
-            onViewport={setViewport}
+            viewportRef={viewportRef}
             selected={selected}
             onSelect={select}
             selectionPolygon={selectionPolygon}
@@ -533,7 +542,11 @@ export function WhiteboardApp({ instanceId, compact = false }: { instanceId: str
             onActivate={select}
             onChange={updateLayer}
             onDelete={remove}
-            imageHref={hash => model.imageUrl(hash)}
+            imageHref={imageHref}
+            studio={studioRef.current}
+            engineActive={engineActive}
+            boardWidth={model.canvasSettings.width}
+            boardHeight={model.canvasSettings.height}
             color={settings.color}
             secondaryColor={settings.secondaryColor ?? '#ffffff'}
             recentColors={recentColors}

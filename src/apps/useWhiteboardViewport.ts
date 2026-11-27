@@ -10,6 +10,7 @@ export function useWhiteboardViewport(
   boardHeight = BOARD_HEIGHT,
 ) {
   const current = useRef(viewport); current.current = viewport;
+  const onChangeRef = useRef(onChange); onChangeRef.current = onChange;
   const sizeRef = useRef({ boardWidth, boardHeight });
   sizeRef.current = { boardWidth, boardHeight };
   const target = useRef<BoardViewport | null>(null);
@@ -17,7 +18,7 @@ export function useWhiteboardViewport(
   const lastTime = useRef<number | null>(null);
   const dimensions = () => ({ width: root.current?.clientWidth || 800, height: root.current?.clientHeight || 500 });
   const stop = () => { if (frame.current !== null) cancelAnimationFrame(frame.current); frame.current = null; target.current = null; lastTime.current = null; };
-  const publish = (view: BoardViewport) => { current.current = view; onChange(view); };
+  const publish = (view: BoardViewport) => { current.current = view; onChangeRef.current(view); };
   const set = (view: BoardViewport) => {
     stop();
     const { width, height } = dimensions();
