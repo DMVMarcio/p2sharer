@@ -4,7 +4,7 @@ import { decodeBase64, inspectPngBytes, sha256Hex, verifyWhiteboardPng } from '.
 import { browserRecord } from './web_storage.ts';
 import { browserFileCommand, downloadBlob, pickBrowserFile } from './web_files.ts';
 import type { ProfileImage } from '../core/profile_image.ts';
-import type { SavedNote } from '../apps/notepad/NotepadFilesDialog.ts';
+import type { SavedNote } from '../apps/shared/DocumentFilesDialog.tsx';
 import { cropDimensions } from '../core/profile_crop.ts';
 import { isGif, inspectProfileGif, cropProfileGif, PROFILE_INPUT_LIMIT } from './web_profile_gif.ts';
 

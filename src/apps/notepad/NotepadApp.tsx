@@ -24,13 +24,14 @@ import {
   pickWhiteboardImage, prepareWhiteboardImage, readClipboardImageDataUrl,
   validHttpImageUrl, type WhiteboardImageRecord,
 } from '../shared/whiteboard_image';
-import { boardError } from '../shared/useWhiteboardFiles';
+import { documentError } from '../shared/document_errors';
 import { showToast } from '../../hooks/useToast';
 import { useRoom } from '../../hooks/useRoom';
 import { useTextEditorContextMenu } from '../../hooks/useTextEditorContextMenu';
 import { ModalDialog } from '../../components/common/ModalDialog';
 import { useDocumentLibraryDeletion } from '../shared/useDocumentLibraryDeletion';
-import { NotepadFilesDialog, type SavedNote, type NoteLibrary, type NoteExportFormat } from './NotepadFilesDialog';
+import { NotepadFilesDialog } from './NotepadFilesDialog';
+import type { SavedNote, NoteLibrary, NoteExportFormat } from '../shared/DocumentFilesDialog';
 
 interface Props { instanceId: string; compact?: boolean }
 
@@ -154,7 +155,7 @@ export const NotepadApp: React.FC<Props> = ({ instanceId, compact = false }) => 
       const image = await prepareWhiteboardImage(dataUrl, filePath);
       insertNoteImage(image, dropPoint);
     } catch (reason) {
-      showToast(boardError(reason), 3500, 'error');
+      showToast(documentError(reason), 3500, 'error');
     }
   };
   const pasteImageRef = useRef(pasteImage);
@@ -197,7 +198,7 @@ export const NotepadApp: React.FC<Props> = ({ instanceId, compact = false }) => 
       setEditingImage(false);
       setImageUrl('');
     } catch (reason) {
-      showToast(boardError(reason), 3500, 'error');
+      showToast(documentError(reason), 3500, 'error');
     } finally {
       setBusy(false);
     }
@@ -216,7 +217,7 @@ export const NotepadApp: React.FC<Props> = ({ instanceId, compact = false }) => 
       setEditingImage(false);
       setImageUrl('');
     } catch (reason) {
-      showToast(boardError(reason), 3500, 'error');
+      showToast(documentError(reason), 3500, 'error');
     } finally {
       setBusy(false);
     }

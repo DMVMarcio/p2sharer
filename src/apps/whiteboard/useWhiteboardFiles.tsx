@@ -1,20 +1,17 @@
 import { useEffect, useRef, useState } from 'react';
 import { invoke } from '../../platform/commands.ts';
 import { FilePlus2, FolderOpen, Save, Download } from 'lucide-react';
-import { DocumentFilesDialog, type NoteLibrary, type SavedNote } from '../notepad/NotepadFilesDialog';
+import { DocumentFilesDialog, type NoteLibrary, type SavedNote } from '../shared/DocumentFilesDialog';
 import { ModalDialog } from '../../components/common/ModalDialog';
 import { TooltipButton } from '../../components/common/TooltipButton';
 import { showToast } from '../../hooks/useToast';
-import { getLanguage, localizeError, t } from '../../i18n';
-import type { WhiteboardModel } from '../whiteboard/whiteboard_model';
-import { boardSvg, parseBoardFile } from '../whiteboard/whiteboard_scene';
-import { useDocumentLibraryDeletion } from './useDocumentLibraryDeletion';
-import { boardPng } from '../whiteboard/whiteboard_export';
+import { getLanguage, t } from '../../i18n';
+import type { WhiteboardModel } from './whiteboard_model';
+import { boardSvg, parseBoardFile } from './whiteboard_scene';
+import { useDocumentLibraryDeletion } from '../shared/useDocumentLibraryDeletion';
+import { documentError } from '../shared/document_errors';
+import { boardPng } from './whiteboard_export';
 
-export function boardError(error: unknown): string {
-  const message = error instanceof Error ? error.message : String(error);
-  return message.startsWith('whiteboard.') || message === 'documents.nameExists' ? t(message) : localizeError(error);
-}
 type Replacement = SavedNote | { content: string; format: string } | 'new';
 export function useWhiteboardFiles(model: WhiteboardModel | undefined, instanceId: string) {
   const [dialog, setDialog] = useState<'open' | 'save' | 'export' | null>(null);
@@ -57,7 +54,7 @@ export function useWhiteboardFiles(model: WhiteboardModel | undefined, instanceI
       if ((model.identity?.id ?? instanceId) !== id) throw new Error('whiteboard.documentChanged');
       if (existing) await persist(existing.name, id);
       else { target.current = id; setDialog('save'); }
-    } catch (error) { showToast(boardError(error), 3500, 'error'); }
+    } catch (error) { showToast(documentError(error), 3500, 'error'); }
     finally { setBusy(false); }
   };
   const replace = (note: Replacement) => {
@@ -65,7 +62,7 @@ export function useWhiteboardFiles(model: WhiteboardModel | undefined, instanceI
       model?.replace(note === 'new' ? '{"version":1,"shapes":[]}' : note.content,
         note !== 'new' && 'id' in note ? note.id : crypto.randomUUID(), note !== 'new' && 'name' in note ? note.name : t('whiteboard.untitled'));
       if (note !== 'new' && 'id' in note) { deleted.current.delete(note.id); saved.current.set(note.id, note); }
-    } catch (error) { showToast(boardError(error), 3500, 'error'); }
+    } catch (error) { showToast(documentError(error), 3500, 'error'); }
     setPending(null);
   };
   const requestReplace = (note: Replacement) => {
@@ -83,7 +80,7 @@ export function useWhiteboardFiles(model: WhiteboardModel | undefined, instanceI
     </div>,
     status: <div className="notepad-file-status" role="status"><strong>{name}</strong><span>{t(busy ? 'notepad.saving' : local?.content === model?.content ? 'notepad.saved' : local ? 'notepad.modified' : 'notepad.unsaved')}</span></div>,
     dialogs: <>{dialog && <DocumentFilesDialog mode={dialog} library="whiteboard" initialName={name} onOpen={requestReplace}
-      onSave={async (name, overwrite) => { try { await persist(name, target.current, overwrite); } catch (error) { throw new Error(boardError(error)); } }}
+      onSave={async (name, overwrite) => { try { await persist(name, target.current, overwrite); } catch (error) { throw new Error(documentError(error)); } }}
       onDelete={forgetSaved}
       onRename={note => { deleted.current.delete(note.id); saved.current.set(note.id, note);
         if ((model?.identity?.id ?? instanceId) === note.id) model?.setIdentity(note.id, note.name);

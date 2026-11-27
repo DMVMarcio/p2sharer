@@ -17,7 +17,8 @@ import { WhiteboardCanvas, type WhiteboardCanvasActions } from './WhiteboardCanv
 import { WhiteboardStudioCompositor } from './whiteboard_webgl';
 import { CANVAS_PRESETS, containBoardLayer, type BoardViewport } from '../shared/whiteboard_interaction';
 import { prepareWhiteboardImage, readClipboardImageDataUrl } from '../shared/whiteboard_image';
-import { boardError, useWhiteboardFiles } from '../shared/useWhiteboardFiles';
+import { useWhiteboardFiles } from './useWhiteboardFiles';
+import { documentError } from '../shared/document_errors';
 
 type WidthTool = 'brush' | 'eraser' | 'rectangle' | 'ellipse' | 'line';
 const isWidthTool = (tool: BoardTool): tool is WidthTool =>
@@ -195,7 +196,7 @@ export function WhiteboardApp({ instanceId, compact = false }: { instanceId: str
   compact = compact && !fullscreen;
   const files = useWhiteboardFiles(model, instanceId);
 
-  const error = useCallback((reason: unknown) => showToast(boardError(reason), 3500, 'error'), []);
+  const error = useCallback((reason: unknown) => showToast(documentError(reason), 3500, 'error'), []);
   const imageHref = useCallback((hash: string) => model?.imageUrl(hash), [model]);
   const updateLayer = (layer: BoardLayer) => { try { model?.updateLayer(layer); } catch (reason) { error(reason); } };
   const select = (id: string | null) => { setSelected(id); if (id) setActiveLayer(id); };
