@@ -28,6 +28,7 @@ import { HeroRoomPreview } from './landing/HeroRoomPreview';
 import { FilesDemo, MeetingsDemo, PlayCreateDemo, RemoteDemo, Showcase, StreamDemo, WatchDemo, type Tone } from './landing/Showcase';
 import { P2PJourney } from './landing/P2PJourney';
 import { AppDock } from './landing/AppDock';
+import { LandingBackdrop } from './landing/Backdrop';
 import { useScrollReveal } from './landing/motion';
 import { usePageMetadata } from './pageMetadata';
 import './landing/landing.css';
@@ -151,6 +152,16 @@ export function SiteLayout() {
   );
 }
 
+/** Wraps each word so the hero title can assemble word by word; spacing stays in the text. */
+function splitWords(text: string) {
+  let word = 0;
+  return text.split(/(\s+)/).map((part, index) => (
+    /\s/.test(part) || !part
+      ? part
+      : <span key={index} className="lp-word" style={{ '--w': word++ } as CSSProperties}>{part}</span>
+  ));
+}
+
 function SectionHeader({ id, eyebrow, title, lead }: { id: string; eyebrow: string; title: string; lead: string }) {
   return (
     <div className="site-section-header" data-reveal="">
@@ -168,18 +179,14 @@ export function LandingPage() {
   useScrollReveal(ref);
   return (
     <div ref={ref} className="site-landing">
-      <div className="lp-backdrop" aria-hidden="true">
-        <span className="lp-orb is-a" />
-        <span className="lp-orb is-b" />
-        <span className="lp-orb is-c" />
-      </div>
+      <LandingBackdrop />
 
       <section className="site-hero">
         <div className="site-hero-content">
           <div className="site-eyebrow">
             <span>{t('web.heroTag')}</span>
           </div>
-          <h1>{t('web.heroTitle')}</h1>
+          <h1>{splitWords(t('web.heroTitle'))}</h1>
           <p className="site-description">{t('web.heroSubtitle')}</p>
           <div className="site-actions">
             <WebsiteLink className="btn btn-primary" href="/app">
@@ -272,14 +279,14 @@ export function LandingPage() {
 
       <section id="security" className="site-section lp-security" aria-labelledby="security-heading">
         <SectionHeader id="security-heading" eyebrow="web.archEyebrow" title="web.archHeading" lead="web.archLead" />
-        <div data-reveal="">
+        <div data-reveal="zoom">
           <P2PJourney />
         </div>
       </section>
 
       <section id="apps" className="site-section" aria-labelledby="apps-heading">
         <SectionHeader id="apps-heading" eyebrow="web.appsEyebrow" title="web.appsHeading" lead="web.appsLead" />
-        <div data-reveal="">
+        <div data-reveal="zoom">
           <AppDock />
         </div>
       </section>
@@ -287,7 +294,7 @@ export function LandingPage() {
       <section id="platforms" className="site-section" aria-labelledby="platforms-heading">
         <SectionHeader id="platforms-heading" eyebrow="web.platformsEyebrow" title="web.platformsHeading" lead="web.platformsLead" />
         <div className="site-platforms-grid">
-          <article className="site-platform-card is-featured" data-reveal="">
+          <article className="site-platform-card is-featured" data-reveal="zoom">
             <div className="site-platform-head">
               <span className="site-platform-tag"><Monitor size={14} aria-hidden="true" />{t('web.platformDesktopTag')}</span>
               <h3>{t('web.platformDesktopTitle')}</h3>
@@ -300,7 +307,7 @@ export function LandingPage() {
               <DownloadButton variant="primary" />
             </div>
           </article>
-          <article className="site-platform-card" data-reveal="" style={{ '--reveal-order': 1 } as CSSProperties}>
+          <article className="site-platform-card" data-reveal="zoom" style={{ '--reveal-order': 1 } as CSSProperties}>
             <div className="site-platform-head">
               <span className="site-platform-tag"><Globe size={14} aria-hidden="true" />{t('web.platformWebTag')}</span>
               <h3>{t('web.platformWebTitle')}</h3>
@@ -319,7 +326,7 @@ export function LandingPage() {
         </div>
       </section>
 
-      <section className="site-cta" aria-labelledby="cta-heading" data-reveal="">
+      <section className="site-cta" aria-labelledby="cta-heading" data-reveal="zoom">
         <div className="site-cta-copy">
           <h2 id="cta-heading">{t('web.ctaHeading')}</h2>
           <p>{t('web.ctaText')}</p>

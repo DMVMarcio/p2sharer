@@ -626,3 +626,35 @@ html.web-landing {
     transition: none !important;
   }
 }
+
+/* Reading progress along the bottom edge of the header (scroll-driven where supported). */
+@supports (animation-timeline: scroll()) {
+  .site-header::after {
+    content: '';
+    position: absolute;
+    left: calc(50% - 50vw);
+    right: calc(50% - 50vw);
+    bottom: -1px;
+    height: 2px;
+    background: linear-gradient(90deg, var(--accent-color), #8b5cf6 55%, #ec4899);
+    transform-origin: left center;
+    animation: siteReadingProgress linear both;
+    animation-timeline: scroll(root);
+    pointer-events: none;
+  }
+}
+
+@keyframes siteReadingProgress {
+  from { transform: scaleX(0); }
+  to { transform: scaleX(1); }
+}
+
+:root[data-reduced-motion="true"] .site-header::after {
+  display: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .site-header::after {
+    display: none;
+  }
+}

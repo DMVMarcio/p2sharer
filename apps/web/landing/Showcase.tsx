@@ -13,10 +13,15 @@ import {
   Headphones,
   Laptop,
   Monitor,
+  Maximize,
   Music,
   Pause,
+  PictureInPicture2,
   Play,
+  Settings,
   ShieldCheck,
+  SkipForward,
+  Subtitles,
   Swords,
   Volume2,
   VolumeX,
@@ -25,6 +30,7 @@ import { t } from '../../../src/i18n';
 import { LevelMeter, LiveCursor, MiniChessBoard, PEERS, PeerAvatar, WhiteboardSketch } from './scenes';
 import { DrawingPointer, ShooterScene, StudioScene } from './screenScenes';
 import { useInView } from './motion';
+import { useReducedMotion } from '../../../src/core/appearance_preferences';
 
 export type Tone = 'violet' | 'rose' | 'emerald' | 'amber' | 'sky' | 'pink' | 'teal';
 
@@ -51,16 +57,16 @@ export function Showcase({ id, tone, icon, tag, title, points, reverse, children
       data-active={active || undefined}
       aria-labelledby={`${tone}-showcase-title`}
     >
-      <div className="lp-showcase-copy" data-reveal="">
+      <div className="lp-showcase-copy" data-reveal={reverse ? 'right' : 'left'}>
         <span className="lp-tag"><span className="lp-tag-icon">{icon}</span>{t(tag)}</span>
         <h2 id={`${tone}-showcase-title`}>{t(title)}</h2>
         <ul>
-          {points.map(point => (
-            <li key={point}><span className="lp-check"><Check size={13} aria-hidden="true" /></span>{t(point)}</li>
+          {points.map((point, index) => (
+            <li key={point} style={{ '--i': index } as CSSProperties}><span className="lp-check"><Check size={13} aria-hidden="true" /></span>{t(point)}</li>
           ))}
         </ul>
       </div>
-      <div className="lp-showcase-visual" data-reveal="" style={{ '--reveal-order': 1 } as CSSProperties}>
+      <div className="lp-showcase-visual" data-reveal="zoom" style={{ '--reveal-order': 1 } as CSSProperties}>
         <div className="lp-showcase-glow" aria-hidden="true" />
         {children}
       </div>
@@ -134,27 +140,97 @@ function StereoField({ silent }: { silent: boolean }) {
   );
 }
 
+const VIDEO_SECONDS = 31 * 60 + 5;
+const PLAYBACK_LOOP_MS = 40000;
+const PLAYBACK_START = 0.12;
+
+const clock = (seconds: number) => {
+  const whole = Math.floor(seconds);
+  return `${Math.floor(whole / 60)}:${String(whole % 60).padStart(2, '0')}`;
+};
+
+/** Shared playback position for the demo player, paused when off-screen or paused by the visitor. */
+function usePlaybackProgress(running: boolean) {
+  const reduced = useReducedMotion();
+  const [progress, setProgress] = useState(0.41);
+  useEffect(() => {
+    if (!running || reduced) return;
+    let last = performance.now();
+    const timer = window.setInterval(() => {
+      const now = performance.now();
+      const delta = (now - last) / PLAYBACK_LOOP_MS;
+      last = now;
+      setProgress(current => {
+        const next = current + delta * (1 - PLAYBACK_START);
+        return next >= 1 ? PLAYBACK_START : next;
+      });
+    }, 250);
+    return () => window.clearInterval(timer);
+  }, [reduced, running]);
+  return progress;
+}
+
 /** Synchronized playback: one pause control freezes every participant's player. */
 export function WatchDemo() {
+  const ref = useRef<HTMLDivElement>(null);
+  const active = useInView(ref);
   const [paused, setPaused] = useState(false);
+  const progress = usePlaybackProgress(active && !paused);
+  const toggle = () => setPaused(value => !value);
+  const style = { '--progress': progress.toFixed(4) } as CSSProperties;
   return (
-    <div className={`lp-demo lp-watch-demo${paused ? ' is-paused' : ''}`}>
+    <div ref={ref} className={`lp-demo lp-watch-demo${paused ? ' is-paused' : ''}`} style={style}>
       <div className="lp-player">
         <div className="lp-player-art" aria-hidden="true">
           <span className="lp-player-shape is-a" />
           <span className="lp-player-shape is-b" />
           <span className="lp-player-shape is-c" />
+          <span className="lp-player-eq">
+            {Array.from({ length: 14 }, (_, index) => <i key={index} style={{ '--i': index } as CSSProperties} />)}
+          </span>
+        </div>
+        <div className="lp-player-top" aria-hidden="true">
+          <span className="lp-player-channel" />
+          <span className="lp-player-title">
+            <strong>Neon Drive — Synthwave Mix</strong>
+            <small>Night Shift FM</small>
+          </span>
+          <span className="lp-player-viewers">
+            {PEERS.slice(0, 3).map(peer => <PeerAvatar key={peer.name} peer={peer} size={20} />)}
+          </span>
         </div>
         <button
           type="button"
           className="lp-player-button"
           aria-pressed={paused}
           aria-label={t(paused ? 'message.ca0709c34209' : 'message.c1301275ce3f')}
-          onClick={() => setPaused(value => !value)}
+          onClick={toggle}
         >
           {paused ? <Play size={22} aria-hidden="true" /> : <Pause size={22} aria-hidden="true" />}
         </button>
-        <div className="lp-player-progress" aria-hidden="true"><i /></div>
+        <div className="lp-player-controls" aria-hidden="true">
+          <div className="lp-player-progress">
+            <span className="lp-player-buffer" />
+            <span className="lp-player-played" />
+            <span className="lp-player-knob" />
+          </div>
+          <div className="lp-player-bar">
+            <span className="lp-player-icon is-toggle" onClick={toggle}>
+              {paused ? <Play size={15} fill="currentColor" /> : <Pause size={15} fill="currentColor" />}
+            </span>
+            <span className="lp-player-icon is-optional"><SkipForward size={15} fill="currentColor" /></span>
+            <span className="lp-player-volume">
+              <span className="lp-player-icon"><Volume2 size={15} /></span>
+              <span className="lp-player-volume-track"><i /></span>
+            </span>
+            <span className="lp-player-time">{clock(progress * VIDEO_SECONDS)} / {clock(VIDEO_SECONDS)}</span>
+            <span className="lp-player-spacer" />
+            <span className="lp-player-icon is-optional"><Subtitles size={15} /></span>
+            <span className="lp-player-icon is-settings"><Settings size={15} /><b>HD</b></span>
+            <span className="lp-player-icon is-optional"><PictureInPicture2 size={15} /></span>
+            <span className="lp-player-icon is-fullscreen"><Maximize size={15} /></span>
+          </div>
+        </div>
       </div>
       <div className="lp-watch-side" aria-hidden="true">
         <div className="lp-watch-card">
