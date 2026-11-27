@@ -1,0 +1,9 @@
+dist/
+logs/
+scratch/
+src-tauri/target/
+src-tauri/gen/
+patches/
+pnpm-lock.yaml
+*.log
+*.md

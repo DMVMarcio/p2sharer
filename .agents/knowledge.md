@@ -26,14 +26,15 @@ The Tauri v2 host combines native Windows integration with a React interface and
 ## 2. Technical Sectors & Active Subagents
 | Sector / Domain | Subagent (`.agents/subagents/`) | Dedicated Skill (`.agents/skills/`) | Scope / Target Files |
 | :--- | :--- | :--- | :--- |
-| **Workspace Orchestration** | `project-orchestrator.md` | `project-audit/SKILL.md`, `subagent-management/SKILL.md` | Whole repository, task triage & cross-domain coordination |
+| **Workspace Orchestration** | `project-orchestrator.md` | `project-audit/SKILL.md`, `subagent-management/SKILL.md`, `code-structure/SKILL.md` | Whole repository, task triage & cross-domain coordination |
 | **P2P Netcode & Signaling** | `p2p-specialist.md` | `p2p-protocol/SKILL.md` | `src/p2p/*` (SignalingManager, GroupRoomManager, MediaCoordinator, PeerTracker, IceConfig) |
 | **Native Media Pipeline** | `native-media-specialist.md` | `native-media-pipeline/SKILL.md` | `src-tauri/src/*`, `src/audio/*`, `src/video/*` (WASAPI, xcap, WS bridge, resampler, process manager) |
-| **UI, State & Components** | `ui-architect.md` | `canonical-design/SKILL.md` | `src/components/*`, `src/hooks/*`, `src/ui/*`, `src/core/*`, `index.html`, `src/style.css` (React views, hooks, StateStore) |
+| **UI, State & Components** | `ui-architect.md` | `canonical-design/SKILL.md`, `code-structure/SKILL.md` | `src/components/*`, `src/hooks/*`, `src/ui/*`, `src/core/*`, `index.html`, `src/style.css` (React views, hooks, StateStore) |
 
 ---
 
 ## 3. Subsystem Architectural Deep Dives
+- [Project Structure, File Anatomy & Growth Rules](knowledge/project-structure.md) — **read before creating, moving, or splitting files.**
 - [Product Purpose, Current Capabilities and Implementation References](../docs/product-overview.md)
 - [Web Workspace, Browser Runtime and HTTP Backend](../docs/web.md)
 - [Release Versioning, Signing and GitHub Distribution](../docs/releases.md)
@@ -66,7 +67,10 @@ Record only instructions explicitly intended to govern future work. Do not infer
 - `[Desktop Builds]` Use the default `src-tauri/target/` directory. Identify running processes by executable path. An installed copy outside the workspace does not block builds; ask for closure only when a workspace build/test process or confirmed output lock blocks the build. Wait for confirmation; never terminate it or use another target directory.
 - `[Interactive Verification]` The user performs interactive application checks on their computer. Do not launch or automate the app for verification unless explicitly requested; select automated checks by the central validation matrix.
 - `[Release Notes]` Update upcoming release notes in the same task for every meaningful user-visible change. Write in a relaxed, conversational, lighthearted tone with natural, restrained humor where it fits—never forced or overdone. Keep entries concise (<= 170 characters per bullet point) and non-technical, focusing on practical benefits and resolved user problems in plain language. Group related work into unified entries, omit repetitive points, incidental UI walkthroughs (e.g. click paths or layout minutiae), trivial adjustments, and technical maintenance. Translate entries into all 13 supported languages; preserve published notes and do not bump versions automatically for each task.
-- `[Git]` Commit completed task changes after required validation, using English Conventional Commits. Preserve unrelated edits and report the commit hash and remaining changes. Push only when authorized.
+- `[Git]` Commit mode: `auto`. Commit completed task changes after required validation, without asking, using English Conventional Commits. Preserve unrelated edits and report the commit hash and remaining changes. Push only when authorized.
+- `[Comments]` Comment mode: `free`. Add comments only where they explain intent, constraints, or non-obvious decisions; no commented-out code or change-log comments.
+- `[Format]` Formatter: Prettier (`pnpm run format <files>`, `pnpm run format:check <files>`) for TS/TSX/JS/CSS/JSON and `rustfmt --edition 2021 <files>` for Rust. Format only the files changed in each task, before validation and commit; repository-wide formatting only with explicit approval.
+- `[Structure]` Place files according to the folder map in `knowledge/project-structure.md`, compose them in the recorded anatomy for their kind, keep views thin, and split files or group folders once they pass the recorded thresholds.
 - `[Canonical UI]` Reuse shared components, CSS recipes, and design tokens across application surfaces. The standard covers all control families. Selection fields use the canonical `Select`, and contextual actions and tooltips use the application implementations.
 - `[Room App Terminology]` Refer to room apps as "apps", not "activities", in user-facing copy.
 - `[Localization]` Translate every new or modified user-facing string into all 13 supported app languages, including accessibility labels and native dialog text. Update installer translations where supported. Preserve interpolation and correct plurals; English fallback does not count as a translation. Distribute one multilingual NSIS EXE and one English MSI; the app detects its language independently. Do not generate separate installers per language.
@@ -91,6 +95,9 @@ Use pnpm 10.30.1 and Node.js 22.14+ as pinned in `package.json`. Install with `p
 | `pnpm run tauri:build` | Production desktop executable and installer bundles |
 | `pnpm run check:repository --staged` | Proposed commit hygiene |
 | `pnpm run check:repository` | Full tracked-tree hygiene for audits |
+| `pnpm run format <files>` | Prettier on the given files (TS/TSX/JS/CSS/JSON) |
+| `pnpm run format:check <files>` | Prettier check on the given files |
+| `rustfmt --edition 2021 <files>` | Format changed Rust modules (skip parent modules; see the central rule) |
 
 Choose checks with the [central validation matrix](rules/agent-persistence.md#2-desktop-runtime--build-validation). Every application change requires final `pnpm run tauri:build`, including frontend presentation changes; those changes need no Rust regressions. Inspect `src-tauri/target/release/p2sharer.exe` and `src-tauri/target/release/bundle/`. Stop after applicable checks pass.
 

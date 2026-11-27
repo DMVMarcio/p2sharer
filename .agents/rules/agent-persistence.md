@@ -1,6 +1,6 @@
 ---
 trigger: always_on
-description: Core executive directives for Antigravity: language protocols, Git enforcement, persistent memory, canonical reuse, and subagent schemas.
+description: Core executive directives for Antigravity: language protocols, Git enforcement, persistent memory, canonical reuse, subagent schemas, and code structure.
 ---
 
 # Workspace Agent Core Kernel
@@ -9,6 +9,7 @@ You are the technical maintainer and continuous architect of this project. Enfor
 
 ## 1. Dual-Channel Language Protocol
 - **Interactive Chat**: Always mirror the user's conversational language (e.g., respond in Portuguese if addressed in Portuguese).
+- **Post-Compaction Language Anchor**: Context summaries, tool outputs, or system compaction blocks (frequently generated in English) do NOT change the user's conversation language. Keep addressing the user in their established language for all explanations, status updates, and responses.
 - **Workspace Artifacts**: All code, comments, commit messages, task files, documentation, and files under `.agents/` must be written **strictly in English** (except explicit i18n/l10n files).
 - **Complete Localization**: Every new or changed user-facing string must be translated in every supported app language: English, Brazilian Portuguese, Spanish, French, German, Italian, Simplified Chinese, Traditional Chinese, Japanese, Korean, Hindi, Finnish and Russian. Preserve interpolation variables, include the language's plural categories, and update localized accessibility labels, native dialog copy and installer messages when applicable. Do not rely on English fallback as a completed translation. Distribute one multilingual NSIS EXE and one English MSI, without generating installer variants per language. The app detects the system language independently of the installer and preserves a saved language preference.
 
@@ -29,6 +30,11 @@ You are the technical maintainer and continuous architect of this project. Enfor
 
 - **Frontend Build Scope**: `pnpm run build` validates TypeScript and Vite only and does not replace the final desktop packaging build for application changes. For final packaging, Tauri's `beforeBuildCommand` already runs the frontend build; do not run a separate frontend build unless needed before tests or for diagnosis. If a required check fails or is blocked, report the concrete failure and affected validation as unverified.
 - **Escalation and Stop Conditions**: Prefer existing tests for the changed behavior. Run an entire domain suite only for broad shared changes, unavailable practical test selection, failures suggesting wider impact, or an explicit request. Run both full suites only when impact warrants both. Reuse successful checks while their relevant inputs remain unchanged; rerun only after a relevant edit, a failure fix, or new evidence. Once the required tests and final packaging build pass, stop validating. Do not add benchmarks, hardware diagnostics, repeated clean builds, dependency reinstalls or repository-wide audits to an ordinary task without a concrete reason.
+- **Code Formatting**: Follow the `[Format]` rule in `.agents/knowledge.md`. After editing and before validation/commit, format only the files changed in the task:
+  - TypeScript, TSX, JavaScript, CSS, and JSON: `pnpm run format <files>` (Prettier with `.prettierrc.json`; Markdown is excluded by `.prettierignore`). `pnpm run format:check <files>` is a cheap check.
+  - Rust: `rustfmt --edition 2021 <files>`. rustfmt also reformats every out-of-line `mod x;` child of a file it receives, so skip parent modules (`src-tauri/src/lib.rs`, `main.rs`, `shared_browser.rs`, any file declaring `mod x;`) unless all their children are part of the task.
+  - The codebase was not formatted before Prettier and rustfmt were adopted, so the first format of a file can produce a large whitespace-only diff. Keep it in the task commit and mention it in the report.
+  - Never reformat unrelated files or change the formatter configuration without approval. Repository-wide formatting (`pnpm exec prettier --write .`, `cargo fmt`) happens only after explicit approval, in its own `style: format codebase` commit.
 - **Canonical Build Directory**: Always build in the default `src-tauri/target/` directory. Never create or use alternate build directories or override Cargo's target directory to bypass a running executable or file lock. Identify running P2Sharer processes by resolved executable path, not process name alone. A separately installed copy outside this workspace does not block the build and must not trigger a close request. Ask the user to close only a process running a build/test executable under this workspace's `src-tauri/target/`, or a process confirmed to lock a required build output; wait for confirmation before retrying. If the path cannot be read, investigate the actual output lock before treating an installed copy as a blocker. Do not terminate the application automatically.
 
 - **Interactive Verification**: The user performs interactive checks. Do not launch or automate the app unless explicitly requested; select automated checks using the matrix above.
@@ -42,7 +48,10 @@ You are the technical maintainer and continuous architect of this project. Enfor
 - If `.git` does not exist in the workspace, run `git init` immediately.
 - Before committing, ensure a stack-appropriate `.gitignore` is present.
 - All commit messages must follow Conventional Commits in **English**.
-- **Mandatory Task-End Commit**: After every task that changes project files, commit the completed task's changes before the final response, without waiting for another user request. Run the required validation first and report the commit hash and any remaining changes. Preserve unrelated pre-existing edits unless the user authorizes committing them; an explicit request to commit all pending changes includes those edits. Do not create empty commits for read-only tasks or push unless authorized.
+- **Task-End Commit (Mode Chosen at Setup)**: After every task that changes project files, run the required validation, then follow the commit mode recorded in the `[Git]` rule of `.agents/knowledge.md`:
+  - `auto` (current mode): commit the completed task's changes before the final response, without waiting for another user request, and report the commit hash and any remaining changes.
+  - `ask`: summarize the changes and ask whether to commit; commit only after a clear yes.
+  - In both modes, preserve unrelated pre-existing edits unless the user authorizes committing them; an explicit request to commit all pending changes includes those edits. Do not create empty commits for read-only tasks or push unless authorized.
 - For stack-specific `.gitignore` rules, invoke `.agents/skills/git-workflow/SKILL.md`.
 
 ### Release maintenance
@@ -82,6 +91,10 @@ You are the technical maintainer and continuous architect of this project. Enfor
 - Prior to creating new visual components (Web, Desktop, Mobile, Mods) or backend utility functions, audit existing project implementations.
 - Never produce disposable, inline, or unmodular elements.
 - For design token rules, native host integration, and backend patterns, follow `.agents/skills/canonical-design/SKILL.md`.
+- **Code Comments (Mode Chosen at Setup)**: Follow the comment mode recorded in the `[Comments]` rule of `.agents/knowledge.md`:
+  - `free` (current mode): add comments where they help, explaining intent, constraints, or non-obvious decisions (the *why*), not restating what the code does. No commented-out code and no change-log comments ("added X", "fixed Y").
+  - `never`: do not add new comments, docstrings, or doc blocks; make the code self-explanatory through naming and structure. Only machine-read directives the tooling requires are allowed (lint/type suppressions, pragmas, license headers, generated-file markers).
+  - In both modes, keep existing comments unless asked to remove them, and update or remove a comment that your change makes false.
 
 ## Test Maintenance
 - Select tests using the validation matrix in section 2. `pnpm run test` runs the full frontend suite; for selected files use `pnpm exec node --experimental-strip-types --import ./test/support/locale.mjs --test test/unit/<name>.test.ts` (or `.mjs`; multiple files are supported). The frontend script appends every test file, so passing a filename to it does not narrow the suite. For selected native tests use `pnpm run test:native --release <filter>`; omit the filter only when the full native suite is justified.
@@ -94,3 +107,15 @@ You are the technical maintainer and continuous architect of this project. Enfor
 ## 6. Subagent Schema & Orchestration Standard
 - Whenever authoring or updating subagents in `.agents/subagents/`, never create raw markdown without configuration.
 - Strictly adhere to the YAML frontmatter schema (defining `name`, `description`, `tools`, `skills`, `subagent: true`, `mainAgent`, `model`, and `commandExecutionPolicy`) specified in `.agents/skills/subagent-management/SKILL.md`.
+- **Strict Anti-Micro-Delegation**: Never spawn a subagent for minor edits ($\le 3$ files), routine styling, simple bugfixes, or CLI runs. Delegate only for full subsystem construction or heavy reference exploration ($>500$ lines) to prevent context pollution in the main thread.
+- **Main Agent Lead**: Keep `.agents/subagents/project-orchestrator.md` as the main orchestrator (`mainAgent: true`, `subagent: false`) with an up-to-date delegation list.
+- **Concrete Guidelines**: Specialist prompts must contain concrete, domain-specific architecture rules and target directories, not vague platitudes like "write clean code".
+- **Drift Prevention**: Verify that subagent target paths and associated skills exist and stay aligned with the codebase when agents are created or the structure changes.
+
+## 7. Structure, File Anatomy & Growth Guardrails
+- **Placement**: Before creating or moving a file, check the folder map in `.agents/knowledge/project-structure.md` and mirror 2–3 existing siblings of the same kind. Ask where the next five similar files would go.
+- **Anatomy**: Compose every file in the internal order recorded for its kind in `project-structure.md` (e.g., component: props → store/local state → derived values and effects → handlers → JSX).
+- **Thin Edges**: Keep components and app views thin. Move state machines, data fetching, P2P coordination, and business logic into hooks, `src/services/`, `src/core/`, and `src/p2p/` following the recorded layer boundaries.
+- **Surface Decomposition**: A large surface or app view becomes a thin shell composed of one section component (with its own hook) per visual area. Surface- or app-private pieces stay in that surface's or app's folder and are promoted to `src/components/common/` or `src/hooks/` once a second surface needs them.
+- **Growth**: When a touched file passes its size budget or a flat folder passes its threshold (same-unit siblings, ~12 mixed files, 3+ files with one domain prefix), split or group it. Small in-scope moves happen in the task; larger ones (e.g., the known `src/apps/` regrouping) are proposed to the user and committed separately as `refactor(structure)` with `git mv`.
+- **Procedure**: Follow `.agents/skills/code-structure/SKILL.md`.

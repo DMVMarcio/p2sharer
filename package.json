@@ -12,6 +12,8 @@
     "release:key": "node tools/release.mjs key",
     "release:build": "node tools/release.mjs check --signing && node tools/tauri.mjs build --config src-tauri/tauri.release.conf.json",
     "check:repository": "node tools/repository-hygiene.mjs",
+    "format": "prettier --write --ignore-unknown",
+    "format:check": "prettier --check --ignore-unknown",
     "dev": "vite",
     "build": "node tools/release-notes.mjs check && tsc && vite build",
     "preview": "vite preview",
@@ -98,6 +100,7 @@
     "esbuild": "0.25.12",
     "fake-indexeddb": "6.2.4",
     "jsdom": "^27.4.0",
+    "prettier": "^3.10.1",
     "typescript": "~5.6.2",
     "upng-js": "^2.1.0",
     "vite": "^6.0.3"

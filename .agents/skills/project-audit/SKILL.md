@@ -20,6 +20,8 @@ Knowledge is a navigation aid for current architecture and explicit standing use
 1. **Manifest Inspection**: Read package files (`package.json`, `Cargo.toml`, `pyproject.toml`, `.csproj`, `CMakeLists.txt`, `go.mod`, etc.) to determine dependencies, runtime, and ecosystem.
 2. **Architecture Identification**: Determine the primary design pattern (Clean Architecture, Monorepo, MVC, MVVM, Hexagonal, Event-Driven).
 3. **Convention Extraction**: Identify file naming conventions (kebab-case, PascalCase), typing approaches, test runners, and error handling patterns.
+4. **Structure & File Anatomy Extraction**: Run the extraction procedure in Section 6 of `.agents/skills/code-structure/SKILL.md`: map folders and the logic behind them, derive the internal order of each file kind from 3–5 real files, and record naming, layer boundaries, size budgets, and existing structure debt in `.agents/knowledge/project-structure.md`. Report structure debt to the user; do not fix it during the audit.
+5. **Formatter Detection**: Look for formatter configs (`.prettierrc*`, `biome.json`, `.editorconfig`, `rustfmt.toml`), `format` / `format:check` scripts, and pre-commit hooks. Record the exact per-file and check commands in the `[Format]` rule of `.agents/knowledge.md` and its command table.
 
 ## 2. Sectoral Decomposition
 Group the codebase into technical sectors based on domain:

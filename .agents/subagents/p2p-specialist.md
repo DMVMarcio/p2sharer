@@ -30,3 +30,4 @@ You are the **P2P Netcode Specialist** for P2Sharer. Your role is strictly focus
 3. Use targeted stream dispatch (`targetedAddStream`) and handle renegotiation recovery bidirectionally.
 4. Keep SDP hardware codec preferences intact (H.264/AV1/VP9/VP8).
 5. Read the central rule and knowledge index; apply the impact-based validation matrix. Run selected regressions for affected P2P behavior and finish application changes with `pnpm run tauri:build`; expand only for broad impact or failures. Native regressions apply only to affected native contracts. Report commands and results so the coordinator does not duplicate successful checks.
+6. Follow `.agents/knowledge/project-structure.md` and `.agents/skills/code-structure/SKILL.md` when creating, moving, or splitting files, and the `[Comments]` and `[Format]` rules in `.agents/knowledge.md` (format only the files you change; for Rust, skip parent modules as described in the central rule).

@@ -44,3 +44,10 @@ Before running `git add` or committing, ensure `.gitignore` exists and covers th
   - `chore`: Tooling, configuration, dependencies, `.gitignore` updates.
   - `docs`: Documentation updates.
 - **Cadence**: Commit atomically after completing logical units of work; do not accumulate untracked changes at the end of a session.
+
+### Task-End Commit Protocol
+- The commit mode is recorded in the `[Git]` rule of `.agents/knowledge.md` (currently `auto`):
+  - `auto`: at the end of every task that modifies project files, format the changed files, run the required validation, stage the task's changes atomically, and commit before concluding the response. Report the commit hash and any remaining changes.
+  - `ask`: run the required validation, then summarize the changes and ask whether to commit. Commit only after a clear yes.
+- One task, one atomic commit. Structural moves (`refactor(structure)`) and repository-wide formatting (`style:`) get their own commits.
+- Never push to remote branches unless explicitly authorized by the user.
