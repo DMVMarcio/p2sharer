@@ -1,7 +1,7 @@
-import { DEFAULT_AUDIO_EXCLUSIONS, DEFAULT_AUDIO_SUB_EXCLUSIONS } from './audio_filter_presets.ts';
-import { readNicknameStyle, type NicknameStyle } from './nickname_style.ts';
-import { normalizeBackground } from './background_color.ts';
-import { streamDrawingLimit, STREAM_DRAWING_MAX } from './stream_pointer.ts';
+import { DEFAULT_AUDIO_EXCLUSIONS, DEFAULT_AUDIO_SUB_EXCLUSIONS } from './media/audio_filter_presets.ts';
+import { readNicknameStyle, type NicknameStyle } from './profile/nickname_style.ts';
+import { normalizeBackground } from './appearance/background_color.ts';
+import { streamDrawingLimit, STREAM_DRAWING_MAX } from './stream/stream_pointer.ts';
 import type { ResolutionConfig, RoomSlotInfo, StreamFilterMode, ThemeMode, TurnConfig } from './types.ts';
 import { parseTurnUrls } from '../p2p/ice_config.ts';
 function isWebRuntime(): boolean {
@@ -12,8 +12,8 @@ function isWebRuntime(): boolean {
   return !('__TAURI_INTERNALS__' in window || '__TAURI__' in window || isTauriGlobal);
 }
 import { isMobileDevice } from './platform.ts';
-import { detectHardwareAcceleration } from './hardware_acceleration.ts';
-import { applyAppearanceAttributes } from './appearance_preferences.ts';
+import { detectHardwareAcceleration } from './media/hardware_acceleration.ts';
+import { applyAppearanceAttributes } from './appearance/appearance_preferences.ts';
 
 export interface TransmissionDefaults {
   resolution: string;
@@ -51,7 +51,7 @@ export class StateStore {
   public editingStreamId: string | null = null;
   public streamOverlays: Record<string, string[]> = {};
   public dismissedAutoOverlays: Record<string, string[]> = {};
-  public overlayPositions: Record<string, import('./media_streams').OverlayPosition> = {};
+  public overlayPositions: Record<string, import('./media/media_streams').OverlayPosition> = {};
   public streamFilter: StreamFilterMode = 'all';
 
   public currentThemeMode: ThemeMode = 'dark';

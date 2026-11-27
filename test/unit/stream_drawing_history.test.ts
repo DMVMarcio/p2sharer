@@ -4,7 +4,7 @@ import { StreamPointerReceiver } from '../../src/services/stream_pointer_receive
 import { streamPointerView } from '../../src/services/stream_pointer_view.ts';
 import { stateStore } from '../../src/core/state_store.ts';
 import { StateStore } from '../../src/core/state_store.ts';
-import { STREAM_DRAWING_MAX, streamDrawingLimit, validStreamPointerState, type StreamPointerState } from '../../src/core/stream_pointer.ts';
+import { STREAM_DRAWING_MAX, streamDrawingLimit, validStreamPointerState, type StreamPointerState } from '../../src/core/stream/stream_pointer.ts';
 
 const drawing = { tool: 'brush' as const, color: '#ff0000', size: 3, points: [{ x: .2, y: .3 }, { x: .4, y: .5 }] };
 test('undo/redo affect only the authenticated author, include clear, and new actions invalidate redo', async context => {

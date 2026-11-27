@@ -3,9 +3,9 @@ import { useEffect, useCallback } from 'react';
 import { stateStore } from '../core/state_store';
 import { ThemeMode } from '../core/types';
 import { useStore } from './useStore';
-import { customAccentTokens } from '../core/accent_color';
-import { backgroundTokens, normalizeBackground } from '../core/background_color';
-import { applyAppearanceAttributes } from '../core/appearance_preferences';
+import { customAccentTokens } from '../core/appearance/accent_color';
+import { backgroundTokens, normalizeBackground } from '../core/appearance/background_color';
+import { applyAppearanceAttributes } from '../core/appearance/appearance_preferences';
 
 export const ACCENT_COLORS = [
   { id: 'cyan', get label() { return t("message.c954e4de2019"); }, color: '#06b6d4' },

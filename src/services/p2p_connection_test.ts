@@ -2,7 +2,7 @@ import { joinRoom as joinMqttRoom } from '@trystero-p2p/mqtt';
 import { buildRtcConfiguration, resolveTurnConfig } from '../p2p/ice_config.ts';
 import { stateStore } from '../core/state_store.ts';
 import { enabledRendezvousUrls, loadRendezvousPreferences } from '../p2p/relay_preferences.ts';
-import { selectedIcePair, type IceStat } from '../core/ice_route.ts';
+import { selectedIcePair, type IceStat } from '../core/network/ice_route.ts';
 
 export type StepStatus = 'pending' | 'running' | 'success' | 'failed';
 

@@ -2,7 +2,7 @@ import { t } from '../../i18n/index.ts';
 import * as Y from 'yjs';
 import { Awareness, applyAwarenessUpdate, encodeAwarenessUpdate } from 'y-protocols/awareness';
 import * as decoding from 'lib0/decoding';
-import { validProfileHash } from '../../core/profile_image.ts';
+import { validProfileHash } from '../../core/profile/profile_image.ts';
 import {
   decodeBase64, inspectPngBytes, PeerImageStore, stripDataPrefix, type WhiteboardImageRecord,
 } from '../shared/whiteboard_image.ts';

@@ -1,5 +1,5 @@
-import { getLanguage } from '../i18n/index.ts';
-import type { RoomSlotInfo } from './types.ts';
+import { getLanguage } from '../../i18n/index.ts';
+import type { RoomSlotInfo } from '../types.ts';
 export type MediaKind = 'screen' | 'camera';
 export const MAX_MEDIA_FPS = 120;
 const frameRateFormatters = new Map<string, Intl.NumberFormat>();

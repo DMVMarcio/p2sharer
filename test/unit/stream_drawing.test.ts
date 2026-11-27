@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { validStreamDrawing, validStreamPointer, validStreamPointerState, type StreamDrawing, type StreamPointerState } from '../../src/core/stream_pointer.ts';
+import { validStreamDrawing, validStreamPointer, validStreamPointerState, type StreamDrawing, type StreamPointerState } from '../../src/core/stream/stream_pointer.ts';
 import { StreamPointerReceiver } from '../../src/services/stream_pointer_receiver.ts';
 import { stateStore } from '../../src/core/state_store.ts';
 

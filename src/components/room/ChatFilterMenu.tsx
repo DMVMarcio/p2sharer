@@ -10,7 +10,7 @@ import {
   setChatFilter,
   type ChatFilterCategory,
   type ChatFilterPreferences,
-} from '../../core/chat_filters';
+} from '../../core/chat/chat_filters';
 
 const FILTER_OPTIONS: ReadonlyArray<{ key: ChatFilterCategory; labelKey: string }> = [
   { key: 'messages', labelKey: 'chat.filter.messages' },

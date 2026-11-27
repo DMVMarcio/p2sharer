@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { BACKGROUND_PRESETS, backgroundTokens, normalizeBackground } from '../../src/core/background_color.ts';
+import { BACKGROUND_PRESETS, backgroundTokens, normalizeBackground } from '../../src/core/appearance/background_color.ts';
 
 function luminance(hex: string) {
   const rgb = [1, 3, 5].map(offset => {

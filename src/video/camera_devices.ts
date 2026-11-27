@@ -1,4 +1,4 @@
-import { MAX_MEDIA_FPS, formatFrameRate } from '../core/media_streams.ts';
+import { MAX_MEDIA_FPS, formatFrameRate } from '../core/media/media_streams.ts';
 import { t } from '../i18n/index.ts';
 import { logDiagnostic } from '../core/logger.ts';
 

@@ -1,4 +1,4 @@
-import { audioProcessKey, audioSubProcessKey, type AudioCaptureChoice } from '../core/audio_filter_presets.ts';
+import { audioProcessKey, audioSubProcessKey, type AudioCaptureChoice } from '../core/media/audio_filter_presets.ts';
 import { t } from '../i18n/index.ts';
 import { useState, useCallback, useRef } from 'react';
 import { invoke } from '@tauri-apps/api/core';

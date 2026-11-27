@@ -2,8 +2,8 @@ import { t } from '../../i18n';
 import { useLocale } from '../../hooks/useLocale';
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Smile, Hand, PawPrint, UtensilsCrossed, MapPin, Gamepad2, Box, Hash, Flag } from 'lucide-react';
-import { EMOJI_CATALOG, EMOJI_CATEGORIES, EMOJI_SEARCH_ALIASES, getEmojiName, EmojiCategory } from '../../core/emoji_catalog';
-import { EmojiPack } from '../../core/emoji_preferences';
+import { EMOJI_CATALOG, EMOJI_CATEGORIES, EMOJI_SEARCH_ALIASES, getEmojiName, EmojiCategory } from '../../core/emoji/emoji_catalog';
+import { EmojiPack } from '../../core/emoji/emoji_preferences';
 import { EmojiGlyph } from './EmojiGlyph';
 
 const CATEGORY_ICONS = [Smile, Hand, PawPrint, UtensilsCrossed, MapPin, Gamepad2, Box, Hash, Flag];

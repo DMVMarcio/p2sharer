@@ -5,7 +5,7 @@ import { useLocale } from '../../hooks/useLocale';
 import { Select } from '../common/Select';
 import { listAudioDevices, onAudioDevicesChanged, type AudioDeviceLists } from '../../audio/voice_devices';
 import { voiceManager } from '../../audio/voice_manager';
-import type { NoiseSuppressionMode, VoicePreferences } from '../../core/voice_preferences';
+import type { NoiseSuppressionMode, VoicePreferences } from '../../core/media/voice_preferences';
 
 interface CommunicationSettingsPaneProps {
   value: VoicePreferences;

@@ -1,4 +1,4 @@
-import { observeDiagnosticPeerConnection } from '../core/media_diagnostics.ts';
+import { observeDiagnosticPeerConnection } from '../core/media/media_diagnostics.ts';
 import type { StreamStatusPayload } from '../core/types.ts';
 import { logDiagnostic } from '../core/logger.ts';
 

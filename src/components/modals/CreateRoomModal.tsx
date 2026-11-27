@@ -4,13 +4,13 @@ import { useLocale } from '../../hooks/useLocale';
 import React, { useEffect, useState } from 'react';
 import { invoke, isTauri } from '@tauri-apps/api/core';
 import { Select } from '../common/Select';
-import { createLanConnection, type LanInterface } from '../../core/lan_room';
+import { createLanConnection, type LanInterface } from '../../core/room/lan_room';
 import { useFormSubmit } from '../../hooks/useFormSubmit';
 import { useModal } from '../../hooks/useModal';
 import { useRoom } from '../../hooks/useRoom';
 import { showToast } from '../../hooks/useToast';
-import { createAuthenticatedInvite, parseRoomInvite } from '../../core/room_invite';
-import { savedRooms } from '../../core/saved_rooms';
+import { createAuthenticatedInvite, parseRoomInvite } from '../../core/room/room_invite';
+import { savedRooms } from '../../core/room/saved_rooms';
 
 export const CreateRoomModal: React.FC = () => {
   useLocale();

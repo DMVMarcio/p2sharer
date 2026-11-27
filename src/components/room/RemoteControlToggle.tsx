@@ -1,5 +1,5 @@
 import { MonitorCog } from 'lucide-react';
-import type { RemoteControlStatus } from '../../core/remote_control.ts';
+import type { RemoteControlStatus } from '../../core/stream/remote_control.ts';
 import { useLocale } from '../../hooks/useLocale';
 import { t } from '../../i18n';
 import { Tooltip } from '../common/Tooltip';

@@ -1,6 +1,6 @@
-import { t } from '../i18n/index.ts';
-import { colorToHex, contrastingTextColor } from './accent_color.ts';
-import { hexToHsv, hsvToHex } from './hsv_color.ts';
+import { t } from '../../i18n/index.ts';
+import { colorToHex, contrastingTextColor } from '../appearance/accent_color.ts';
+import { hexToHsv, hsvToHex } from '../appearance/hsv_color.ts';
 
 // Card backgrounds are independent of the interface accent palette.
 export const PROFILE_CARD_COLORS = [

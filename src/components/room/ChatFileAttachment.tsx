@@ -11,13 +11,13 @@ import type { FileProgress } from '../../p2p/group_room';
 import { selfId } from '@trystero-p2p/core';
 import { formatFileSize } from '../../core/file_size';
 import { FileProgressRing } from './FileProgressRing';
-import { MAX_IMAGE_PREVIEW_BYTES } from '../../core/chat_file_limits';
+import { MAX_IMAGE_PREVIEW_BYTES } from '../../core/chat/chat_file_limits';
 import { Tooltip } from '../common/Tooltip';
 import { showToast } from '../../hooks/useToast';
-import { formatTransferSpeed, type TransferSpeedUnit } from '../../core/transfer_speed';
+import { formatTransferSpeed, type TransferSpeedUnit } from '../../core/network/transfer_speed';
 import { calculateFocalZoom, clampZoom } from './zoom_utils';
 import { useContextMenu, type ContextMenuAction } from '../common/ContextMenu';
-import { copyImageToClipboard } from '../../core/image_clipboard';
+import { copyImageToClipboard } from '../../core/ui/image_clipboard';
 
 interface Props { message: ChatMessage; transfers: FileProgress[]; preview?: string; savedRequestId?: string;
   speedUnit: TransferSpeedUnit;

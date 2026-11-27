@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { t } from '../../i18n';
-import type { ProfileDraft, ImageCrop } from '../../core/profile_image';
-import { cropDimensions, zoomCrop } from '../../core/profile_crop';
+import type { ProfileDraft, ImageCrop } from '../../core/profile/profile_image';
+import { cropDimensions, zoomCrop } from '../../core/profile/profile_crop';
 import { ModalDialog } from './ModalDialog';
 
 export function CropPreview({ draft, crop, aspect = 1 }: { draft: ProfileDraft; crop: ImageCrop; aspect?: number }) {

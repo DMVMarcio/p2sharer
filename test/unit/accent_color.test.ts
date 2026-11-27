@@ -1,8 +1,8 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { contrastingTextColor, customAccentTokens } from '../../src/core/accent_color.ts';
-import { automaticCardColor } from '../../src/core/profile_card_color.ts';
-import { hexToHsv } from '../../src/core/hsv_color.ts';
+import { contrastingTextColor, customAccentTokens } from '../../src/core/appearance/accent_color.ts';
+import { automaticCardColor } from '../../src/core/profile/profile_card_color.ts';
+import { hexToHsv } from '../../src/core/appearance/hsv_color.ts';
 
 test('custom colors validate hex and select contrasting text', () => {
   for (const color of ['cyan', '#fff', '#12345g', 'red; background: white']) {

@@ -1,4 +1,4 @@
-import type { LanRoomConnection } from '../core/lan_room.ts';
+import type { LanRoomConnection } from '../core/room/lan_room.ts';
 
 export type LanSignalEvent = { kind: 'closed' } | { kind: 'message'; topic: string; data: string };
 export interface LanSignalDriver {

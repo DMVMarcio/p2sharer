@@ -12,7 +12,7 @@ const bundle = await build({
   stdin: {
     contents: `
       export { getChatMessageActions } from './src/components/room/chat_message_actions.tsx';
-      export { imageSrcToBase64, copyImageToClipboard } from './src/core/image_clipboard.ts';
+      export { imageSrcToBase64, copyImageToClipboard } from './src/core/ui/image_clipboard.ts';
     `,
     resolveDir: process.cwd(),
   },

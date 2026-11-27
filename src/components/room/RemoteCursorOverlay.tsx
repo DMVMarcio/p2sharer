@@ -3,8 +3,8 @@ import type {
   RemoteCursorImageAsset,
   RemoteCursorShape,
   RemoteCursorSyncState,
-} from '../../core/remote_control';
-import { streamPointerVideoRect } from '../../core/stream_pointer';
+} from '../../core/stream/remote_control';
+import { streamPointerVideoRect } from '../../core/stream/stream_pointer';
 
 interface RemoteCursorOverlayProps {
   containerRef: RefObject<HTMLElement | null>;

@@ -5,7 +5,7 @@ import type {
   RemoteControlRequest,
   RemoteCursorShape,
   RemoteInputEvent,
-} from '../core/remote_control.ts';
+} from '../core/stream/remote_control.ts';
 
 export interface RemoteScreenTarget {
   sessionId?: string;

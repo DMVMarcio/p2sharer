@@ -1,4 +1,4 @@
-import { validProfileColor } from './profile_image.ts';
+import { validProfileColor } from '../profile/profile_image.ts';
 
 export interface RoomPreviewParticipant { id: string; name: string; color: string; avatar?: string }
 export interface RoomPreview { name: string; protected: boolean; participants: RoomPreviewParticipant[] }

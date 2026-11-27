@@ -1,7 +1,7 @@
 import { describe, it, beforeEach } from 'node:test';
 import assert from 'node:assert/strict';
-import { detectHardwareAcceleration } from '../../src/core/hardware_acceleration.ts';
-import { isReducedMotion, applyAppearanceAttributes } from '../../src/core/appearance_preferences.ts';
+import { detectHardwareAcceleration } from '../../src/core/media/hardware_acceleration.ts';
+import { isReducedMotion, applyAppearanceAttributes } from '../../src/core/appearance/appearance_preferences.ts';
 import { stateStore } from '../../src/core/state_store.ts';
 
 describe('Hardware acceleration detection', () => {

@@ -8,7 +8,7 @@ The creator must keep the app open for new joins and reconnecting edges. Losing 
 
 ## Invitations and adapters
 
-`core/lan_room.ts` validates numeric unicast IPv4/IPv6 endpoints and random 256-bit rendezvous capabilities. Scoped/link-local IPv6, DNS names, URL credentials, extra paths, queries, multicast, loopback and unspecified addresses are rejected. Runtime discovery uses sysinfo. Prefer Radmin/Hamachi IPv4 by adapter name, with explicit user selection of other adapters. Never retain personal addresses in source or fixtures.
+`core/room/lan_room.ts` validates numeric unicast IPv4/IPv6 endpoints and random 256-bit rendezvous capabilities. Scoped/link-local IPv6, DNS names, URL credentials, extra paths, queries, multicast, loopback and unspecified addresses are rejected. Runtime discovery uses sysinfo. Prefer Radmin/Hamachi IPv4 by adapter name, with explicit user selection of other adapters. Never retain personal addresses in source or fixtures.
 
 LAN uses signed `p2s5` snapshots containing `{ mode, endpoint, token }`. The token is a shareable discovery capability, not the room password or a private key. Old `p2s3`/`p2s4` invitations remain supported; internet creation still emits `p2s4`. Name/role/ownership updates preserve the descriptor and cannot silently retarget an active room. The frontend saved-room store and native encrypted vault preserve v5 revision ordering.
 

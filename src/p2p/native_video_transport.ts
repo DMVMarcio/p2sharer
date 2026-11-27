@@ -1,6 +1,6 @@
 import { invoke } from '@tauri-apps/api/core';
 import { listen, type UnlistenFn } from '@tauri-apps/api/event';
-import { validStreamDescriptors, type StreamDescriptor } from '../core/media_streams.ts';
+import { validStreamDescriptors, type StreamDescriptor } from '../core/media/media_streams.ts';
 import { nativeSenderSource, type NativeSenderSource } from '../video/native_sender_source.ts';
 import { MediaCoordinator } from './media_coordinator.ts';
 import { logDiagnostic } from '../core/logger.ts';

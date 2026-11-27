@@ -1,5 +1,5 @@
 import { getLanguage, t } from '../../i18n/index.ts';
-import { MEDIA_SYNC_MAX_SAMPLE_AGE_MS, shouldCorrectMediaPosition } from '../../core/media_sync.ts';
+import { MEDIA_SYNC_MAX_SAMPLE_AGE_MS, shouldCorrectMediaPosition } from '../../core/media/media_sync.ts';
 import { projectYouTubePosition } from './youtube_timeline.ts';
 import type { YouTubeState } from '../types.ts';
 

@@ -1,6 +1,6 @@
 import React from 'react';
 import { Gamepad2, Keyboard, Mouse, Shield } from 'lucide-react';
-import type { ControllerInputActivity } from '../../core/remote_control_activity';
+import type { ControllerInputActivity } from '../../core/stream/remote_control_activity';
 import { t } from '../../i18n';
 import { Tooltip } from './Tooltip';
 

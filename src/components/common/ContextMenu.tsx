@@ -5,7 +5,7 @@ import { createPortal } from 'react-dom';
 import { Copy, ChevronRight } from 'lucide-react';
 import { useDropdownPresence } from '../../hooks/useDropdownPresence';
 import { showToast } from '../../hooks/useToast';
-import { captureTextEditing, TEXT_EDITOR_SELECTOR } from '../../core/text_editing';
+import { captureTextEditing, TEXT_EDITOR_SELECTOR } from '../../core/ui/text_editing';
 import { getTextEditingActions } from './text_editing_actions';
 import { Tooltip } from './Tooltip';
 

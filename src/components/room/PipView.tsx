@@ -1,10 +1,10 @@
 import { Tooltip } from '../common/Tooltip';
 import { Nickname } from '../common/Nickname';
-import { normalizeNicknameStyle } from '../../core/nickname_style';
+import { normalizeNicknameStyle } from '../../core/profile/nickname_style';
 import { localizeText, t } from '../../i18n';
 import { useLocale } from '../../hooks/useLocale';
 import { useStreamPointer } from '../../hooks/useStreamPointer';
-import { streamOwner, formatFrameRate } from '../../core/media_streams';
+import { streamOwner, formatFrameRate } from '../../core/media/media_streams';
 import { StreamPointerToggle } from './StreamPointerToggle';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { invoke, isTauri } from '@tauri-apps/api/core';

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState, type FocusEvent, type RefObject } from 'react';
-import { useReducedMotion } from '../../../src/core/appearance_preferences';
+import { useReducedMotion } from '../../../src/core/appearance/appearance_preferences';
 
 const hasObserver = () => typeof window !== 'undefined' && 'IntersectionObserver' in window;
 

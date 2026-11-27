@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { mergeChatHistory } from '../../src/core/chat_history.ts';
-import { PeerAuthenticator } from '../../src/core/peer_auth.ts';
+import { mergeChatHistory } from '../../src/core/chat/chat_history.ts';
+import { PeerAuthenticator } from '../../src/core/network/peer_auth.ts';
 import type { ChatMessage } from '../../src/core/types.ts';
 
 test('forged edits, deletions, relays, history and replay cannot change another author', async () => {

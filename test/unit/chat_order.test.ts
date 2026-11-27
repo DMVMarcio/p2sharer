@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { mergeChatHistory, nextChatOrder } from '../../src/core/chat_history.ts';
-import { PeerAuthenticator } from '../../src/core/peer_auth.ts';
+import { mergeChatHistory, nextChatOrder } from '../../src/core/chat/chat_history.ts';
+import { PeerAuthenticator } from '../../src/core/network/peer_auth.ts';
 import type { ChatMessage } from '../../src/core/types.ts';
 
 const message = (id: string, timestamp: number, logicalOrder: number): ChatMessage => ({

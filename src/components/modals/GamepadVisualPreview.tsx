@@ -1,6 +1,6 @@
 import React from 'react';
-import type { GamepadTargetControl } from '../../core/input_bindings';
-import type { GamepadSnapshotState } from '../../core/remote_control';
+import type { GamepadTargetControl } from '../../core/ui/input_bindings';
+import type { GamepadSnapshotState } from '../../core/stream/remote_control';
 import { t } from '../../i18n';
 
 export const GAMEPAD_CONTROL_COLORS = {

@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { Palette } from 'lucide-react';
 import { t } from '../../i18n';
 import { useLocale } from '../../hooks/useLocale';
-import type { NicknameStyle } from '../../core/nickname_style';
+import type { NicknameStyle } from '../../core/profile/nickname_style';
 import { ModalDialog } from './ModalDialog';
 import { TooltipButton } from './TooltipButton';
 import { Nickname } from './Nickname';

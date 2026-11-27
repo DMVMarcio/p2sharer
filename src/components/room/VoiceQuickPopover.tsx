@@ -9,7 +9,7 @@ import { modalManager } from '../../hooks/useModal';
 import { useRoom } from '../../hooks/useRoom';
 import { roomService } from '../../services/room_service';
 import { listAudioDevices, onAudioDevicesChanged, type AudioDeviceLists } from '../../audio/voice_devices';
-import { DEFAULT_VOICE_PREFERENCES, type NoiseSuppressionMode, type VoicePreferences } from '../../core/voice_preferences';
+import { DEFAULT_VOICE_PREFERENCES, type NoiseSuppressionMode, type VoicePreferences } from '../../core/media/voice_preferences';
 import { Select } from '../common/Select';
 
 export interface VoiceQuickPopoverProps {

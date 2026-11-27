@@ -1,6 +1,6 @@
-import { invoke } from '../platform/commands.ts';
+import { invoke } from '../../platform/commands.ts';
 import { automaticCardColor } from './profile_card_color.ts';
-import { hsvToHex } from './hsv_color.ts';
+import { hsvToHex } from '../appearance/hsv_color.ts';
 
 export interface ProfileImage { hash: string; data: string; color: string; cardColor?: string | null; dominantColor?: string | null; bannerEnabled?: boolean; bannerBlur?: boolean }
 export interface ImageCrop { x: number; y: number; size: number }

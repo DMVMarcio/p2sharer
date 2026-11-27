@@ -1,6 +1,6 @@
-import type { ChatMessage } from './types.ts';
-import { hasSafeChatOrder } from './chat_history.ts';
-import { createRoomIdentity, hexToBytes, type RoomIdentity } from './room_invite.ts';
+import type { ChatMessage } from '../types.ts';
+import { hasSafeChatOrder } from '../chat/chat_history.ts';
+import { createRoomIdentity, hexToBytes, type RoomIdentity } from '../room/room_invite.ts';
 
 const encoder = new TextEncoder();
 const hex = (bytes: Uint8Array): string => Array.from(bytes, (byte) => byte.toString(16).padStart(2, '0')).join('');

@@ -4,7 +4,7 @@ import { GroupRoomManager } from '../../src/p2p/group_room.ts';
 import { stateStore } from '../../src/core/state_store.ts';
 import { StreamPointerReceiver } from '../../src/services/stream_pointer_receiver.ts';
 import { streamPointerView } from '../../src/services/stream_pointer_view.ts';
-import { localStreamPointerVisuals, validStreamPointerState, type StreamPointerState } from '../../src/core/stream_pointer.ts';
+import { localStreamPointerVisuals, validStreamPointerState, type StreamPointerState } from '../../src/core/stream/stream_pointer.ts';
 
 function snapshot(): StreamPointerState {
   return { kind: 'state', sentAt: 10000, visuals: [

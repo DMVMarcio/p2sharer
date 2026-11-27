@@ -1,4 +1,4 @@
-import { invoke } from '../platform/commands.ts';
+import { invoke } from '../../platform/commands.ts';
 
 /** Keep file data binary across the WebView/native boundary. */
 export async function readChatFileBytes(id: string, offset: number, length: number): Promise<Uint8Array> {

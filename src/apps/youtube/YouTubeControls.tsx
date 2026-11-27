@@ -4,7 +4,7 @@ import React from 'react';
 import { Captions, CaptionsOff, Maximize, Minimize, Pause, PictureInPicture2, Play, SkipBack, SkipForward, Volume2, VolumeX } from 'lucide-react';
 import { MediaSeekBar } from '../../components/common/MediaSeekBar';
 import { TooltipButton } from '../../components/common/TooltipButton';
-import { formatMediaTime } from '../../core/media_time';
+import { formatMediaTime } from '../../core/media/media_time';
 
 interface Props {
   hasVideo: boolean;

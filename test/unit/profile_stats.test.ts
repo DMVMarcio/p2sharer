@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { ProfileStatistics, parseProfileStats } from '../../src/core/profile_stats.ts';
+import { ProfileStatistics, parseProfileStats } from '../../src/core/profile/profile_stats.ts';
 
 test('profile totals survive reload and call transitions account only active sessions once', () => {
   const data = new Map<string, string>();

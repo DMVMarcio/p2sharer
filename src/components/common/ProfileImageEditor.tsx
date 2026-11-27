@@ -1,14 +1,14 @@
 import { NicknameField } from './NicknameField';
 import { ProfileBannerEditor, type BannerDraft } from './ProfileBannerEditor';
-import type { NicknameStyle } from '../../core/nickname_style';
+import type { NicknameStyle } from '../../core/profile/nickname_style';
 import { useState, useSyncExternalStore } from 'react';
 import { Upload, X } from 'lucide-react';
 import { invoke } from '../../platform/commands.ts';
 import { t } from '../../i18n';
-import { profileImages, profileBanners, type ProfileDraft } from '../../core/profile_image';
-import { contrastingTextColor } from '../../core/accent_color';
+import { profileImages, profileBanners, type ProfileDraft } from '../../core/profile/profile_image';
+import { contrastingTextColor } from '../../core/appearance/accent_color';
 import { CropPreview, ProfileCropDialog } from './ProfileCropDialog';
-import { PROFILE_CARD_COLORS } from '../../core/profile_card_color';
+import { PROFILE_CARD_COLORS } from '../../core/profile/profile_card_color';
 import { ColorPalette } from './ColorPalette';
 import { ColorPicker } from './ColorPicker';
 import { TooltipButton } from './TooltipButton';

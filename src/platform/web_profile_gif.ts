@@ -1,7 +1,7 @@
 import { parseGIF, decompressFrame, type ParsedGif } from 'gifuct-js';
 import { PngAnimationEncoder } from '../core/png_animation';
-import { cropDimensions } from '../core/profile_crop';
-import type { ImageCrop } from '../core/profile_image';
+import { cropDimensions } from '../core/profile/profile_crop';
+import type { ImageCrop } from '../core/profile/profile_image';
 
 export const PROFILE_INPUT_LIMIT = 32 * 1024 * 1024;
 const PIXEL_BUDGET = 128 * 1024 * 1024;

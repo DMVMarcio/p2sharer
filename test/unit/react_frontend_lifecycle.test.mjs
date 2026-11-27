@@ -72,7 +72,7 @@ export { ChatPane } from './src/components/room/ChatPane.tsx';
 export { ParticipantsPane } from './src/components/room/ParticipantsPane.tsx';
 export { WatchersTooltipContent } from './src/components/room/WatchersTooltipContent.tsx';
 export { Nickname } from './src/components/common/Nickname.tsx';
-export { profileImages, profileBanners } from './src/core/profile_image.ts';
+export { profileImages, profileBanners } from './src/core/profile/profile_image.ts';
 export { ContextMenuProvider } from './src/components/common/ContextMenu.tsx';`, resolveDir: process.cwd() },
   bundle: true, write: false, format: 'esm', platform: 'node', jsx: 'automatic', loader: { '.css': 'empty', '.png': 'dataurl' }, plugins: [{ name: 'fixtures', setup(builder) {
     builder.onResolve({ filter: /\/(useRoom|useStore|state_store|room_service|room_apps_service|RoomAppCard|audio_context_manager|pip_service|useStreamPointer|useModal|useToast|useChatFileInput|EmojiComposerInput)$/ }, args => ({

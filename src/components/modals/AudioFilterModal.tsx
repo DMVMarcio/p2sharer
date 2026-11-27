@@ -4,7 +4,7 @@ import { t } from '../../i18n';
 import { useLocale } from '../../hooks/useLocale';
 import { useModal } from '../../hooks/useModal';
 import { useAudioFilter } from '../../hooks/useAudioFilter';
-import { audioProcessKey, audioProcessLabels, type AudioCaptureChoice } from '../../core/audio_filter_presets';
+import { audioProcessKey, audioProcessLabels, type AudioCaptureChoice } from '../../core/media/audio_filter_presets';
 import { ModalDialog } from '../common/ModalDialog';
 import { Select } from '../common/Select';
 import { TooltipButton } from '../common/TooltipButton';

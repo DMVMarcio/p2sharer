@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { ToastManager, type ToastItem } from '../../src/core/toast_manager.ts';
+import { ToastManager, type ToastItem } from '../../src/core/ui/toast_manager.ts';
 
 test('toast lifetime pauses, resumes with the remaining time, and stays independent of other notifications', context => {
   context.mock.timers.enable({ apis: ['setTimeout', 'Date'], now: 1000 });

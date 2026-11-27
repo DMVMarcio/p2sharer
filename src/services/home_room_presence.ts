@@ -1,7 +1,7 @@
-import { parseRoomInvite } from '../core/room_invite.ts';
-import { stabilizeRoomPreview, type RoomPreview, type RoomPreviewParticipant } from '../core/room_preview.ts';
-import { orderSavedRooms } from '../core/saved_room_order.ts';
-import { savedRooms, type SavedRoom } from '../core/saved_rooms.ts';
+import { parseRoomInvite } from '../core/room/room_invite.ts';
+import { stabilizeRoomPreview, type RoomPreview, type RoomPreviewParticipant } from '../core/room/room_preview.ts';
+import { orderSavedRooms } from '../core/room/saved_room_order.ts';
+import { savedRooms, type SavedRoom } from '../core/room/saved_rooms.ts';
 import { stateStore } from '../core/state_store.ts';
 import { modalManager } from '../hooks/useModal.ts';
 import { GroupRoomManager } from '../p2p/group_room.ts';

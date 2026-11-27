@@ -17,7 +17,7 @@ import {
   normalizeVoicePreferences,
   saveUserVoiceVolume,
   saveVoicePreferences,
-} from '../../src/core/voice_preferences.ts';
+} from '../../src/core/media/voice_preferences.ts';
 import {
   createDefaultInputBindings,
   DEFAULT_SHORTCUTS,
@@ -25,7 +25,7 @@ import {
   resetInputBindingsCacheForTest,
   sanitizeInputBindingsConfig,
   saveInputBindings,
-} from '../../src/core/input_bindings.ts';
+} from '../../src/core/ui/input_bindings.ts';
 
 function createMemoryStorage(): Storage {
   const store = new Map<string, string>();
@@ -536,7 +536,7 @@ test('voice shortcuts default to unassigned, bind in Shortcuts & Keyboard settin
       contents: `
         export * from './src/services/voice_shortcuts.ts';
         export { KeybindingsSettingsPane } from './src/components/modals/KeybindingsSettingsPane.tsx';
-        export * from './src/core/input_bindings.ts';
+        export * from './src/core/ui/input_bindings.ts';
       `,
       resolveDir: process.cwd(),
     },

@@ -30,7 +30,7 @@ import { t } from '../../../src/i18n';
 import { LevelMeter, LiveCursor, MiniChessBoard, PEERS, PeerAvatar, WhiteboardSketch } from './scenes';
 import { DrawingPointer, ShooterScene, StudioScene } from './screenScenes';
 import { useInView } from './motion';
-import { useReducedMotion } from '../../../src/core/appearance_preferences';
+import { useReducedMotion } from '../../../src/core/appearance/appearance_preferences';
 
 export type Tone = 'violet' | 'rose' | 'emerald' | 'amber' | 'sky' | 'pink' | 'teal';
 

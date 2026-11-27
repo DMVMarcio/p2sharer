@@ -1,4 +1,4 @@
-import { blobToDataUrl } from '../core/image_clipboard';
+import { blobToDataUrl } from '../core/ui/image_clipboard';
 import { t } from '../i18n/index.ts';
 import { useEffect, useRef, useState, type RefObject } from 'react';
 import { isTauri } from '@tauri-apps/api/core';

@@ -1,4 +1,4 @@
-import type { ChatMessage } from './types.ts';
+import type { ChatMessage } from '../types.ts';
 
 export function hasSafeChatOrder(order: unknown): boolean {
   return order === undefined || (typeof order === 'number' && Number.isSafeInteger(order) && order > 0);

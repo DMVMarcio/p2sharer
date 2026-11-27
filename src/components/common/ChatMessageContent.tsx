@@ -2,14 +2,14 @@ import React from 'react';
 import ReactMarkdown from 'react-markdown';
 import { HighlightedCodeBlock } from './HighlightedCodeBlock';
 import remarkGfm from 'remark-gfm';
-import { safeChatUrl } from '../../core/chat_links';
-import { EmojiPack } from '../../core/emoji_preferences';
+import { safeChatUrl } from '../../core/chat/chat_links';
+import { EmojiPack } from '../../core/emoji/emoji_preferences';
 import { modalManager } from '../../hooks/useModal';
 import { EmojiText } from './EmojiText';
-import { getEmojiIndex } from '../../core/emoji_catalog';
+import { getEmojiIndex } from '../../core/emoji/emoji_catalog';
 import { stateStore } from '../../core/state_store';
 import { roomService } from '../../services/room_service';
-import { profileImages } from '../../core/profile_image';
+import { profileImages } from '../../core/profile/profile_image';
 import { selfId } from '@trystero-p2p/core';
 
 const allowedElements = [

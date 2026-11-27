@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { diagnosticOpaqueId, diagnosticPeerSnapshot, startMediaDiagnostics } from '../../src/core/media_diagnostics.ts';
+import { diagnosticOpaqueId, diagnosticPeerSnapshot, startMediaDiagnostics } from '../../src/core/media/media_diagnostics.ts';
 
 test('diagnostic RTP snapshots retain counters while excluding source identifiers and addresses', async () => {
   const pc = {

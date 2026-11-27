@@ -20,7 +20,7 @@ window.matchMedia = () => ({ matches: false });
 Object.defineProperty(HTMLElement.prototype, 'offsetWidth', { get() { return this.getAttribute('role') === 'menu' ? 240 : 0; } });
 Object.defineProperty(HTMLElement.prototype, 'offsetHeight', { get() { return this.getAttribute('role') === 'menu' ? 180 : 0; } });
 const require = createRequire(import.meta.url);
-const bundle = await build({ stdin: { contents: "export * from './src/components/common/ContextMenu.tsx'; export * from './src/components/room/chat_message_actions.tsx'; export * from './src/core/text_editing.ts';", resolveDir: process.cwd() }, bundle: true,
+const bundle = await build({ stdin: { contents: "export * from './src/components/common/ContextMenu.tsx'; export * from './src/components/room/chat_message_actions.tsx'; export * from './src/core/ui/text_editing.ts';", resolveDir: process.cwd() }, bundle: true,
   write: false, format: 'esm', platform: 'node', jsx: 'automatic', plugins: [{ name: 'shared-react', setup(builder) {
     builder.onResolve({ filter: /^[^./]/ }, (args) => ({ path: pathToFileURL(require.resolve(args.path)).href, external: true }));
   } }] });

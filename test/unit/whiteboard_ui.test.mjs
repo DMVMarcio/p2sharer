@@ -52,7 +52,7 @@ const mocks = {
   useToast: 'export const showToast = value => globalThis.whiteboardFixture.errors.push(value);',
 };
 const bundle = await build({ stdin: { contents: `export { WhiteboardApp } from './src/apps/whiteboard/WhiteboardApp.tsx';
-  export { trimWhiteCanvasMargins } from './src/core/image_clipboard.ts';
+  export { trimWhiteCanvasMargins } from './src/core/ui/image_clipboard.ts';
   export { ContextMenuProvider } from './src/components/common/ContextMenu.tsx';
   export { WhiteboardModel } from './src/apps/whiteboard/whiteboard_model.ts'; export { setLanguage } from './src/i18n/index.ts';`, resolveDir: process.cwd() },
   bundle: true, write: false, platform: 'node', format: 'esm', jsx: 'automatic', plugins: [{ name: 'whiteboard-fixture', setup(builder) {

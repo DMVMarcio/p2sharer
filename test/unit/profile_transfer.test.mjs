@@ -9,7 +9,7 @@ globalThis.__profileInvoke = async (command, args) => {
   return `data:image/png;base64,${args.data}`;
 };
 const bundle = await build({
-  stdin: { contents: `export { ProfileTransfer } from './src/p2p/profile_transfer.ts'; export { profileImages, profileBanners } from './src/core/profile_image.ts'; export { contrastingTextColor } from './src/core/accent_color.ts';`, resolveDir: process.cwd() },
+  stdin: { contents: `export { ProfileTransfer } from './src/p2p/profile_transfer.ts'; export { profileImages, profileBanners } from './src/core/profile/profile_image.ts'; export { contrastingTextColor } from './src/core/appearance/accent_color.ts';`, resolveDir: process.cwd() },
   bundle: true, write: false, format: 'esm', platform: 'node',
   plugins: [{ name: 'native', setup(builder) {
     builder.onResolve({ filter: /^(?:@tauri-apps\/api\/core|.*\/platform\/commands\.ts)$/ }, () => ({ path: 'native', namespace: 'fixture' }));

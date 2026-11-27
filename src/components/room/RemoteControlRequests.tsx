@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { loadRemoteControlHostDefaults } from '../../core/remote_control';
+import { loadRemoteControlHostDefaults } from '../../core/stream/remote_control';
 import { t } from '../../i18n';
 import { useLocale } from '../../hooks/useLocale';
 import { useRoom } from '../../hooks/useRoom';

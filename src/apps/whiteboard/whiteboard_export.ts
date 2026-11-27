@@ -1,4 +1,4 @@
-import { blobToPngBlob, blobToDataUrl, trimWhiteCanvasMargins } from '../../core/image_clipboard';
+import { blobToPngBlob, blobToDataUrl, trimWhiteCanvasMargins } from '../../core/ui/image_clipboard';
 import {
   boardSvg, defaultBoardCanvasSettings,
   type BoardCanvasSettings, type BoardLayer, type BoardShape,

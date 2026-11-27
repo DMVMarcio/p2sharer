@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { TrafficRateSampler } from '../../src/core/traffic_rate.ts';
+import { TrafficRateSampler } from '../../src/core/network/traffic_rate.ts';
 import { formatFileSize } from '../../src/core/file_size.ts';
 
 test('traffic rates average recent counter deltas and settle to zero when idle', () => {

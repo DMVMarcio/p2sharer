@@ -14,16 +14,16 @@ import {
   validRemoteControlHostPacket,
   type RemoteControlHostPacket,
   type RemoteInputEvent,
-} from '../../src/core/remote_control.ts';
+} from '../../src/core/stream/remote_control.ts';
 import { RemoteControlHostManager } from '../../src/services/remote_control_receiver.ts';
 import {
   createDefaultGamepadProfile,
   detectGamepadCapture,
   matchesShortcut,
   resolveKeyRemapping,
-} from '../../src/core/input_bindings.ts';
-import { ToastManager } from '../../src/core/toast_manager.ts';
-import { RemoteControlActivityTracker } from '../../src/core/remote_control_activity.ts';
+} from '../../src/core/ui/input_bindings.ts';
+import { ToastManager } from '../../src/core/ui/toast_manager.ts';
+import { RemoteControlActivityTracker } from '../../src/core/stream/remote_control_activity.ts';
 
 test('validRemoteControlClientPacket and validRemoteControlHostPacket validate bounds and schemas', () => {
   assert.equal(validRemoteControlClientPacket({ type: 'request', mediaId: 'screen-1' }), true);

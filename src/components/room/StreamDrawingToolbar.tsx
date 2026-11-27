@@ -3,7 +3,7 @@ import { useLocale } from '../../hooks/useLocale';
 import { Brush, Square, Circle, Type, MousePointer2, Eraser, Undo2, Redo2 } from 'lucide-react';
 import { TooltipButton } from '../common/TooltipButton';
 import { useContextMenu } from '../common/ContextMenu';
-import type { DrawingTool } from '../../core/stream_pointer';
+import type { DrawingTool } from '../../core/stream/stream_pointer';
 
 export interface DrawingSettings { tool: DrawingTool | null; color: string; size: number }
 const getColors = () => [

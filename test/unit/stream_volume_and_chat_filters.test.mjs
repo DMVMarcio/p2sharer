@@ -12,12 +12,12 @@ import {
   getStreamVolumePreferenceKey,
   saveSessionAppVolume,
   saveStreamVolume,
-} from '../../src/core/stream_volume_preferences.ts';
+} from '../../src/core/media/stream_volume_preferences.ts';
 import {
   getChatMessageCategory,
   matchesChatFilter,
   DEFAULT_CHAT_FILTERS,
-} from '../../src/core/chat_filters.ts';
+} from '../../src/core/chat/chat_filters.ts';
 
 test('stream volume preferences match broadcaster identity + screen across new peerIds and separate sources', () => {
   const map = new Map();
@@ -180,7 +180,7 @@ test('chat filters classify notices and ChatPane filters messages interactively 
       stdin: {
         contents: `export { ChatPane } from './src/components/room/ChatPane.tsx';
           export { ContextMenuProvider } from './src/components/common/ContextMenu.tsx';
-          export { resetChatFilters } from './src/core/chat_filters.ts';`,
+          export { resetChatFilters } from './src/core/chat/chat_filters.ts';`,
         resolveDir: process.cwd(),
       },
       bundle: true,

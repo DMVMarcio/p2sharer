@@ -1,4 +1,4 @@
-import { getLanguage } from '../i18n/index.ts';
+import { getLanguage } from '../../i18n/index.ts';
 export type TransferSpeedUnit = 'MB' | 'Mb';
 
 const STORAGE_KEY = 'p2sharer_transfer_speed_unit';

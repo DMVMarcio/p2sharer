@@ -1,6 +1,6 @@
 import CodeBlockLowlight from '@tiptap/extension-code-block-lowlight';
 import { NodeViewContent, NodeViewWrapper, ReactNodeViewRenderer, useEditorState, type NodeViewProps } from '@tiptap/react';
-import { codeHighlighter, codeLanguage, codeLanguages } from '../../core/code_highlighting';
+import { codeHighlighter, codeLanguage, codeLanguages } from '../../core/ui/code_highlighting';
 import { CodeLanguageSelect } from './CodeLanguageSelect';
 import { t } from '../../i18n';
 import { useLocale } from '../../hooks/useLocale';

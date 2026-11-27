@@ -3,8 +3,8 @@ import { test } from 'node:test';
 import { setupTestDOM } from '../helpers/browser_mocks.ts';
 import { RoomService } from '../../src/services/room_service.ts';
 import { GroupRoomManager } from '../../src/p2p/group_room.ts';
-import { CHAT_FILE_CHUNK_BYTES, MAX_IMAGE_PREVIEW_BYTES } from '../../src/core/chat_file_limits.ts';
-import { profileStats } from '../../src/core/profile_stats.ts';
+import { CHAT_FILE_CHUNK_BYTES, MAX_IMAGE_PREVIEW_BYTES } from '../../src/core/chat/chat_file_limits.ts';
+import { profileStats } from '../../src/core/profile/profile_stats.ts';
 
 test('transport details follow each transfer and ignore a stale query after switching to native TLS', async () => {
   const dom = setupTestDOM();

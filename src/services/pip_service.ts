@@ -1,5 +1,5 @@
 import { t } from '../i18n/index.ts';
-import { streamOwner } from "../core/media_streams.ts";
+import { streamOwner } from "../core/media/media_streams.ts";
 import { invoke, isTauri } from '@tauri-apps/api/core';
 import { emit, listen, type UnlistenFn } from '@tauri-apps/api/event';
 import { stateStore } from '../core/state_store.ts';
@@ -7,7 +7,7 @@ import type { StreamWatcher } from '../core/types.ts';
 import { roomService } from './room_service.ts';
 import { buildIceServers } from '../p2p/ice_config.ts';
 import { audioContextManager } from '../audio/audio_context_manager.ts';
-import { getStreamVolumePreferenceKey } from '../core/stream_volume_preferences.ts';
+import { getStreamVolumePreferenceKey } from '../core/media/stream_volume_preferences.ts';
 import { validPipAudioSettings } from './pip_audio.ts';
 
 interface PipSession {

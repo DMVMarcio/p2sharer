@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { GroupRoomManager } from '../../src/p2p/group_room.ts';
-import type { StreamDescriptor } from '../../src/core/media_streams.ts';
+import type { StreamDescriptor } from '../../src/core/media/media_streams.ts';
 
 const descriptor = (id: string): StreamDescriptor => ({ id, kind: 'screen', label: id, videoTrackId: id, fps: 60, bitrate: 8000 });
 function fixture() {

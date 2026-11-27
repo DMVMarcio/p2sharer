@@ -1,9 +1,9 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { GroupRoomManager } from '../../src/p2p/group_room.ts';
-import { CHAT_FILE_CHUNK_BYTES, CHAT_FILE_IO_BATCH_BYTES, CHAT_FILE_IN_FLIGHT_CHUNKS } from '../../src/core/chat_file_limits.ts';
-import { decodeSignedFileChunk, encodeSignedFileChunk, fileChunkSignatureData, hashFileChunk } from '../../src/core/chat_file_wire.ts';
-import { PeerAuthenticator } from '../../src/core/peer_auth.ts';
+import { CHAT_FILE_CHUNK_BYTES, CHAT_FILE_IO_BATCH_BYTES, CHAT_FILE_IN_FLIGHT_CHUNKS } from '../../src/core/chat/chat_file_limits.ts';
+import { decodeSignedFileChunk, encodeSignedFileChunk, fileChunkSignatureData, hashFileChunk } from '../../src/core/chat/chat_file_wire.ts';
+import { PeerAuthenticator } from '../../src/core/network/peer_auth.ts';
 import { setupTestDOM } from '../helpers/browser_mocks.ts';
 
 test('pipelined image chunks are assembled in offset order before acknowledgment', async () => {

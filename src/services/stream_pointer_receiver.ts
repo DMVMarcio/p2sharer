@@ -1,7 +1,7 @@
 import { invoke, isTauri } from '@tauri-apps/api/core';
 import { stateStore } from '../core/state_store.ts';
-import { StreamDrawingHistory } from '../core/stream_drawing_history.ts';
-import { STREAM_POINTER_PING_MS, streamDrawingLimit, streamDrawingPointLimit, validStreamPointer, type StreamPointerState, type StreamPointerVisual } from '../core/stream_pointer.ts';
+import { StreamDrawingHistory } from '../core/stream/stream_drawing_history.ts';
+import { STREAM_POINTER_PING_MS, streamDrawingLimit, streamDrawingPointLimit, validStreamPointer, type StreamPointerState, type StreamPointerVisual } from '../core/stream/stream_pointer.ts';
 
 export class StreamPointerReceiver {
   private visuals = new Map<string, StreamPointerVisual>();

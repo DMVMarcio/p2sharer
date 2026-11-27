@@ -1,7 +1,7 @@
 import { t } from '../../i18n';
 import { Copy, Scissors, ClipboardPaste, Undo2, Redo2, TextSelect, Delete, TableRowsSplit, TableColumnsSplit, Trash2 } from 'lucide-react';
 import type { ContextMenuAction } from './ContextMenu';
-import type { TextEditingSession } from '../../core/text_editing';
+import type { TextEditingSession } from '../../core/ui/text_editing';
 
 export function getTextEditingActions(session: TextEditingSession): ContextMenuAction[] {
   const copy = async () => {

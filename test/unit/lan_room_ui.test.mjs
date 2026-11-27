@@ -5,7 +5,7 @@ import { pathToFileURL } from 'node:url';
 import { build } from 'esbuild';
 import { JSDOM } from 'jsdom';
 import React, { act } from 'react';
-import { verifyRoomInvite } from '../../src/core/room_invite_validation.ts';
+import { verifyRoomInvite } from '../../src/core/room/room_invite_validation.ts';
 
 const dom = new JSDOM('<div id="root"></div>', { url: 'http://localhost' });
 for (const key of ['window', 'document', 'HTMLElement', 'Element', 'Node', 'MutationObserver', 'Event', 'CustomEvent', 'localStorage']) globalThis[key] = dom.window[key];

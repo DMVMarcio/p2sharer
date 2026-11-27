@@ -1,14 +1,14 @@
 import { useEffect, useState, useSyncExternalStore, type RefObject } from 'react';
-import { streamPointerVideoRect } from '../../core/stream_pointer';
+import { streamPointerVideoRect } from '../../core/stream/stream_pointer';
 import { streamPointerView } from '../../services/stream_pointer_view';
 import { StreamDrawingLayer } from './StreamDrawingLayer';
 import { StreamPointerGlyph } from './StreamPointerGlyph';
 import { StreamDrawingTextEditor } from './StreamDrawingTextEditor';
-import type { StreamDrawing } from '../../core/stream_pointer';
+import type { StreamDrawing } from '../../core/stream/stream_pointer';
 
 export function StreamPointerVideoLayer({ container, video, peerId, local, draft, textDraft, textEditorRef, onTextConfirm }: {
   container: RefObject<HTMLDivElement | null>; video: RefObject<HTMLVideoElement | null>; peerId: string;
-  local: { x: number; y: number } | null; draft?: import('../../core/stream_pointer').StreamDrawing | null;
+  local: { x: number; y: number } | null; draft?: import('../../core/stream/stream_pointer').StreamDrawing | null;
   textDraft?: StreamDrawing | null; onTextConfirm?: (drawing: StreamDrawing) => void;
   textEditorRef?: RefObject<HTMLTextAreaElement | null>;
 }) {

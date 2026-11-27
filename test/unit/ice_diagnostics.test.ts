@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { attachIceDiagnostics, formatJoinError, summarizeIceDescription, summarizeIceStats } from '../../src/p2p/ice_config.ts';
-import { classifyIceAddress, createIceAddressFingerprinter } from '../../src/core/ice_address_diagnostics.ts';
+import { classifyIceAddress, createIceAddressFingerprinter } from '../../src/core/network/ice_address_diagnostics.ts';
 
 // Documentation-only addresses and intentionally fake credentials exercise redaction.
 const description = (port = '9') => ({ type: 'offer', sdp: [

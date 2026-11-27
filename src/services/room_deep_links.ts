@@ -1,8 +1,8 @@
 import { isTauri } from '@tauri-apps/api/core';
 import { getCurrent, onOpenUrl } from '@tauri-apps/plugin-deep-link';
-import { extractRoomInvite, RoomDeepLinkInbox } from '../core/room_deep_links.ts';
-import { verifyRoomInvite } from '../core/room_invite_validation.ts';
-import { isShortRoomCode, parseRoomInvite } from '../core/room_invite.ts';
+import { extractRoomInvite, RoomDeepLinkInbox } from '../core/room/room_deep_links.ts';
+import { verifyRoomInvite } from '../core/room/room_invite_validation.ts';
+import { isShortRoomCode, parseRoomInvite } from '../core/room/room_invite.ts';
 import { stateStore } from '../core/state_store.ts';
 import { modalManager } from '../hooks/useModal.ts';
 import { showToast } from '../hooks/useToast.ts';

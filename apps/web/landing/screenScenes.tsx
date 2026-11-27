@@ -1,5 +1,5 @@
 import { useEffect, useRef } from 'react';
-import { useReducedMotion } from '../../../src/core/appearance_preferences';
+import { useReducedMotion } from '../../../src/core/appearance/appearance_preferences';
 import { useInView } from './motion';
 import { LiveCursor, PEERS, type Peer } from './scenes';
 

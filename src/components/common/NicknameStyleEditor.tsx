@@ -1,7 +1,7 @@
 import { useId } from 'react';
 import { t } from '../../i18n';
 import { useLocale } from '../../hooks/useLocale';
-import { DEFAULT_NICKNAME_STYLE, NICKNAME_ANIMATIONS, NICKNAME_EFFECTS, NICKNAME_FONTS, NICKNAME_FONT_LABELS, NICKNAME_FONT_SCALES, normalizeNicknameStyle, type NicknameStyle } from '../../core/nickname_style';
+import { DEFAULT_NICKNAME_STYLE, NICKNAME_ANIMATIONS, NICKNAME_EFFECTS, NICKNAME_FONTS, NICKNAME_FONT_LABELS, NICKNAME_FONT_SCALES, normalizeNicknameStyle, type NicknameStyle } from '../../core/profile/nickname_style';
 import { Nickname } from './Nickname';
 import { ColorPicker } from './ColorPicker';
 import { Select } from './Select';

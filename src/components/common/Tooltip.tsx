@@ -8,7 +8,7 @@ import React, {
 } from 'react';
 import { createPortal } from 'react-dom';
 import { calculateTooltipPosition } from './tooltip_utils';
-import { isReducedMotion } from '../../core/appearance_preferences';
+import { isReducedMotion } from '../../core/appearance/appearance_preferences';
 
 export interface TooltipProps {
   /** The content to show inside the tooltip. If null or undefined, tooltip will not appear. */

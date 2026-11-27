@@ -1,16 +1,16 @@
-import { normalizeNicknameStyle, type NicknameStyle } from '../core/nickname_style.ts';
+import { normalizeNicknameStyle, type NicknameStyle } from '../core/profile/nickname_style.ts';
 import { stateStore } from '../core/state_store.ts';
 import { logDiagnostic } from '../core/logger.ts';
 import { ProfileTransfer } from './profile_transfer.ts';
-import { profileImages, profileBanners } from '../core/profile_image.ts';
-import { profileStats } from '../core/profile_stats.ts';
-import { validStreamDescriptors, streamSlotKey, streamOwner, type StreamDescriptor } from '../core/media_streams.ts';
+import { profileImages, profileBanners } from '../core/profile/profile_image.ts';
+import { profileStats } from '../core/profile/profile_stats.ts';
+import { validStreamDescriptors, streamSlotKey, streamOwner, type StreamDescriptor } from '../core/media/media_streams.ts';
 import {
   validStreamPointer,
   validStreamPointerState,
   type StreamPointerState,
   type StreamPointerPacket,
-} from '../core/stream_pointer.ts';
+} from '../core/stream/stream_pointer.ts';
 import {
   decodeRemoteControlBinaryInput,
   decodeRemoteControlCursorSync,
@@ -21,7 +21,7 @@ import {
   validRemoteControlHostPacket,
   type RemoteControlClientPacket,
   type RemoteControlHostPacket,
-} from '../core/remote_control.ts';
+} from '../core/stream/remote_control.ts';
 import { selfId } from '@trystero-p2p/core';
 import { invoke } from '../platform/commands.ts';
 import type { AppWireEvent } from '../apps/types.ts';
@@ -32,23 +32,23 @@ import {
   chatRevisionKey,
   mergeChatHistory,
   nextChatOrder,
-} from '../core/chat_history.ts';
+} from '../core/chat/chat_history.ts';
 import {
   CHAT_FILE_CHUNK_BYTES,
   CHAT_FILE_IO_BATCH_BYTES,
   CHAT_FILE_IN_FLIGHT_CHUNKS,
   MAX_IMAGE_PREVIEW_BYTES,
-} from '../core/chat_file_limits.ts';
+} from '../core/chat/chat_file_limits.ts';
 import {
   decodeSignedFileChunk,
   encodeSignedFileChunk,
   fastFileChunkTag,
   fileChunkSignatureData,
   hashFileChunk,
-} from '../core/chat_file_wire.ts';
-import { PeerAuthenticator } from '../core/peer_auth.ts';
-import { readChatFileBytes, writeChatDownloadBytes } from '../core/chat_file_io.ts';
-import { selectedIcePair, selectedIceRoute, type IceStat } from '../core/ice_route.ts';
+} from '../core/chat/chat_file_wire.ts';
+import { PeerAuthenticator } from '../core/network/peer_auth.ts';
+import { readChatFileBytes, writeChatDownloadBytes } from '../core/chat/chat_file_io.ts';
+import { selectedIcePair, selectedIceRoute, type IceStat } from '../core/network/ice_route.ts';
 import {
   cancelDirectFile,
   directFileAddress,
@@ -56,13 +56,13 @@ import {
   receiveDirectFile,
   validDirectFileOffer,
   type DirectFileOffer,
-} from '../core/chat_file_direct.ts';
+} from '../core/chat/chat_file_direct.ts';
 import {
   RoomAuthority,
   type AdminAdmission,
   type AuthorityTransfer,
   type HostCommand,
-} from '../core/room_authority.ts';
+} from '../core/room/room_authority.ts';
 import {
   compareRoomInvites,
   formatRoomInvite,
@@ -70,10 +70,10 @@ import {
   signRoomInvite,
   validRoomName,
   type NamedRoomInvite,
-} from '../core/room_invite.ts';
-import { isAuthorityChainPrefix, verifyRoomInvite } from '../core/room_invite_validation.ts';
-import { savedRoomCustomName, savedRooms, type SavedRoom } from '../core/saved_rooms.ts';
-import { latestAdminCommand, roomStateFingerprint } from '../core/room_state_sync.ts';
+} from '../core/room/room_invite.ts';
+import { isAuthorityChainPrefix, verifyRoomInvite } from '../core/room/room_invite_validation.ts';
+import { savedRoomCustomName, savedRooms, type SavedRoom } from '../core/room/saved_rooms.ts';
+import { latestAdminCommand, roomStateFingerprint } from '../core/room/room_state_sync.ts';
 import type {
   ActiveStreamInfo,
   AppPlatform,
@@ -99,15 +99,15 @@ import {
 import { createFileOptimizedPeerConnection, type FileOptimizedConnection } from './file_data_channel.ts';
 import { FileBulkChannelManager } from './file_bulk_channel.ts';
 import { PeerPayloadChannels } from './peer_payload_channels.ts';
-import { encodePeerPayload, decodePeerPayload } from '../core/peer_payload.ts';
-import { decodeFileBase64, encodeFileBase64 } from '../core/chat_file_wire.ts';
+import { encodePeerPayload, decodePeerPayload } from '../core/network/peer_payload.ts';
+import { decodeFileBase64, encodeFileBase64 } from '../core/chat/chat_file_wire.ts';
 import { NativeVideoTransport } from './native_video_transport.ts';
 import { MediaCoordinator } from './media_coordinator.ts';
 import { withLocalInterfaceStun } from './interface_stun.ts';
 import { PeerTracker } from './peer_tracker.ts';
 import { signalingManager } from './signaling_manager.ts';
 import { t } from '../i18n/index.ts';
-import { profileThumbnail, validRoomPreview, type RoomPreview } from '../core/room_preview.ts';
+import { profileThumbnail, validRoomPreview, type RoomPreview } from '../core/room/room_preview.ts';
 
 const APP_ID = 'p2sharer-multi-stream-v5';
 

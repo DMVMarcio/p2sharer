@@ -1,4 +1,4 @@
-import { PeerAuthenticator } from './peer_auth.ts';
+import { PeerAuthenticator } from '../network/peer_auth.ts';
 
 export interface AuthorityTransfer {
   roomId: string;

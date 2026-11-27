@@ -3,8 +3,8 @@ import assert from 'node:assert/strict';
 import { build } from 'esbuild';
 import { createRequire } from 'node:module';
 import { pathToFileURL } from 'node:url';
-import { createAuthenticatedInvite } from '../../src/core/room_invite.ts';
-import { roomInviteLink } from '../../src/core/room_deep_links.ts';
+import { createAuthenticatedInvite } from '../../src/core/room/room_invite.ts';
+import { roomInviteLink } from '../../src/core/room/room_deep_links.ts';
 
 test('the production listener handles startup, live delivery, profile setup and cleanup without joining', async () => {
   const first = (await createAuthenticatedInvite('Startup fixture')).invite;

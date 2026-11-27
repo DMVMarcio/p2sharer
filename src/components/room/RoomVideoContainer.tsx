@@ -16,7 +16,7 @@ import { roomService } from '../../services/room_service';
 import { ParticipantCard } from './ParticipantCard';
 import { RoomSlotInfo } from '../../core/types';
 import { useRoomCardGestures } from '../../hooks/useRoomCardGestures';
-import { calculateCardLayout } from '../../core/room_card_layout';
+import { calculateCardLayout } from '../../core/room/room_card_layout';
 import { useIsMobile } from '../../hooks/useIsMobile';
 import { RoomCardFrame, RoomCardPlaceholder } from './RoomCardFrame';
 import { RoomCardLayoutContext, RoomCardLayoutSurface } from './RoomCardLayoutContext';

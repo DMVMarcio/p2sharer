@@ -2,9 +2,9 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { GroupRoomManager } from '../../src/p2p/group_room.ts';
 import { signalingManager } from '../../src/p2p/signaling_manager.ts';
-import { createLanConnection } from '../../src/core/lan_room.ts';
-import { createAuthenticatedInvite, parseRoomInvite } from '../../src/core/room_invite.ts';
-import { savedRooms } from '../../src/core/saved_rooms.ts';
+import { createLanConnection } from '../../src/core/room/lan_room.ts';
+import { createAuthenticatedInvite, parseRoomInvite } from '../../src/core/room/room_invite.ts';
+import { savedRooms } from '../../src/core/room/saved_rooms.ts';
 
 test('LAN room lifecycle keeps canonical actions, host-only ICE, signed renames and isolated teardown', async () => {
   const connection = createLanConnection('192.0.2.1');

@@ -1,6 +1,6 @@
 import { Extension, type Editor } from '@tiptap/core';
 import { TextSelection } from '@tiptap/pm/state';
-import { codeLanguage } from '../../core/code_highlighting';
+import { codeLanguage } from '../../core/ui/code_highlighting';
 
 type LineAction = 'indent' | 'outdent' | 'duplicateUp' | 'duplicateDown' | 'up' | 'down' | 'comment';
 

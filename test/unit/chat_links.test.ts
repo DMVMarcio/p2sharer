@@ -1,6 +1,6 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
-import { safeChatUrl } from '../../src/core/chat_links.ts';
+import { safeChatUrl } from '../../src/core/chat/chat_links.ts';
 
 describe('chat link safety', () => {
   it('allows external HTTP links', () => {

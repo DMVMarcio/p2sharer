@@ -1,6 +1,6 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
-import type { ToastItem } from '../core/toast_manager';
-import { useReducedMotion } from '../core/appearance_preferences';
+import type { ToastItem } from '../core/ui/toast_manager';
+import { useReducedMotion } from '../core/appearance/appearance_preferences';
 
 interface PresentedToast extends ToastItem { exiting: boolean; }
 

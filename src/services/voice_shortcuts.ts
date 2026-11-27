@@ -6,7 +6,7 @@ import {
   subscribeInputBindings,
   type InputBindingsConfig,
   type VoiceShortcutAction,
-} from '../core/input_bindings.ts';
+} from '../core/ui/input_bindings.ts';
 import { logDiagnostic } from '../core/logger.ts';
 import { roomService } from './room_service.ts';
 

@@ -1,4 +1,4 @@
-import { localStreamPointerVisuals, type StreamDrawingHistoryState, type StreamPointerState, type StreamPointerVisual } from '../core/stream_pointer.ts';
+import { localStreamPointerVisuals, type StreamDrawingHistoryState, type StreamPointerState, type StreamPointerVisual } from '../core/stream/stream_pointer.ts';
 
 export interface StreamPointerScene { visuals: StreamPointerVisual[]; localPeerId: string; name: string; color: string; drawingAllowed?: boolean; history?: StreamDrawingHistoryState[] }
 const EMPTY: StreamPointerScene = { visuals: [], localPeerId: '', name: '', color: '' };

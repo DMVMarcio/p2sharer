@@ -1,5 +1,5 @@
 import { useLayoutEffect, useRef, useState } from 'react';
-import { isReducedMotion } from '../../core/appearance_preferences.ts';
+import { isReducedMotion } from '../../core/appearance/appearance_preferences.ts';
 
 export interface PieceReturnTransform {
   dxPercent: number;

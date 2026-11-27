@@ -4,7 +4,7 @@ import { t } from '../../i18n';
 import { useLocale } from '../../hooks/useLocale';
 import { ModalDialog } from './ModalDialog';
 import { TooltipButton } from './TooltipButton';
-import { hexToHsv, hsvToHex, type Hsv } from '../../core/hsv_color';
+import { hexToHsv, hsvToHex, type Hsv } from '../../core/appearance/hsv_color';
 
 function ColorPickerDialog({ value, label, onApply, onClose }: {
   value: string; label: string; onApply: (color: string) => void; onClose: () => void;

@@ -1,7 +1,7 @@
 import { invoke } from '@tauri-apps/api/core';
 import { listen } from '@tauri-apps/api/event';
 import { createTopicStrategy, type JoinRoom } from '@trystero-p2p/core';
-import type { LanRoomConnection } from '../core/lan_room.ts';
+import type { LanRoomConnection } from '../core/room/lan_room.ts';
 import { LanRelay, type LanSignalDriver, type LanSignalEvent } from './lan_relay.ts';
 
 const driver: LanSignalDriver = {

@@ -1,4 +1,4 @@
-import { codeLanguage, codeLanguages } from '../../core/code_highlighting';
+import { codeLanguage, codeLanguages } from '../../core/ui/code_highlighting';
 import { Select } from './Select';
 import { t } from '../../i18n';
 import { useLocale } from '../../hooks/useLocale';

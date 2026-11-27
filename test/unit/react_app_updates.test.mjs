@@ -36,7 +36,7 @@ test('the real header badge opens the update dialog and installation remains an 
           useToast: 'export const showToast = () => {};',
           saved_rooms: 'export const savedRooms = { subscribe: () => () => {} };',
         };
-        builder.onResolve({ filter: /services\/app_updates$|hooks\/useRoom$|hooks\/useModal$|hooks\/useToast$|core\/saved_rooms$/ }, args => ({
+        builder.onResolve({ filter: /services\/app_updates$|hooks\/useRoom$|hooks\/useModal$|hooks\/useToast$|core\/room\/saved_rooms$/ }, args => ({
           namespace: 'fixture', path: args.path.split('/').at(-1),
         }));
         builder.onLoad({ filter: /.*/, namespace: 'fixture' }, args => ({ contents: mocks[args.path], loader: 'js' }));

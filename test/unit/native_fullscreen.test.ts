@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { NativeFullscreenSession } from '../../src/core/native_fullscreen.ts';
+import { NativeFullscreenSession } from '../../src/core/ui/native_fullscreen.ts';
 
 test('fullscreen snapshots placement before resizing and restores it after native exit', async () => {
   const initial = { x: 100, y: 80, width: 640, height: 360, maximized: false };

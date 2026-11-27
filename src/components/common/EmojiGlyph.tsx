@@ -1,6 +1,6 @@
 import React from 'react';
-import { EmojiPack } from '../../core/emoji_preferences';
-import { getEmojiVisual } from '../../core/emoji_visual';
+import { EmojiPack } from '../../core/emoji/emoji_preferences';
+import { getEmojiVisual } from '../../core/emoji/emoji_visual';
 
 type Props = { emoji: string; pack: EmojiPack; size?: number; label?: string };
 

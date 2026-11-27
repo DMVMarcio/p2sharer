@@ -7,8 +7,8 @@ import { Nickname } from '../common/Nickname';
 import { modalManager } from '../../hooks/useModal';
 import { useStore } from '../../hooks/useStore';
 import { useRoom } from '../../hooks/useRoom';
-import { profileImages, profileBanners } from '../../core/profile_image';
-import { profileStats, formatProfileDuration } from '../../core/profile_stats';
+import { profileImages, profileBanners } from '../../core/profile/profile_image';
+import { profileStats, formatProfileDuration } from '../../core/profile/profile_stats';
 import { getLanguage, t } from '../../i18n';
 import { useLocale } from '../../hooks/useLocale';
 

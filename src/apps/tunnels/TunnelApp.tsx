@@ -12,7 +12,7 @@ import { ProfileAvatar } from '../../components/common/ProfileAvatar';
 import { roomAppsService } from '../room_apps_service';
 import { TunnelModel, type TunnelCounters, type NetworkCounters } from './tunnel_model';
 import { formatFileSize } from '../../core/file_size';
-import type { TrafficCount, TrafficSnapshot } from '../../core/traffic_rate';
+import type { TrafficCount, TrafficSnapshot } from '../../core/network/traffic_rate';
 import { validTunnelRule, type TunnelRule } from './tunnel_rules';
 
 const trafficAmount = (bytes: number) => formatFileSize(bytes, { binary: true, fractionDigits: 2 });

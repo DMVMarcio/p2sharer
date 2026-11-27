@@ -1,4 +1,4 @@
-import { invoke } from '../platform/commands.ts';
+import { invoke } from '../../platform/commands.ts';
 import { compareRoomInvites, parseRoomInvite, type RoomIdentity } from './room_invite.ts';
 import { verifyRoomInvite } from './room_invite_validation.ts';
 import type { AuthorityTransfer, HostCommand } from './room_authority.ts';

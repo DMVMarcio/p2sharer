@@ -1,11 +1,11 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { PeerAuthenticator } from '../../src/core/peer_auth.ts';
-import { RoomAuthority } from '../../src/core/room_authority.ts';
+import { PeerAuthenticator } from '../../src/core/network/peer_auth.ts';
+import { RoomAuthority } from '../../src/core/room/room_authority.ts';
 import { compareRoomInvites, createAuthenticatedInvite, formatRoomInvite,
-  parseRoomInvite, signRoomInvite } from '../../src/core/room_invite.ts';
-import { verifyRoomInvite } from '../../src/core/room_invite_validation.ts';
-import { savedRooms } from '../../src/core/saved_rooms.ts';
+  parseRoomInvite, signRoomInvite } from '../../src/core/room/room_invite.ts';
+import { verifyRoomInvite } from '../../src/core/room/room_invite_validation.ts';
+import { savedRooms } from '../../src/core/room/saved_rooms.ts';
 
 test('named invitations reject tampered names, administrator grants, and signatures', async () => {
   const created = await createAuthenticatedInvite('Sala do Café');

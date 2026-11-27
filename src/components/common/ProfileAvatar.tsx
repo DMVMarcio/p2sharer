@@ -1,6 +1,6 @@
 import { useSyncExternalStore, type HTMLAttributes, type Ref } from 'react';
-import { profileImages } from '../../core/profile_image';
-import { contrastingTextColor } from '../../core/accent_color';
+import { profileImages } from '../../core/profile/profile_image';
+import { contrastingTextColor } from '../../core/appearance/accent_color';
 
 export function ProfileAvatar({ peerId = 'local', name, isLocal = false, color, imageUrl, className = '', ...props }: {
   peerId?: string; name: string; isLocal?: boolean; color?: string; imageUrl?: string; className?: string;

@@ -1,5 +1,5 @@
 import * as Y from 'yjs';
-import { PROFILE_CHUNK, PROFILE_MAX_BYTES } from '../../core/profile_image.ts';
+import { PROFILE_CHUNK, PROFILE_MAX_BYTES } from '../../core/profile/profile_image.ts';
 import { decodeUpdate, encodeUpdate, type RoomAppModel, type RoomAppModelContext } from '../models.ts';
 import { inspectPngBytes, verifyWhiteboardPng, type WhiteboardImageRecord } from '../shared/whiteboard_image.ts';
 import { flipBoardLayer, scaleBoardLayer, type BoardBox } from '../shared/whiteboard_interaction.ts';

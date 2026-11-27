@@ -23,7 +23,7 @@ import {
   MAX_RENDEZVOUS_SERVERS_PER_TRANSPORT,
   type RendezvousPreferences,
 } from './relay_preferences.ts';
-import type { LanRoomConnection } from '../core/lan_room.ts';
+import type { LanRoomConnection } from '../core/room/lan_room.ts';
 import { prepareLanSignaling, type LanSignalingRoom } from './lan_signaling.ts';
 export { DEFAULT_MQTT_RELAY_URLS } from './relay_preferences.ts';
 

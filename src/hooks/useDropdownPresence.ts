@@ -1,5 +1,5 @@
 import { useLayoutEffect, useState } from 'react';
-import { isReducedMotion } from '../core/appearance_preferences.ts';
+import { isReducedMotion } from '../core/appearance/appearance_preferences.ts';
 
 // Keep in sync with --dropdown-exit-duration in style.css.
 const EXIT_DURATION_MS = 260;

@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { reconcilePinnedRoomSlot, snapOverlay, resizeOverlay, streamOwner, streamSlotKey, validStreamDescriptors, type StreamDescriptor } from '../../src/core/media_streams.ts';
+import { reconcilePinnedRoomSlot, snapOverlay, resizeOverlay, streamOwner, streamSlotKey, validStreamDescriptors, type StreamDescriptor } from '../../src/core/media/media_streams.ts';
 import type { RoomSlotInfo } from '../../src/core/types.ts';
 import { GroupRoomManager } from '../../src/p2p/group_room.ts';
 import { MediaCoordinator } from '../../src/p2p/media_coordinator.ts';

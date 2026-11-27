@@ -1,8 +1,8 @@
 import { createActionWireManager } from '../../node_modules/@trystero-p2p/core/dist/action-wire.mjs';
-import { CHAT_FILE_CHUNK_BYTES, CHAT_FILE_IN_FLIGHT_CHUNKS } from '../../src/core/chat_file_limits.ts';
+import { CHAT_FILE_CHUNK_BYTES, CHAT_FILE_IN_FLIGHT_CHUNKS } from '../../src/core/chat/chat_file_limits.ts';
 import { decodeFileBase64, decodeSignedFileChunk, encodeFileBase64, encodeSignedFileChunk,
-  fileChunkSignatureData, hashFileChunk } from '../../src/core/chat_file_wire.ts';
-import { selectedIceRoute } from '../../src/core/ice_route.ts';
+  fileChunkSignatureData, hashFileChunk } from '../../src/core/chat/chat_file_wire.ts';
+import { selectedIceRoute } from '../../src/core/network/ice_route.ts';
 import { createFileOptimizedPeerConnection, ensureFileDataChannelWindow } from '../../src/p2p/file_data_channel.ts';
 import { FileBulkChannelManager } from '../../src/p2p/file_bulk_channel.ts';
 

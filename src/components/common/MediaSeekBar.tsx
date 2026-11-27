@@ -1,7 +1,7 @@
 import { t } from '../../i18n';
 import { useLocale } from '../../hooks/useLocale';
 import React, { useRef, useState } from 'react';
-import { formatMediaTime } from '../../core/media_time';
+import { formatMediaTime } from '../../core/media/media_time';
 
 interface Props {
   value: number;

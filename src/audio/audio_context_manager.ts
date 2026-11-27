@@ -1,5 +1,5 @@
 import { logDiagnostic } from '../core/logger.ts';
-import { getSavedStreamVolume, saveStreamVolume } from '../core/stream_volume_preferences.ts';
+import { getSavedStreamVolume, saveStreamVolume } from '../core/media/stream_volume_preferences.ts';
 import { AudioContextRecovery } from './audio_context_recovery.ts';
 import type { PeerAudioSinkState } from '../core/types.ts';
 

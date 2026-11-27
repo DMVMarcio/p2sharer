@@ -1,4 +1,4 @@
-import { t } from '../i18n/index.ts';
+import { t } from '../../i18n/index.ts';
 export const EMOJI_PACKS = [
   { id: 'twemoji', name: 'Twemoji', get description() { return t("message.11806bf8d0e3"); } },
   { id: 'classic', name: 'EmojiOne 2.2', get description() { return t("message.d880876bcdff"); } },

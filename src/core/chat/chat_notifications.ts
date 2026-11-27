@@ -1,4 +1,4 @@
-import type { ChatMessage } from './types.ts';
+import type { ChatMessage } from '../types.ts';
 
 export function shouldPlayChatSound(appFocused: boolean, sidebarCollapsed: boolean, sidebarTab: string): boolean {
   return !appFocused || sidebarCollapsed || sidebarTab !== 'chat';

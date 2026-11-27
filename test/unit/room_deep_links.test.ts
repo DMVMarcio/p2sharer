@@ -1,8 +1,8 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { createAuthenticatedInvite } from '../../src/core/room_invite.ts';
-import { verifyRoomInvite } from '../../src/core/room_invite_validation.ts';
-import { extractRoomInvite, roomInviteLink, RoomDeepLinkInbox } from '../../src/core/room_deep_links.ts';
+import { createAuthenticatedInvite } from '../../src/core/room/room_invite.ts';
+import { verifyRoomInvite } from '../../src/core/room/room_invite_validation.ts';
+import { extractRoomInvite, roomInviteLink, RoomDeepLinkInbox } from '../../src/core/room/room_deep_links.ts';
 
 test('application invitation links preserve signed credentials and reject ambiguous URL fields', async () => {
   const { invite } = await createAuthenticatedInvite('Link fixture');

@@ -1,7 +1,7 @@
 import { useModalDialogBehavior } from '../common/useModalDialogBehavior';
 import { roomService } from '../../services/room_service';
 import { NicknameField } from '../common/NicknameField';
-import { NICKNAME_STYLE_KEY } from '../../core/nickname_style';
+import { NICKNAME_STYLE_KEY } from '../../core/profile/nickname_style';
 import { t } from '../../i18n';
 import { useLocale } from '../../hooks/useLocale';
 import React, { useState } from 'react';

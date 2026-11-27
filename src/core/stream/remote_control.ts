@@ -5,7 +5,7 @@ import {
   readGamepadSourceValue,
   type GamepadInputSourceLike,
   type GamepadMappingProfile,
-} from './input_bindings.ts';
+} from '../ui/input_bindings.ts';
 
 export type RemoteCursorShape =
   | 'default'
@@ -900,7 +900,7 @@ export function decodeRemoteControlCursorSync(frame: Uint8Array): DecodedRemoteC
   return validRemoteControlHostPacket(packet) ? { seq, packet } : null;
 }
 
-export type { GamepadInputSourceLike } from './input_bindings.ts';
+export type { GamepadInputSourceLike } from '../ui/input_bindings.ts';
 
 export type GamepadSnapshotState = Omit<
   Extract<RemoteInputEvent, { kind: 'gamepadState' }>,

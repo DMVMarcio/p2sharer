@@ -1,4 +1,4 @@
-import { getLanguage, t } from '../i18n/index.ts';
+import { getLanguage, t } from '../../i18n/index.ts';
 export function formatEditedElapsed(editedAt: number, now = Date.now()): string {
   const elapsedSeconds = Math.max(0, Math.floor((now - editedAt) / 1000));
   const units = [

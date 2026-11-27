@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { streamPointerPosition, validStreamPointer } from '../../src/core/stream_pointer.ts';
+import { streamPointerPosition, validStreamPointer } from '../../src/core/stream/stream_pointer.ts';
 
 test('stream pointing accepts only bounded finite coordinates and visual packet kinds', () => {
   for (const kind of ['move', 'ping']) {

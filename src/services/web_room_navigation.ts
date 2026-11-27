@@ -1,6 +1,6 @@
 import { isTauri } from '@tauri-apps/api/core';
-import { roomCodeFromPath, webRoomPath } from '../core/web_room_links.ts';
-import { parseRoomInvite } from '../core/room_invite.ts';
+import { roomCodeFromPath, webRoomPath } from '../core/room/web_room_links.ts';
+import { parseRoomInvite } from '../core/room/room_invite.ts';
 import { stateStore } from '../core/state_store.ts';
 import { modalManager } from '../hooks/useModal.ts';
 import { roomService } from './room_service.ts';

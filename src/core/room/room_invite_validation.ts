@@ -1,4 +1,4 @@
-import { PeerAuthenticator } from './peer_auth.ts';
+import { PeerAuthenticator } from '../network/peer_auth.ts';
 import { RoomAuthority } from './room_authority.ts';
 import type { AuthorityTransfer } from './room_authority.ts';
 import { createRoomIdentity, parseRoomInvite, roomInvitePayload, type RoomIdentity, type RoomInvite } from './room_invite.ts';

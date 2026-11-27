@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { ArrowLeftRight, Circle, Pipette, RotateCcw, Square, Triangle } from 'lucide-react';
 import { TooltipButton } from '../../components/common/TooltipButton';
-import { hexToHsv, hsvToHex, type Hsv } from '../../core/hsv_color';
+import { hexToHsv, hsvToHex, type Hsv } from '../../core/appearance/hsv_color';
 import { t } from '../../i18n';
 
 export type ColorPickerMode = 'square' | 'triangle' | 'wheel';

@@ -1,4 +1,4 @@
-import { projectMediaPosition } from '../../core/media_sync.ts';
+import { projectMediaPosition } from '../../core/media/media_sync.ts';
 import type { YouTubeState } from '../types.ts';
 
 export const YOUTUBE_MAX_POSITION_SECONDS = 10 * 365 * 24 * 60 * 60;

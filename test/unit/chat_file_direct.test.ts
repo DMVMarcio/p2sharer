@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { directFileAddress, directFileSignature, validDirectFileOffer } from '../../src/core/chat_file_direct.ts';
-import { PeerAuthenticator } from '../../src/core/peer_auth.ts';
+import { directFileAddress, directFileSignature, validDirectFileOffer } from '../../src/core/chat/chat_file_direct.ts';
+import { PeerAuthenticator } from '../../src/core/network/peer_auth.ts';
 import { GroupRoomManager } from '../../src/p2p/group_room.ts';
 import { setupTestDOM } from '../helpers/browser_mocks.ts';
 

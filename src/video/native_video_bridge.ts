@@ -1,6 +1,6 @@
-import { diagnosticOpaqueId, isMediaDiagnosticsActive, registerDiagnosticBridge } from '../core/media_diagnostics.ts';
+import { diagnosticOpaqueId, isMediaDiagnosticsActive, registerDiagnosticBridge } from '../core/media/media_diagnostics.ts';
 import { localizeError, t } from '../i18n/index.ts';
-import { getEncoderPreference, type NativeEncoderSupport } from '../core/encoder_preferences.ts';
+import { getEncoderPreference, type NativeEncoderSupport } from '../core/media/encoder_preferences.ts';
 import { invoke } from '@tauri-apps/api/core';
 import type { ScreenSourcesResponse, VideoCaptureBridge, VideoSourceOptions } from '../core/types.ts';
 import { BridgeLoadMeter } from './bridge_load_meter.ts';

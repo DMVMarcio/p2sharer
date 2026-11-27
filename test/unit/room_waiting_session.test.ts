@@ -2,13 +2,13 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { RoomService } from '../../src/services/room_service.ts';
 import { GroupRoomManager, type RoomCallbacks } from '../../src/p2p/group_room.ts';
-import { createAuthenticatedInvite } from '../../src/core/room_invite.ts';
+import { createAuthenticatedInvite } from '../../src/core/room/room_invite.ts';
 import { stateStore } from '../../src/core/state_store.ts';
 import { modalManager } from '../../src/hooks/useModal.ts';
 import { setupTestDOM } from '../helpers/browser_mocks.ts';
 import { soundEffects } from '../../src/ui/sound_effects.ts';
 import { toastManager } from '../../src/hooks/useToast.ts';
-import { profileStats } from '../../src/core/profile_stats.ts';
+import { profileStats } from '../../src/core/profile/profile_stats.ts';
 
 test('an unanswered room opens locally without granting admission and resumes its password dialog on denial', async () => {
   const dom = setupTestDOM();

@@ -1,6 +1,6 @@
 import { useEffect, useLayoutEffect, useRef, useState, type PointerEvent, type KeyboardEvent, type RefObject } from 'react';
 import { moveOrderedItem } from '../core/ordered_items.ts';
-import { isReducedMotion } from '../core/appearance_preferences.ts';
+import { isReducedMotion } from '../core/appearance/appearance_preferences.ts';
 
 interface Drag {
   id: string; pointerId: number; initial: string[]; x: number; y: number;

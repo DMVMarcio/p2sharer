@@ -11,7 +11,7 @@ import { TooltipButton } from '../common/TooltipButton';
 import { formatFileSize } from '../../core/file_size';
 import type { FileProgress } from '../../p2p/group_room';
 import { formatTransferSpeed, getTransferSpeedUnit, subscribeTransferSpeedUnit,
-  type TransferSpeedUnit } from '../../core/transfer_speed';
+  type TransferSpeedUnit } from '../../core/network/transfer_speed';
 
 function statusText(transfer: FileProgress): string {
   switch (transfer.status) {

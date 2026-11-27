@@ -1,6 +1,6 @@
 import type { CSSProperties } from 'react';
 import { useStore } from '../../hooks/useStore';
-import { NICKNAME_FONTS, NICKNAME_FONT_SCALES, normalizeNicknameStyle, type NicknameStyle } from '../../core/nickname_style';
+import { NICKNAME_FONTS, NICKNAME_FONT_SCALES, normalizeNicknameStyle, type NicknameStyle } from '../../core/profile/nickname_style';
 
 const segmenter = new Intl.Segmenter(undefined, { granularity: 'grapheme' });
 const palette = ['#f87171', '#fb923c', '#facc15', '#4ade80', '#38bdf8', '#a78bfa', '#f472b6'];

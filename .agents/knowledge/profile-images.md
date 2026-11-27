@@ -1,6 +1,6 @@
 # Profile Images
 
-`core/profile_image.ts` owns the saved local profile, process-only remote hash cache,
+`core/profile/profile_image.ts` owns the saved local profile, process-only remote hash cache,
 peer-to-hash associations and reactive subscriptions. Card background mode is
 saved as nullable `cardColor` (automatic by default); native `dominantColor` caches
 an alpha-weighted palette from the visible circle of the first cropped frame.
@@ -13,7 +13,7 @@ Existing profiles are re-evaluated on load and Save without changing image hashe
 Automatic mode
 preserves the extracted hue with moderate saturation and brightness caps, then
 reduces brightness only as needed for white text contrast through
-`core/profile_card_color.ts`. It also softens the initial
+`core/profile/profile_card_color.ts`. It also softens the initial
 color without a visible image; manual colors are used verbatim. The card preset
 palette is independent of the interface accent palette. Old profiles are upgraded
 on load; custom and dominant colors are validated hex values. Resolved card color
@@ -28,7 +28,7 @@ wheel zoom, pointer dragging and keyboard zoom/panning. An extended preview
 viewport shows source overflow; image geometry and drag scale remain anchored to
 the centered square crop frame. `ColorPicker` shares an HSV
 saturation/brightness plane, hue slider, keyboard-accessible channel sliders and
-hex input; conversion functions live in `core/hsv_color.ts`.
+hex input; conversion functions live in `core/appearance/hsv_color.ts`.
 
 `src-tauri/src/profile_image.rs` uses the native file picker and keeps original
 image bytes behind temporary random tokens. The frontend receives a bounded,
@@ -82,7 +82,7 @@ instead of the avatar file. The same bounded decoders, orientation handling,
 metadata stripping, high-compression PNG/APNG encoder and hash validation apply.
 Banner crops have a fixed 3:1 profile aspect, capped at 960 by 320 without upscaling;
 the card aspect never changes the stored crop. `ProfileCropDialog` and
-`core/profile_crop.ts` share preview, zoom and pan geometry between both assets.
+`core/profile/profile_crop.ts` share preview, zoom and pan geometry between both assets.
 Four native source tokens allow replacement drafts for both images; settings
 retains applied sources until close so failed saves can be retried.
 
@@ -115,7 +115,7 @@ APNG decoding without requiring interactive browser automation or physical devic
 
 ## Profile statistics and viewing
 
-`core/profile_stats.ts` stores versioned aggregate totals in the main WebView local
+`core/profile/profile_stats.ts` stores versioned aggregate totals in the main WebView local
 storage. RoomService starts/stops admitted room sessions (including solo sessions),
 counts successfully published new messages, and counts acknowledged complete file
 transfers once per request, excluding image previews and local copies of cached

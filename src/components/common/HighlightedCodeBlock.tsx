@@ -1,5 +1,5 @@
 import { useMemo, useState, type ReactNode } from 'react';
-import { highlightCode } from '../../core/code_highlighting';
+import { highlightCode } from '../../core/ui/code_highlighting';
 import { CodeLanguageSelect } from './CodeLanguageSelect';
 
 type HighlightNode = ReturnType<typeof highlightCode>['children'][number];

@@ -3,7 +3,7 @@ import { JSDOM } from 'jsdom';
 
 // Keep source data reproducible and bundle only names used by the offline picker.
 const revision = '5b159148f1390735049e296723f6b847229b23ef';
-const catalog = JSON.parse(readFileSync(new URL('../src/core/emoji_catalog.json', import.meta.url)));
+const catalog = JSON.parse(readFileSync(new URL('../src/core/emoji/emoji_catalog.json', import.meta.url)));
 const normalize = (emoji) => emoji.replaceAll('\uFE0F', '');
 for (const [language, sourceLanguage] of [['en', 'en'], ['pt-BR', 'pt'], ['es', 'es'], ['fr', 'fr'], ['de', 'de'], ['it', 'it'], ['zh-CN', 'zh'], ['zh-TW', 'zh_Hant'], ['ja', 'ja'], ['ko', 'ko'], ['hi', 'hi'], ['fi', 'fi'], ['ru', 'ru']]) {
   const labels = new Map();

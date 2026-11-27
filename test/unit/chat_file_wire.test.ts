@@ -1,9 +1,9 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { decodeFileBase64, decodeSignedFileChunk, encodeFileBase64, encodeSignedFileChunk,
-  hashFileChunk } from '../../src/core/chat_file_wire.ts';
-import { CHAT_FILE_CHUNK_BYTES, CHAT_FILE_IN_FLIGHT_CHUNKS } from '../../src/core/chat_file_limits.ts';
-import { selectedIceRoute } from '../../src/core/ice_route.ts';
+  hashFileChunk } from '../../src/core/chat/chat_file_wire.ts';
+import { CHAT_FILE_CHUNK_BYTES, CHAT_FILE_IN_FLIGHT_CHUNKS } from '../../src/core/chat/chat_file_limits.ts';
+import { selectedIceRoute } from '../../src/core/network/ice_route.ts';
 
 test('binary file chunk preserves metadata and bytes within the protocol limit', async () => {
   const bytes = crypto.getRandomValues(new Uint8Array(128));

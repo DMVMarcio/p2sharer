@@ -1,10 +1,10 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { createLanConnection, validLanConnection } from '../../src/core/lan_room.ts';
-import { createAuthenticatedInvite, formatRoomInvite, parseRoomInvite, signRoomInvite } from '../../src/core/room_invite.ts';
-import { verifyRoomInvite } from '../../src/core/room_invite_validation.ts';
-import { PeerAuthenticator } from '../../src/core/peer_auth.ts';
-import { savedRooms } from '../../src/core/saved_rooms.ts';
+import { createLanConnection, validLanConnection } from '../../src/core/room/lan_room.ts';
+import { createAuthenticatedInvite, formatRoomInvite, parseRoomInvite, signRoomInvite } from '../../src/core/room/room_invite.ts';
+import { verifyRoomInvite } from '../../src/core/room/room_invite_validation.ts';
+import { PeerAuthenticator } from '../../src/core/network/peer_auth.ts';
+import { savedRooms } from '../../src/core/room/saved_rooms.ts';
 import { LanRelay, type LanSignalDriver, type LanSignalEvent } from '../../src/p2p/lan_relay.ts';
 
 test('LAN invitations authenticate the network mode, endpoint and capability and survive room rename/save', async () => {

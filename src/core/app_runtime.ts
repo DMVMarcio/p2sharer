@@ -1,6 +1,6 @@
 import { invoke, isTauri } from '@tauri-apps/api/core';
 import { initFrontendLogger } from './logger';
-import { startMediaDiagnostics } from './media_diagnostics';
+import { startMediaDiagnostics } from './media/media_diagnostics';
 import { MediaCoordinator } from '../p2p/media_coordinator';
 
 let initialized = false;

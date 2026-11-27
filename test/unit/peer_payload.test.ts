@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { encodePeerPayload, decodePeerPayload } from '../../src/core/peer_payload.ts';
+import { encodePeerPayload, decodePeerPayload } from '../../src/core/network/peer_payload.ts';
 import { PeerPayloadChannels } from '../../src/p2p/peer_payload_channels.ts';
 
 class Channel extends EventTarget {

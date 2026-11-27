@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { calculateCardLayout, placeCardAtPoint, reconcileCardRows, resizeCardScale, type CardResizeEdge } from '../../src/core/room_card_layout.ts';
+import { calculateCardLayout, placeCardAtPoint, reconcileCardRows, resizeCardScale, type CardResizeEdge } from '../../src/core/room/room_card_layout.ts';
 
 test('every border and corner resizes outward consistently and clamps unsafe sizes', () => {
   for (const edge of ['n', 's', 'e', 'w', 'ne', 'nw', 'se', 'sw'] as CardResizeEdge[]) {

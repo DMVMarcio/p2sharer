@@ -1,5 +1,5 @@
-import { SOUND_EVENTS, renderSoundCue, type SoundEvent, type SoundPreferences } from '../core/sound_cues.ts';
-export { SOUND_EVENTS, type SoundEvent, type SoundPreferences } from '../core/sound_cues.ts';
+import { SOUND_EVENTS, renderSoundCue, type SoundEvent, type SoundPreferences } from '../core/ui/sound_cues.ts';
+export { SOUND_EVENTS, type SoundEvent, type SoundPreferences } from '../core/ui/sound_cues.ts';
 
 // Cached original waveforms share one Web Audio context and preserve per-event preferences.
 export class SoundEffectsManager {

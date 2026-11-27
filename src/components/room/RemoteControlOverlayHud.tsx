@@ -1,6 +1,6 @@
 import React from 'react';
 import { Gamepad2, Keyboard, Mouse } from 'lucide-react';
-import type { RemoteControllerOverlayItem } from '../../core/remote_control_activity';
+import type { RemoteControllerOverlayItem } from '../../core/stream/remote_control_activity';
 
 interface RemoteControlOverlayHudProps {
   items: RemoteControllerOverlayItem[];

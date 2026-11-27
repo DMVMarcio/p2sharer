@@ -6,11 +6,11 @@ import {
   parseRoomInvite,
   signRoomInvite,
   formatRoomInvite,
-} from '../../src/core/room_invite.ts';
-import { PeerAuthenticator } from '../../src/core/peer_auth.ts';
-import { RoomAuthority } from '../../src/core/room_authority.ts';
-import { savedRooms } from '../../src/core/saved_rooms.ts';
-import { validRoomPreview } from '../../src/core/room_preview.ts';
+} from '../../src/core/room/room_invite.ts';
+import { PeerAuthenticator } from '../../src/core/network/peer_auth.ts';
+import { RoomAuthority } from '../../src/core/room/room_authority.ts';
+import { savedRooms } from '../../src/core/room/saved_rooms.ts';
+import { validRoomPreview } from '../../src/core/room/room_preview.ts';
 import { GroupRoomManager } from '../../src/p2p/group_room.ts';
 import { signalingManager } from '../../src/p2p/signaling_manager.ts';
 
@@ -715,7 +715,7 @@ test('duplicate denials emit once, admitted members ignore denials, and host pro
   }
 
   // Host preview promotion with empty string preserves restored password and signs initial password command.
-  const { savedRooms } = await import('../../src/core/saved_rooms.ts');
+  const { savedRooms } = await import('../../src/core/room/saved_rooms.ts');
   await savedRooms.put({
     roomId: invite.roomId,
     invite: created.invite,

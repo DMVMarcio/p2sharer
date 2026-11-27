@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { shouldNotifyChat, shouldPlayChatSound } from '../../src/core/chat_notifications.ts';
+import { shouldNotifyChat, shouldPlayChatSound } from '../../src/core/chat/chat_notifications.ts';
 import { SoundEffectsManager, SOUND_EVENTS } from '../../src/ui/sound_effects.ts';
 
 const incoming = { id: 'message-1', sender: 'Peer', authorId: 'remote', text: 'Hello', timestamp: 1, revision: 0 };

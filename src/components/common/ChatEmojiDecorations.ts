@@ -1,9 +1,9 @@
 import { Extension } from '@tiptap/core';
 import { Plugin, PluginKey } from '@tiptap/pm/state';
 import { Decoration, DecorationSet } from '@tiptap/pm/view';
-import { getEmojiIndex } from '../../core/emoji_catalog';
-import type { EmojiPack } from '../../core/emoji_preferences';
-import { getEmojiVisual } from '../../core/emoji_visual';
+import { getEmojiIndex } from '../../core/emoji/emoji_catalog';
+import type { EmojiPack } from '../../core/emoji/emoji_preferences';
+import { getEmojiVisual } from '../../core/emoji/emoji_visual';
 
 const segmenter = new Intl.Segmenter(undefined, { granularity: 'grapheme' });
 const decorationKey = new PluginKey('chatEmojiDecorations');

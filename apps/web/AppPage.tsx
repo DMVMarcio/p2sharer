@@ -4,12 +4,12 @@ import App from '../../src/App';
 import { AppContextMenu } from '../../src/components/common/AppContextMenu';
 import { initializeAppRuntime } from '../../src/core/app_runtime';
 import { stateStore } from '../../src/core/state_store';
-import { roomCodeFromPath } from '../../src/core/web_room_links';
-import { parseRoomInvite } from '../../src/core/room_invite';
+import { roomCodeFromPath } from '../../src/core/room/web_room_links';
+import { parseRoomInvite } from '../../src/core/room/room_invite';
 import { roomService } from '../../src/services/room_service';
 import type { WebRoomNavigation } from '../../src/services/web_room_navigation';
 import { tryDesktopRoomInvite } from '../../src/platform/desktop_room_invite';
-import '../../src/core/nickname_fonts';
+import '../../src/core/profile/nickname_fonts';
 import '../../src/components/room/stream_pointer.css';
 import '../../src/apps/apps.css';
 

@@ -1,4 +1,4 @@
-import { t } from '../i18n/index.ts';
+import { t } from '../../i18n/index.ts';
 export interface IceStat {
   id: string;
   type: string;

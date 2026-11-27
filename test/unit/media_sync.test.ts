@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { MEDIA_SYNC_INTERVAL_MS, projectMediaPosition, shouldCorrectMediaPosition } from '../../src/core/media_sync.ts';
+import { MEDIA_SYNC_INTERVAL_MS, projectMediaPosition, shouldCorrectMediaPosition } from '../../src/core/media/media_sync.ts';
 
 test('shared playback projects from receipt time and stops advancing while paused', () => {
   assert.equal(MEDIA_SYNC_INTERVAL_MS, 10_000);

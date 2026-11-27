@@ -162,7 +162,7 @@ test('all catalogs cover every literal translation key and preserve interpolatio
 });
 
 test('every offline emoji has an accessible name in every supported language', () => {
-  const catalog = JSON.parse(readFileSync('src/core/emoji_catalog.json', 'utf8'));
+  const catalog = JSON.parse(readFileSync('src/core/emoji/emoji_catalog.json', 'utf8'));
   const en = JSON.parse(readFileSync('src/i18n/locales/emoji-en.json', 'utf8'));
   const pt = JSON.parse(readFileSync('src/i18n/locales/emoji-pt-BR.json', 'utf8'));
   for (const language of APP_LANGUAGES) {

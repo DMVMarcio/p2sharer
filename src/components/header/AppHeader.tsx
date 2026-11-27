@@ -11,11 +11,11 @@ import { BookmarkCheck, BookmarkPlus, Check, ChevronDown, Copy, Link, LockKeyhol
 import { isTauri } from '@tauri-apps/api/core';
 import { getCurrentWindow } from '@tauri-apps/api/window';
 import { websiteUrl } from '../../platform/website';
-import { webRoomPath } from '../../core/web_room_links';
+import { webRoomPath } from '../../core/room/web_room_links';
 import logo from '../../assets/logo.png';
-import { parseRoomInvite } from '../../core/room_invite';
-import { roomInviteLink } from '../../core/room_deep_links';
-import { savedRooms, type SavedRoom } from '../../core/saved_rooms';
+import { parseRoomInvite } from '../../core/room/room_invite';
+import { roomInviteLink } from '../../core/room/room_deep_links';
+import { savedRooms, type SavedRoom } from '../../core/room/saved_rooms';
 import { AppUpdateButton } from './AppUpdateButton';
 import { useContextMenu } from '../common/ContextMenu';
 import { profileAction } from '../common/profile_actions';

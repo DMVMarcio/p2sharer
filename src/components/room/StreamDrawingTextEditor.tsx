@@ -1,7 +1,7 @@
 import { t } from '../../i18n';
 import { useLocale } from '../../hooks/useLocale';
 import { useLayoutEffect, useRef, useState, type RefObject } from 'react';
-import type { StreamDrawing } from '../../core/stream_pointer';
+import type { StreamDrawing } from '../../core/stream/stream_pointer';
 
 /** Borderless native text editing anchored to the shared video projection. */
 export function StreamDrawingTextEditor({ drawing, bounds, inputRef, onConfirm }: {

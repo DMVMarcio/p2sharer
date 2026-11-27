@@ -7,7 +7,7 @@ import { build } from 'esbuild';
 import { JSDOM } from 'jsdom';
 import React, { act, useState } from 'react';
 import { AppUpdateController } from '../../src/core/app_updates.ts';
-import { backgroundTokens } from '../../src/core/background_color.ts';
+import { backgroundTokens } from '../../src/core/appearance/background_color.ts';
 
 const dom = new JSDOM('<div id="root"></div>', { url: 'http://localhost', pretendToBeVisual: true });
 for (const key of [
@@ -42,7 +42,7 @@ const bundle = await build({
     export { ReleaseNotesDialog } from './src/components/modals/ReleaseNotesDialog.tsx';
     export { getLanguage, setLanguage } from './src/i18n/index.ts';
     export { stateStore } from './src/core/state_store.ts';
-    export { profileImages, profileBanners } from './src/core/profile_image.ts';`,
+    export { profileImages, profileBanners } from './src/core/profile/profile_image.ts';`,
     resolveDir: process.cwd(),
   },
   bundle: true,

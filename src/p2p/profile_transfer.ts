@@ -1,4 +1,4 @@
-import { profileImages, PROFILE_CHUNK, PROFILE_MAX_BYTES, validProfileColor, validProfileHash } from '../core/profile_image.ts';
+import { profileImages, PROFILE_CHUNK, PROFILE_MAX_BYTES, validProfileColor, validProfileHash } from '../core/profile/profile_image.ts';
 
 type Send = (packet: unknown, peerId: string) => Promise<unknown> | unknown;
 interface Offer { hash: string; size: number; color: string; cardColor?: string; bannerEnabled?: boolean; bannerBlur?: boolean }

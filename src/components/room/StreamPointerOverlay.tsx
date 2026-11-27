@@ -3,7 +3,7 @@ import { invoke } from '@tauri-apps/api/core';
 import { listen } from '@tauri-apps/api/event';
 import { StreamDrawingLayer } from './StreamDrawingLayer';
 import { StreamPointerGlyph } from './StreamPointerGlyph';
-import type { StreamPointerVisual } from '../../core/stream_pointer';
+import type { StreamPointerVisual } from '../../core/stream/stream_pointer';
 
 export function StreamPointerOverlay() {
   const [visuals, setVisuals] = useState<StreamPointerVisual[]>([]);

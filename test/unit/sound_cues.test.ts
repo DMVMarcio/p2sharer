@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { createHash } from 'node:crypto';
-import { renderSoundCue, SOUND_EVENTS } from '../../src/core/sound_cues.ts';
+import { renderSoundCue, SOUND_EVENTS } from '../../src/core/ui/sound_cues.ts';
 
 test('all notification cues render distinct, bounded waveforms without abrupt edges', () => {
   for (const rate of [44100, 48000]) {

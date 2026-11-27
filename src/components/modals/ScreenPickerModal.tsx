@@ -8,7 +8,7 @@ import { useScreenPicker } from '../../hooks/useScreenPicker';
 import { getSkeletonCountForTab } from './screen_picker_utils';
 import { MediaPreview } from '../common/MediaPreview';
 import { Camera, Monitor } from 'lucide-react';
-import { formatFrameRate } from '../../core/media_streams';
+import { formatFrameRate } from '../../core/media/media_streams';
 import { useSkeletonPresence } from '../../hooks/useSkeletonPresence';
 
 export const ScreenPickerModal: React.FC = () => {

@@ -1,4 +1,4 @@
-import { t } from '../i18n/index.ts';
+import { t } from '../../i18n/index.ts';
 import rawCatalog from './emoji_catalog.json';
 
 export const EMOJI_CATEGORIES = [

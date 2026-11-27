@@ -47,7 +47,7 @@ export interface ScreenSourcesResponse {
 export type AppPlatform = 'desktop' | 'web' | 'mobile';
 
 export interface PeerInfo {
-  nicknameStyle?: import("./nickname_style").NicknameStyle;
+  nicknameStyle?: import("./profile/nickname_style").NicknameStyle;
   id: string;
   publicKey?: string;
   username: string;
@@ -59,7 +59,7 @@ export interface PeerInfo {
 }
 
 export interface StreamWatcher {
-  nicknameStyle?: import("./nickname_style").NicknameStyle;
+  nicknameStyle?: import("./profile/nickname_style").NicknameStyle;
   peerId: string;
   username: string;
   isSelf?: boolean;
@@ -69,7 +69,7 @@ export interface RoomSlotInfo {
   ownerPeerId?: string;
   ownerPublicKey?: string;
   mediaId?: string;
-  mediaKind?: import("./media_streams").MediaKind;
+  mediaKind?: import("./media/media_streams").MediaKind;
   mediaLabel?: string;
   pointerEligible?: boolean;
   peerId: string;
@@ -184,7 +184,7 @@ export interface TransportStatusInfo {
 
 export interface StreamStatusPayload {
   revision?: number;
-  streams?: import("./media_streams").StreamDescriptor[];
+  streams?: import("./media/media_streams").StreamDescriptor[];
   isStreaming: boolean;
   senderName?: string;
   streamId?: string;

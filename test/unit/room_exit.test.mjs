@@ -18,8 +18,8 @@ test('room exit requires consent, persists before leaving, and retains the sessi
     bundle: true, write: false, format: 'esm', platform: 'node',
     plugins: [{ name: 'exit-fixture', setup(builder) {
       builder.onResolve({ filter: /core\/state_store$/ }, () => ({ path: 'state', namespace: 'fixture' }));
-      builder.onResolve({ filter: /core\/room_invite$/ }, () => ({ path: 'invite', namespace: 'fixture' }));
-      builder.onResolve({ filter: /core\/saved_rooms$/ }, () => ({ path: 'rooms', namespace: 'fixture' }));
+      builder.onResolve({ filter: /core\/room\/room_invite$/ }, () => ({ path: 'invite', namespace: 'fixture' }));
+      builder.onResolve({ filter: /core\/room\/saved_rooms$/ }, () => ({ path: 'rooms', namespace: 'fixture' }));
       builder.onResolve({ filter: /useToast$/ }, () => ({ path: 'toast', namespace: 'fixture' }));
       builder.onResolve({ filter: /i18n$/ }, () => ({ path: 'locale', namespace: 'fixture' }));
       builder.onLoad({ filter: /.*/, namespace: 'fixture' }, ({ path }) => ({ contents: {

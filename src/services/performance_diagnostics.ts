@@ -1,8 +1,8 @@
 import { isTauri } from '@tauri-apps/api/core';
 import { invoke } from '../platform/commands.ts';
 import { stateStore } from '../core/state_store.ts';
-import { detectHardwareAcceleration } from '../core/hardware_acceleration.ts';
-import { getEncoderPreference } from '../core/encoder_preferences.ts';
+import { detectHardwareAcceleration } from '../core/media/hardware_acceleration.ts';
+import { getEncoderPreference } from '../core/media/encoder_preferences.ts';
 import { roomService } from './room_service.ts';
 import { roomAppsService } from '../apps/room_apps_service.ts';
 

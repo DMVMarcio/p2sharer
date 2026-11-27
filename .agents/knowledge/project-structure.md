@@ -15,7 +15,7 @@ Verified reference for **where files live and how they are composed** in P2Share
 | `src/apps/games/` | Shared board-game infrastructure (lobby, planning overlay, `board_game_*`, timers, sounds, `games.css`) with one subfolder per game: `chess/`, `checkers/`, `tictactoe/` (`<Name>App.tsx` + engine). | By game |
 | `src/apps/shared/` | Pieces used by more than one app: the document library dialog and its types (`DocumentFilesDialog.tsx`), document error formatting, library deletion events, and the image/interaction helpers shared by Whiteboard and Notepad. Apps import from here, never from another app's folder, and `shared/` never imports from an app folder. | Flat |
 | `src/hooks/` | Cross-surface React hooks (`useX.ts`, one hook per file). Hooks used by a single surface belong next to that surface instead. | Flat |
-| `src/core/` | Framework-free domain logic and shared state: `state_store.ts` (`stateStore` + `useStore`), chat, media, profile, room, emoji, preferences, input bindings, `types.ts`. | Flat, `snake_case.ts` grouped by name prefix (`chat_*`, `room_*`, `profile_*`, `media_*`…) |
+| `src/core/` | Framework-free domain logic and shared state. The root holds cross-cutting foundations only: `state_store.ts` (`stateStore` + `useStore`), `types.ts`, `logger.ts`, `platform.ts`, app runtime/updates/release notes, and small generic helpers (`file_size`, `ordered_items`, `diagnostic_id`, `png_animation`). Domain modules live in `chat/`, `room/` (rooms, invites, saved rooms, deep links, LAN/web room links), `profile/` (images, stats, nicknames), `appearance/` (colors, theme preferences), `emoji/` (catalog, preferences, rendering), `media/` (streams, sync, diagnostics, encoder/voice/audio-filter preferences), `stream/` (stream pointer, drawing, remote control), `network/` (peer auth/payload, ICE, tunnels, traffic/transfer rates), and `ui/` (text editing, toasts, sound cues, input bindings, clipboard images, code highlighting, fullscreen). | By domain
 | `src/services/` | Stateful coordinators that orchestrate core + P2P + platform (`room_service.ts`, PiP, diagnostics, updates, deep links, receivers). | Flat |
 | `src/p2p/` | Signaling failover, group room mesh, peer tracking, media coordination, data channels, LAN relay. Owned by `p2p-specialist`. | Flat |
 | `src/audio/`, `src/video/` | TypeScript side of the native media bridges and voice/audio contexts. Owned by `native-media-specialist`. | Flat |
@@ -83,7 +83,7 @@ Fixtures and setup → one observable behavior per test (arrange → act → ass
 
 ## 4. Layer Boundaries (Dependency Direction)
 - `components` / `apps` (views) → `hooks` → `services` → `core` / `p2p` / `audio` / `video` → `platform` (Tauri commands or web adapters) → Rust host via IPC.
-- `src/core/` and `src/p2p/` stay framework-free: no React components or hooks (two exceptions exist today, `core/appearance_preferences.ts` and `core/emoji_visual.ts`; do not add more).
+- `src/core/` and `src/p2p/` stay framework-free: no React components or hooks (two exceptions exist today, `core/appearance/appearance_preferences.ts` and `core/emoji/emoji_visual.ts`; do not add more).
 - New native calls go through `src/platform/` adapters or a hook/service. About 30 view files still import `@tauri-apps/api/core` directly (e.g., `components/header/AppHeader.tsx`); do not extend that pattern, and move calls behind an adapter when you touch them in scope.
 - One app must not import another app's internals; share through `src/core/`, `src/hooks/`, or `src/components/common/`.
 
@@ -104,7 +104,6 @@ Budgets are higher than the generic defaults because many existing files are lar
 
 ## 6. Known Structure Debt
 Observed, not yet fixed. Restructure gradually: small in-scope moves happen inside a task; larger moves are proposed to the user and committed separately as `refactor(structure)` with `git mv`.
-- `src/core/` is flat with 72 modules; prefixes such as `chat_*`, `room_*`, `profile_*`, `media_*`, `remote_control*` are candidate subfolders.
 - `src/hooks/` is flat with 38 hooks; browser (`useBrowser*`), presence (`use*Presence`), and stream (`useStream*`) hooks are candidate groups, and single-surface hooks can move next to their surface.
 - `src/components/common/` (62) and `src/components/room/` (51) are past the folder threshold; chat (`Chat*`), stream overlays (`Stream*`), and remote control (`RemoteControl*`) are candidate subfolders of `room/`.
 - Oversized files: `src/style.css` (~8,900 lines), `src/p2p/group_room.ts` (~5,700), `src/services/room_service.ts` (~2,500), `src/apps/whiteboard/whiteboard_canvas2d.ts` (~2,200), `src/apps/whiteboard/WhiteboardCanvas.tsx` (~1,800), `src/hooks/useRemoteControl.ts` (~1,500), `src/components/modals/SettingsModal.tsx` (~1,300).

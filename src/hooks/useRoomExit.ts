@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { stateStore } from '../core/state_store';
-import { parseRoomInvite } from '../core/room_invite';
-import { savedRooms } from '../core/saved_rooms';
+import { parseRoomInvite } from '../core/room/room_invite';
+import { savedRooms } from '../core/room/saved_rooms';
 import { showToast } from './useToast';
 import { t } from '../i18n';
 

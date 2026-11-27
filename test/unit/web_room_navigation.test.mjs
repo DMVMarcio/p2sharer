@@ -2,8 +2,8 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { build } from 'esbuild';
 import { JSDOM } from 'jsdom';
-import { createAuthenticatedInvite, parseRoomInvite } from '../../src/core/room_invite.ts';
-import { extractWebRoomCode, roomCodeFromPath, webRoomPath } from '../../src/core/web_room_links.ts';
+import { createAuthenticatedInvite, parseRoomInvite } from '../../src/core/room/room_invite.ts';
+import { extractWebRoomCode, roomCodeFromPath, webRoomPath } from '../../src/core/room/web_room_links.ts';
 import { tryDesktopRoomInvite } from '../../src/platform/desktop_room_invite.ts';
 
 test('web room URLs accept complete short codes and omit secrets or unsupported routes', () => {

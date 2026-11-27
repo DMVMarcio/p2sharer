@@ -18,8 +18,8 @@ import {
   type InputBindingsConfig,
   type KeyRemapRule,
   type RemoteShortcutAction,
-} from '../../core/input_bindings';
-import { readGamepadSnapshotState } from '../../core/remote_control';
+} from '../../core/ui/input_bindings';
+import { readGamepadSnapshotState } from '../../core/stream/remote_control';
 import { setVoiceShortcutCapturePaused } from '../../services/voice_shortcuts';
 import { t } from '../../i18n';
 import { ModalDialog } from '../common/ModalDialog';

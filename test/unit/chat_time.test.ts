@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { formatEditedElapsed } from '../../src/core/chat_time.ts';
+import { formatEditedElapsed } from '../../src/core/chat/chat_time.ts';
 
 test('edited time uses Portuguese relative units and switches to a local date', () => {
   const now = Date.UTC(2026, 8, 28, 12, 0);

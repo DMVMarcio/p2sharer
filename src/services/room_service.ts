@@ -7,7 +7,7 @@ import {
   streamSlotKey,
   type MediaKind,
   type StreamDescriptor,
-} from '../core/media_streams.ts';
+} from '../core/media/media_streams.ts';
 import { StreamPointerReceiver } from './stream_pointer_receiver.ts';
 import { generateUserColor } from '../p2p/group_room.ts';
 import {
@@ -15,15 +15,15 @@ import {
   validStreamPointerState,
   type StreamPointerState,
   type StreamPointerPacket,
-} from '../core/stream_pointer.ts';
+} from '../core/stream/stream_pointer.ts';
 import { RemoteControlHostManager } from './remote_control_receiver.ts';
-import { profileImages } from '../core/profile_image.ts';
+import { profileImages } from '../core/profile/profile_image.ts';
 import {
   RemoteControlActivityTracker,
   type ControllerInputActivity,
   type GamepadInputActivity,
   type RemoteControllerOverlayItem,
-} from '../core/remote_control_activity.ts';
+} from '../core/stream/remote_control_activity.ts';
 import {
   loadRemoteControlHostDefaults,
   normalizeCursorShape,
@@ -36,7 +36,7 @@ import {
   type RemoteCursorSyncState,
   type RemoteInputEvent,
   type VirtualGamepadSlot,
-} from '../core/remote_control.ts';
+} from '../core/stream/remote_control.ts';
 import { emitTo, listen } from '@tauri-apps/api/event';
 import { streamPointerView } from './stream_pointer_view.ts';
 import { invoke } from '../platform/commands.ts';
@@ -45,14 +45,14 @@ import { roomAppsService } from '../apps/room_apps_service.ts';
 import { AudioBridge } from '../audio/audio_bridge.ts';
 import { audioContextManager } from '../audio/audio_context_manager.ts';
 import { voiceManager } from '../audio/voice_manager.ts';
-import type { UserVoiceVolumePreference, VoicePeerState, VoicePreferences } from '../core/voice_preferences.ts';
+import type { UserVoiceVolumePreference, VoicePeerState, VoicePreferences } from '../core/media/voice_preferences.ts';
 import { stateStore } from '../core/state_store.ts';
-import { shouldNotifyChat, shouldPlayChatSound } from '../core/chat_notifications.ts';
-import { mergeChatHistory, nextChatOrder } from '../core/chat_history.ts';
-import { CHAT_FILE_CHUNK_BYTES, MAX_IMAGE_PREVIEW_BYTES } from '../core/chat_file_limits.ts';
-import { compareRoomInvites, parseRoomInvite } from '../core/room_invite.ts';
-import { verifyRoomInvite } from '../core/room_invite_validation.ts';
-import { savedRooms } from '../core/saved_rooms.ts';
+import { shouldNotifyChat, shouldPlayChatSound } from '../core/chat/chat_notifications.ts';
+import { mergeChatHistory, nextChatOrder } from '../core/chat/chat_history.ts';
+import { CHAT_FILE_CHUNK_BYTES, MAX_IMAGE_PREVIEW_BYTES } from '../core/chat/chat_file_limits.ts';
+import { compareRoomInvites, parseRoomInvite } from '../core/room/room_invite.ts';
+import { verifyRoomInvite } from '../core/room/room_invite_validation.ts';
+import { savedRooms } from '../core/room/saved_rooms.ts';
 import type { ChatMessage, PeerInfo, RoomSlotInfo } from '../core/types.ts';
 import {
   generateRandomRoomSlug,
@@ -67,7 +67,7 @@ import { NativeVideoBridge } from '../video/native_video_bridge.ts';
 import { MediaCoordinator } from '../p2p/media_coordinator.ts';
 import { showToast } from '../hooks/useToast.ts';
 import { modalManager } from '../hooks/useModal.ts';
-import { profileStats } from '../core/profile_stats.ts';
+import { profileStats } from '../core/profile/profile_stats.ts';
 import { pipService } from './pip_service.ts';
 
 export interface ConnectingOverlayState {

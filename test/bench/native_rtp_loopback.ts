@@ -3,7 +3,7 @@ import { invoke } from '@tauri-apps/api/core';
 import { getCurrentWindow } from '@tauri-apps/api/window';
 import { NativeVideoBridge } from '../../src/video/native_video_bridge';
 import { NativeVideoTransport } from '../../src/p2p/native_video_transport';
-import type { StreamDescriptor } from '../../src/core/media_streams';
+import type { StreamDescriptor } from '../../src/core/media/media_streams';
 
 const wait = (ms: number) => new Promise(resolve => setTimeout(resolve,ms));
 function require(value: unknown, message: string): asserts value { if (!value) throw new Error(message); }

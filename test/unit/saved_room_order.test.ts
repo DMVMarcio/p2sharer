@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { orderSavedRooms, readSavedRoomOrder, saveSavedRoomOrder } from '../../src/core/saved_room_order.ts';
+import { orderSavedRooms, readSavedRoomOrder, saveSavedRoomOrder } from '../../src/core/room/saved_room_order.ts';
 import { moveOrderedItem } from '../../src/core/ordered_items.ts';
 
 test('manual room order survives metadata changes and appends new rooms', () => {

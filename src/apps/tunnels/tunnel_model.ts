@@ -1,8 +1,8 @@
 import { invoke, isTauri } from '@tauri-apps/api/core';
 import { listen } from '@tauri-apps/api/event';
-import { TrafficRateSampler, type TrafficSnapshot } from '../../core/traffic_rate.ts';
+import { TrafficRateSampler, type TrafficSnapshot } from '../../core/network/traffic_rate.ts';
 import { t } from '../../i18n/index.ts';
-import { listenTunnelPayloads, receiveTunnelPayload } from '../../core/tunnel_payload_bridge.ts';
+import { listenTunnelPayloads, receiveTunnelPayload } from '../../core/network/tunnel_payload_bridge.ts';
 import type { RoomAppModel, RoomAppModelContext } from '../models.ts';
 import { createTunnelRules, isVirtualIp, validTunnelAdvertisements, validTunnelRule, type TunnelAdvertisement, type TunnelExport, type TunnelRule } from './tunnel_rules.ts';
 

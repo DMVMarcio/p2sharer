@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { stateStore } from './state_store.ts';
+import { stateStore } from '../state_store.ts';
 
 /**
  * Checks whether reduced motion is requested either via the application setting

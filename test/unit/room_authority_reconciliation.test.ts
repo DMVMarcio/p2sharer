@@ -1,11 +1,11 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { PeerAuthenticator } from '../../src/core/peer_auth.ts';
-import { RoomAuthority } from '../../src/core/room_authority.ts';
+import { PeerAuthenticator } from '../../src/core/network/peer_auth.ts';
+import { RoomAuthority } from '../../src/core/room/room_authority.ts';
 import { createAuthenticatedInvite, formatRoomInvite, parseRoomInvite,
-  signRoomInvite } from '../../src/core/room_invite.ts';
-import { roomStateFingerprint } from '../../src/core/room_state_sync.ts';
-import { savedRooms } from '../../src/core/saved_rooms.ts';
+  signRoomInvite } from '../../src/core/room/room_invite.ts';
+import { roomStateFingerprint } from '../../src/core/room/room_state_sync.ts';
+import { savedRooms } from '../../src/core/room/saved_rooms.ts';
 import { GroupRoomManager } from '../../src/p2p/group_room.ts';
 import { signalingManager } from '../../src/p2p/signaling_manager.ts';
 

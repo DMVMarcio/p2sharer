@@ -1,6 +1,6 @@
 import { useLayoutEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
-import type { EmojiPack } from '../../core/emoji_preferences';
+import type { EmojiPack } from '../../core/emoji/emoji_preferences';
 import { calculateTooltipPosition } from './tooltip_utils';
 import { EmojiPicker } from './EmojiPicker';
 

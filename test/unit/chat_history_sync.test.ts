@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { mergeChatHistory } from '../../src/core/chat_history.ts';
-import { PeerAuthenticator } from '../../src/core/peer_auth.ts';
+import { mergeChatHistory } from '../../src/core/chat/chat_history.ts';
+import { PeerAuthenticator } from '../../src/core/network/peer_auth.ts';
 import type { ChatMessage } from '../../src/core/types.ts';
 import { GroupRoomManager } from '../../src/p2p/group_room.ts';
 import { signalingManager } from '../../src/p2p/signaling_manager.ts';

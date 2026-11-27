@@ -1,5 +1,5 @@
 import { useEffect, useRef, type CSSProperties } from 'react';
-import { useReducedMotion } from '../../../src/core/appearance_preferences';
+import { useReducedMotion } from '../../../src/core/appearance/appearance_preferences';
 import { useInView } from './motion';
 
 /** Fictional room participants used across the landing page illustrations. */

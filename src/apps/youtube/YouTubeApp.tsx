@@ -4,7 +4,7 @@ import { useElementFullscreen } from '../../hooks/useElementFullscreen';
 import { showToast } from '../../hooks/useToast';
 import React, { useEffect, useRef, useState } from 'react';
 import { invoke, isTauri } from '@tauri-apps/api/core';
-import { getSessionAppVolume, saveSessionAppVolume } from '../../core/stream_volume_preferences';
+import { getSessionAppVolume, saveSessionAppVolume } from '../../core/media/stream_volume_preferences';
 import { emit, listen, type UnlistenFn } from '@tauri-apps/api/event';
 import { openUrl } from '@tauri-apps/plugin-opener';
 import { ArrowDown, ArrowLeft, ArrowUp, ExternalLink, Expand, ListMinus, ListVideo,
@@ -27,7 +27,7 @@ import { useRoom } from '../../hooks/useRoom';
 import { describeYouTubeActivity, describeAutomaticYouTubeActivity } from './youtube_activity';
 import { validYouTubePipCommand, validYouTubePipSettings, youtubePipEvent, youtubePipPeerId,
   type YouTubePipMessage } from './youtube_pip';
-import { MEDIA_SYNC_INTERVAL_MS } from '../../core/media_sync';
+import { MEDIA_SYNC_INTERVAL_MS } from '../../core/media/media_sync';
 import { markCurrentYouTubeLive, YOUTUBE_MAX_POSITION_SECONDS } from './youtube_timeline';
 import type { YouTubeEntry, YouTubeState } from '../types';
 

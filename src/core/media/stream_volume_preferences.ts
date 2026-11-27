@@ -1,4 +1,4 @@
-import type { RoomSlotInfo } from './types.ts';
+import type { RoomSlotInfo } from '../types.ts';
 
 export const STREAM_VOLUME_STORAGE_KEY = 'p2sharer_stream_volumes_v1';
 const MAX_SAVED_VOLUMES = 200;

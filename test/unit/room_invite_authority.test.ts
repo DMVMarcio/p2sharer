@@ -1,9 +1,9 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { PeerAuthenticator } from '../../src/core/peer_auth.ts';
-import { RoomAuthority } from '../../src/core/room_authority.ts';
-import { createAuthenticatedInvite, parseRoomInvite } from '../../src/core/room_invite.ts';
-import { latestAdminCommand, roomStateFingerprint } from '../../src/core/room_state_sync.ts';
+import { PeerAuthenticator } from '../../src/core/network/peer_auth.ts';
+import { RoomAuthority } from '../../src/core/room/room_authority.ts';
+import { createAuthenticatedInvite, parseRoomInvite } from '../../src/core/room/room_invite.ts';
+import { latestAdminCommand, roomStateFingerprint } from '../../src/core/room/room_state_sync.ts';
 
 test('invitation anchors host identity and rejects forged authority changes', async () => {
   const created = await createAuthenticatedInvite();

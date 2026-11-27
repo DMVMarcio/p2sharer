@@ -1,6 +1,6 @@
 import React from 'react';
-import { getEmojiIndex } from '../../core/emoji_catalog';
-import { EmojiPack } from '../../core/emoji_preferences';
+import { getEmojiIndex } from '../../core/emoji/emoji_catalog';
+import { EmojiPack } from '../../core/emoji/emoji_preferences';
 import { EmojiGlyph } from './EmojiGlyph';
 
 export const EmojiText: React.FC<{ text: string; pack: EmojiPack; size?: number }> = ({ text, pack, size = 16 }) => {

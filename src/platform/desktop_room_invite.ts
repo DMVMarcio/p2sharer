@@ -1,5 +1,5 @@
-import { roomCodeFromPath } from '../core/web_room_links.ts';
-import { roomInviteLink } from '../core/room_deep_links.ts';
+import { roomCodeFromPath } from '../core/room/web_room_links.ts';
+import { roomInviteLink } from '../core/room/room_deep_links.ts';
 
 const attempts = new WeakMap<Document, Set<string>>();
 

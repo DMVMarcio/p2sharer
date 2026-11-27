@@ -5,9 +5,9 @@ import { pathToFileURL } from 'node:url';
 import { build } from 'esbuild';
 import { JSDOM } from 'jsdom';
 import React, { act } from 'react';
-import { savedRooms } from '../../src/core/saved_rooms.ts';
+import { savedRooms } from '../../src/core/room/saved_rooms.ts';
 import { stateStore } from '../../src/core/state_store.ts';
-import { createAuthenticatedInvite, parseRoomInvite } from '../../src/core/room_invite.ts';
+import { createAuthenticatedInvite, parseRoomInvite } from '../../src/core/room/room_invite.ts';
 import {
   createHomeRoomPresenceService,
   HOME_ROOM_PRESENCE_INTERVAL_MS,

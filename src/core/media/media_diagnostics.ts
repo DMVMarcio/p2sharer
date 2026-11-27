@@ -1,6 +1,6 @@
 import { invoke, isTauri } from '@tauri-apps/api/core';
-import { diagnosticOpaqueId } from './diagnostic_id.ts';
-export { diagnosticOpaqueId } from './diagnostic_id.ts';
+import { diagnosticOpaqueId } from '../diagnostic_id.ts';
+export { diagnosticOpaqueId } from '../diagnostic_id.ts';
 
 const measurements = (`timestamp ssrc bytesSent bytesReceived packetsSent packetsReceived packetsLost
   framesEncoded framesDecoded framesReceived framesSent framesDropped framesPerSecond frameWidth frameHeight

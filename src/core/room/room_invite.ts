@@ -1,6 +1,6 @@
-import { t } from '../i18n/index.ts';
+import { t } from '../../i18n/index.ts';
 import type { AuthorityTransfer } from './room_authority.ts';
-import type { PeerAuthenticator } from './peer_auth.ts';
+import type { PeerAuthenticator } from '../network/peer_auth.ts';
 import { validLanConnection, type LanRoomConnection } from './lan_room.ts';
 
 export interface LegacyRoomInvite {

@@ -1,6 +1,6 @@
 import React from 'react';
 import { t } from '../../i18n';
-import type { CardResizeEdge } from '../../core/room_card_layout';
+import type { CardResizeEdge } from '../../core/room/room_card_layout';
 
 export const CARD_RESIZE_EDGES: CardResizeEdge[] = ['n', 's', 'e', 'w', 'ne', 'nw', 'se', 'sw'];
 

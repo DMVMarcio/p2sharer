@@ -1,9 +1,9 @@
 import type { TurnConfig } from '../core/types.ts';
 import { t } from '../i18n/index.ts';
 import { logDiagnostic } from '../core/logger.ts';
-import { selectedIcePair } from '../core/ice_route.ts';
+import { selectedIcePair } from '../core/network/ice_route.ts';
 import { diagnosticOpaqueId } from '../core/diagnostic_id.ts';
-import { classifyIceAddress, fingerprintIceAddress } from '../core/ice_address_diagnostics.ts';
+import { classifyIceAddress, fingerprintIceAddress } from '../core/network/ice_address_diagnostics.ts';
 import { apiUrl } from '../platform/website.ts';
 
 export const DEFAULT_STUN_SERVERS = [

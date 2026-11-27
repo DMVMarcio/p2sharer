@@ -5,7 +5,7 @@ import type { ChatMessage } from '../../core/types.ts';
 import { getRoomApp } from '../../apps/registry';
 import { modalManager } from '../../hooks/useModal';
 import { stateStore } from '../../core/state_store';
-import { profileImages } from '../../core/profile_image';
+import { profileImages } from '../../core/profile/profile_image';
 
 interface SystemNoticeTextProps {
   message: ChatMessage;

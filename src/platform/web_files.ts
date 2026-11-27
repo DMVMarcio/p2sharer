@@ -1,5 +1,5 @@
 import type { NativeChatFile } from '../p2p/group_room.ts';
-import { blobToDataUrl } from '../core/image_clipboard.ts';
+import { blobToDataUrl } from '../core/ui/image_clipboard.ts';
 
 export const WEB_FILE_LIMIT = Number.MAX_SAFE_INTEGER;
 

@@ -3,7 +3,7 @@ import { ProfileAvatar } from '../common/ProfileAvatar';
 import { t } from '../../i18n';
 import { useLocale } from '../../hooks/useLocale';
 import React, { useEffect, useRef, useState } from 'react';
-import { clampOverlay, snapOverlay, resizeOverlay, type OverlayCorner, type OverlayPosition } from '../../core/media_streams';
+import { clampOverlay, snapOverlay, resizeOverlay, type OverlayCorner, type OverlayPosition } from '../../core/media/media_streams';
 import type { RoomSlotInfo } from '../../core/types';
 import { roomService } from '../../services/room_service';
 import { stateStore } from '../../core/state_store';

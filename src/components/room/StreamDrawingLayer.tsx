@@ -1,5 +1,5 @@
 import { memo, useEffect, useRef, useState } from 'react';
-import type { StreamDrawing, StreamPointerVisual } from '../../core/stream_pointer';
+import type { StreamDrawing, StreamPointerVisual } from '../../core/stream/stream_pointer';
 
 /** One normalized projection for native desktop, video cards, zoom, and PiP. */
 export function StreamDrawingLayer({ visuals, bounds, draft }: {

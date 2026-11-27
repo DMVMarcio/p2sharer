@@ -1,6 +1,6 @@
 import { Channel, invoke } from '@tauri-apps/api/core';
-import { selectedIcePair, type IceStat } from './ice_route.ts';
-import { classifyIceAddress } from './ice_address_diagnostics.ts';
+import { selectedIcePair, type IceStat } from '../network/ice_route.ts';
+import { classifyIceAddress } from '../network/ice_address_diagnostics.ts';
 
 export interface DirectFileOffer { address: string; port: number; certificate: string; token: string }
 

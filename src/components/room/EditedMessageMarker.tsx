@@ -2,7 +2,7 @@ import { t } from '../../i18n';
 import { useLocale } from '../../hooks/useLocale';
 import { useState } from 'react';
 import { Tooltip } from '../common/Tooltip';
-import { formatEditedElapsed } from '../../core/chat_time';
+import { formatEditedElapsed } from '../../core/chat/chat_time';
 
 export function EditedMessageMarker({ editedAt }: { editedAt: number }) {
   useLocale();

@@ -1,4 +1,4 @@
-import type { ChatMessage } from './types.ts';
+import type { ChatMessage } from '../types.ts';
 
 export const CHAT_FILTERS_STORAGE_KEY = 'p2sharer_chat_filters_v1';
 

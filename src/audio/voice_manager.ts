@@ -10,7 +10,7 @@ import {
   saveVoicePreferences,
   type UserVoiceVolumePreference,
   type VoicePreferences,
-} from '../core/voice_preferences.ts';
+} from '../core/media/voice_preferences.ts';
 import { AudioContextRecovery } from './audio_context_recovery.ts';
 import { listAudioDevices, onAudioDevicesChanged } from './voice_devices.ts';
 

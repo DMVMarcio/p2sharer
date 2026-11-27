@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { formatTransferSpeed } from '../../src/core/transfer_speed.ts';
+import { formatTransferSpeed } from '../../src/core/network/transfer_speed.ts';
 
 test('transfer speed switches between decimal megabytes and megabits per second', () => {
   assert.equal(formatTransferSpeed(1_000_000, 'MB'), '1,0 MB/s');

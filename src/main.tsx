@@ -7,7 +7,7 @@ import App from './App';
 import { AppContextMenu } from './components/common/AppContextMenu';
 import '@fontsource-variable/plus-jakarta-sans/wght.css';
 import '@fontsource-variable/jetbrains-mono/wght.css';
-import './core/nickname_fonts';
+import './core/profile/nickname_fonts';
 import './style.css';
 import './components/room/stream_pointer.css';
 import './apps/apps.css';

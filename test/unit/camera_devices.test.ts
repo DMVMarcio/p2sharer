@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { acquireCamera, listCameras, cameraResolutions, cameraFrameRates, configureCamera, preferredCameraFrameRate } from '../../src/video/camera_devices.ts';
-import { formatFrameRate } from '../../src/core/media_streams.ts';
+import { formatFrameRate } from '../../src/core/media/media_streams.ts';
 
 test('camera enumeration unlocks identities only on explicit request and releases the temporary device', async () => {
   let enumerations = 0, opened = 0, stopped = 0;
