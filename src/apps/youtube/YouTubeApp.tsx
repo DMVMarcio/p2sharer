@@ -11,7 +11,7 @@ import { ArrowDown, ArrowLeft, ArrowUp, ExternalLink, Expand, ListMinus, ListVid
   LoaderCircle, Minimize2, PictureInPicture2, Play, Plus, Repeat, Repeat1, Search, Shuffle, SquarePlay,
   Trash2, Library } from 'lucide-react';
 import { roomAppsService } from '../room_apps_service';
-import { YouTubeModel } from '../models.ts';
+import { YouTubeModel } from '../youtube/youtube_model.ts';
 import { loadYouTubePlaylist, loadYouTubePlaylistPreview, parseYouTubeInput, resolveYouTubeTitle, searchYouTube,
   type YouTubeSearchItem } from './youtube_api';
 import { createYouTubePlayer, loadYouTubePlayerApi, reconcileYouTubePlayer, setYouTubeCaptions, sampleYouTubeTimeline,

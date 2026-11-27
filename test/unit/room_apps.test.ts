@@ -1,7 +1,8 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { RoomAppsService } from '../../src/apps/room_apps_service.ts';
-import { NotepadModel, YouTubeModel } from '../../src/apps/models.ts';
+import { NotepadModel } from '../../src/apps/notepad/notepad_model.ts';
+import { YouTubeModel } from '../../src/apps/youtube/youtube_model.ts';
 import { registerRoomApp } from '../../src/apps/registry.ts';
 import type { AppWireEvent } from '../../src/apps/types.ts';
 import * as Y from 'yjs';

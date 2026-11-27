@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { reconcileYouTubePlayer, sampleYouTubeLive, sampleYouTubeTimeline, type YouTubePlayer, type YouTubePlaybackTracker } from '../../src/apps/youtube/youtube_player.ts';
 import { markCurrentYouTubeLive, projectYouTubePosition } from '../../src/apps/youtube/youtube_timeline.ts';
-import { validYouTubeState } from '../../src/apps/models.ts';
+import { validYouTubeState } from '../../src/apps/youtube/youtube_model.ts';
 import { validYouTubePipCommand } from '../../src/apps/youtube/youtube_pip.ts';
 import type { YouTubeState } from '../../src/apps/types.ts';
 

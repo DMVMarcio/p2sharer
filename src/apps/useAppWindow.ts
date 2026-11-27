@@ -9,7 +9,7 @@ import { twitchPipPeerId } from './twitch/twitch_pip';
 import { stateStore } from '../core/state_store';
 import { showToast } from '../hooks/useToast';
 import type { RoomAppInstance } from './types';
-import { YouTubeModel } from './models';
+import { YouTubeModel } from './youtube/youtube_model';
 import { getRoomApp } from './registry';
 import { BrowserModel } from './browser/browser_model';
 import { BrowserMedia } from './browser/browser_media';

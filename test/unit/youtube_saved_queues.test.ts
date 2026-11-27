@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { createSavedYouTubeQueues, SAVED_YOUTUBE_QUEUES_KEY } from '../../src/apps/youtube/youtube_saved_queues.ts';
 import { importYouTubeQueue } from '../../src/apps/youtube/youtube_queue.ts';
-import { YouTubeModel } from '../../src/apps/models.ts';
+import { YouTubeModel } from '../../src/apps/youtube/youtube_model.ts';
 import { describeYouTubeActivity } from '../../src/apps/youtube/youtube_activity.ts';
 import type { YouTubeState } from '../../src/apps/types.ts';
 

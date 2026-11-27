@@ -13,7 +13,7 @@ import { YouTubeControls } from './YouTubeControls';
 import { canAdvanceYouTubeQueue } from './youtube_queue';
 import { createYouTubePlayer, loadYouTubePlayerApi, reconcileYouTubePlayer, setYouTubeCaptions, sampleYouTubeTimeline,
   type YouTubePlaybackTracker, type YouTubePlayer } from './youtube_player';
-import { validYouTubeState } from '../models.ts';
+import { validYouTubeState } from '../youtube/youtube_model.ts';
 import { validYouTubePipSettings, youtubePipEvent, youtubePipPeerId,
   type YouTubePipCommand, type YouTubePipLocalSettings, type YouTubePipMessage } from './youtube_pip';
 import type { YouTubeState } from '../types';

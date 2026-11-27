@@ -29,7 +29,7 @@ import {
   type TwitchPipMessage,
 } from './twitch_pip';
 import { roomAppsService } from '../room_apps_service';
-import { TwitchModel } from '../models.ts';
+import { TwitchModel } from '../twitch/twitch_model.ts';
 import type { TwitchState } from '../types.ts';
 import {
   buildTwitchChatUrl,

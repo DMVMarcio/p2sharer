@@ -15,7 +15,7 @@ import {
   loadTwitchPlayerScript,
   type TwitchPlayerInstance,
 } from './twitch_player';
-import { validTwitchState } from '../models.ts';
+import { validTwitchState } from '../twitch/twitch_model.ts';
 import {
   twitchPipEvent,
   twitchPipPeerId,

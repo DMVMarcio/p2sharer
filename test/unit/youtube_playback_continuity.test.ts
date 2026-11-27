@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { YouTubeModel, validYouTubeState } from '../../src/apps/models.ts';
+import { YouTubeModel, validYouTubeState } from '../../src/apps/youtube/youtube_model.ts';
 import { appendYouTubeQueue, advanceYouTubeQueue, importYouTubeQueue, moveYouTubeQueueEntry } from '../../src/apps/youtube/youtube_queue.ts';
 import { describeAutomaticYouTubeActivity, describeYouTubeActivity } from '../../src/apps/youtube/youtube_activity.ts';
 import { reconcileYouTubePlayer, type YouTubePlayer, type YouTubePlaybackTracker } from '../../src/apps/youtube/youtube_player.ts';

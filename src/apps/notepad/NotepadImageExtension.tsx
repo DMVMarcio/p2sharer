@@ -2,7 +2,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { Node, mergeAttributes } from '@tiptap/core';
 import { NodeViewWrapper, ReactNodeViewRenderer, type NodeViewProps } from '@tiptap/react';
 import { validProfileHash } from '../../core/profile_image.ts';
-import type { NotepadModel } from '../models.ts';
+import type { NotepadModel } from '../notepad/notepad_model.ts';
 import {
   decodeBase64, inspectPngBytes, prepareWhiteboardImage, sha256Hex, stripDataPrefix, validHttpImageUrl,
   verifyWhiteboardPng, WHITEBOARD_IMAGE_MAX_SIDE,

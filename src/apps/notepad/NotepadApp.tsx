@@ -17,7 +17,7 @@ import Highlight from '@tiptap/extension-highlight';
 import TextAlign from '@tiptap/extension-text-align';
 import { TableKit } from '@tiptap/extension-table';
 import { roomAppsService } from '../room_apps_service';
-import { NotepadModel } from '../models.ts';
+import { NotepadModel } from '../notepad/notepad_model.ts';
 import { NotepadToolbar } from './NotepadToolbar';
 import { createNotepadImageExtension, initialNoteImageDimensions } from './NotepadImageExtension';
 import {

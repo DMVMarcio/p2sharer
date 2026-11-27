@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { TwitchModel } from '../../src/apps/models.ts';
+import { TwitchModel } from '../../src/apps/twitch/twitch_model.ts';
 import type { TwitchState } from '../../src/apps/types.ts';
 
 test('TwitchModel updates state and emits snapshots with incremented clock', () => {

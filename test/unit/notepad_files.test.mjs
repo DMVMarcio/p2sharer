@@ -63,7 +63,7 @@ const bundle = await build({ stdin: { contents: `export { NotepadApp } from './s
   export { resizedNoteImageDimensions } from './src/apps/notepad/NotepadImageExtension.tsx';
   export { sha256Hex, decodeBase64 } from './src/apps/shared/whiteboard_image.ts';
   export { useDocumentLibraryDeletion } from './src/apps/shared/useDocumentLibraryDeletion.ts';
-  export { NotepadModel } from './src/apps/models.ts'; export { setLanguage } from './src/i18n/index.ts';`, resolveDir: process.cwd() },
+  export { NotepadModel } from './src/apps/notepad/notepad_model.ts'; export { setLanguage } from './src/i18n/index.ts';`, resolveDir: process.cwd() },
   bundle: true, write: false, platform: 'node', format: 'esm', jsx: 'automatic',
   plugins: [{ name: 'notepad-native-fixture', setup(builder) {
     builder.onResolve({ filter: /^@tauri-apps\/api\/event$/ }, () => ({ path: 'event', namespace: 'fixture' }));

@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { describeTwitchActivity } from '../../src/apps/twitch/twitch_activity.ts';
 import { parseTwitchChannel } from '../../src/apps/twitch/twitch_player.ts';
-import { validTwitchState } from '../../src/apps/models.ts';
+import { validTwitchState } from '../../src/apps/twitch/twitch_model.ts';
 import type { TwitchState } from '../../src/apps/types.ts';
 
 const baseState: TwitchState = {
