@@ -10,7 +10,7 @@ import {
   UserX,
 } from 'lucide-react';
 import { moveOrderedItem } from '../../core/ordered_items';
-import { generateUserColor } from '../../p2p/group_room';
+import { generateUserColor } from '../../p2p/room_identity';
 import { useLocale } from '../../hooks/useLocale';
 import { useModal } from '../../hooks/useModal';
 import { useRoom } from '../../hooks/useRoom';

@@ -4,7 +4,12 @@ import { logDiagnostic } from '../core/logger.ts';
 import { ProfileTransfer } from './profile_transfer.ts';
 import { profileImages, profileBanners } from '../core/profile/profile_image.ts';
 import { profileStats } from '../core/profile/profile_stats.ts';
-import { validStreamDescriptors, streamSlotKey, streamOwner, type StreamDescriptor } from '../core/media/media_streams.ts';
+import {
+  validStreamDescriptors,
+  streamSlotKey,
+  streamOwner,
+  type StreamDescriptor,
+} from '../core/media/media_streams.ts';
 import {
   validStreamPointer,
   validStreamPointerState,
@@ -108,110 +113,18 @@ import { PeerTracker } from './peer_tracker.ts';
 import { signalingManager } from './signaling_manager.ts';
 import { t } from '../i18n/index.ts';
 import { profileThumbnail, validRoomPreview, type RoomPreview } from '../core/room/room_preview.ts';
+import { computeSignalingRoomId, generateUserColor } from './room_identity.ts';
+import {
+  newFileTimings,
+  type FilePacket,
+  type FileProgress,
+  type FileRequest,
+  type FileSession,
+  type FileTransportDiagnostics,
+  type NativeChatFile,
+} from './chat_file_transfer_types.ts';
 
 const APP_ID = 'p2sharer-multi-stream-v5';
-
-const ADJECTIVES = [
-  'cyber',
-  'neon',
-  'rapid',
-  'swift',
-  'cosmic',
-  'hyper',
-  'solar',
-  'lunar',
-  'mystic',
-  'sonic',
-  'ultra',
-  'mega',
-  'royal',
-  'epic',
-  'prime',
-  'iron',
-  'silver',
-  'golden',
-  'shadow',
-  'crystal',
-  'astro',
-  'blaze',
-  'storm',
-  'vortex',
-  'quantum',
-  'echo',
-  'alpha',
-  'nova',
-  'turbo',
-  'ninja',
-  'pixel',
-  'phantom',
-];
-
-const NOUNS = [
-  'falcon',
-  'tiger',
-  'wolf',
-  'eagle',
-  'hawk',
-  'panther',
-  'fox',
-  'dragon',
-  'phoenix',
-  'bear',
-  'shark',
-  'cobra',
-  'viper',
-  'lion',
-  'lynx',
-  'titan',
-  'nomad',
-  'runner',
-  'driver',
-  'spark',
-  'storm',
-  'pulse',
-  'byte',
-  'core',
-  'matrix',
-  'drift',
-  'horizon',
-  'forge',
-  'nexus',
-  'rover',
-  'shield',
-  'vortex',
-];
-
-export function generateRandomRoomSlug(): string {
-  const adj = ADJECTIVES[Math.floor(Math.random() * ADJECTIVES.length)];
-  const noun = NOUNS[Math.floor(Math.random() * NOUNS.length)];
-  const num = Math.floor(100 + Math.random() * 900);
-  return `${adj}-${noun}-${num}`;
-}
-
-export async function computeSignalingRoomId(roomId: string, password = ''): Promise<string> {
-  const cleanRoom = roomId.trim().toLowerCase();
-  const cleanPass = password.trim();
-  if (!cleanPass) {
-    return `public-${cleanRoom}`;
-  }
-  const data = new TextEncoder().encode(`p2sharer-auth:${cleanRoom}:${cleanPass}`);
-  const hashBuffer = await crypto.subtle.digest('SHA-256', data);
-  const hashArray = Array.from(new Uint8Array(hashBuffer));
-  const hashHex = hashArray
-    .map((b) => b.toString(16).padStart(2, '0'))
-    .join('')
-    .substring(0, 16);
-  return `sec-${cleanRoom}-${hashHex}`;
-}
-
-export function generateUserColor(name: string): string {
-  let hash = 0;
-  for (let i = 0; i < name.length; i++) {
-    hash = name.charCodeAt(i) + ((hash << 5) - hash);
-  }
-  const hue = Math.abs(hash % 360);
-  return `hsl(${hue}, 65%, 45%)`;
-}
 
 export interface RoomCallbacks {
   onPreview?: (preview: RoomPreview, peerId: string) => void;
@@ -241,105 +154,6 @@ export interface RoomCallbacks {
   onWatchStarted?: (watcherPeerId: string, watcherName: string, broadcasterPeerId: string) => void;
   onWatchStopped?: (watcherPeerId: string, watcherName: string, broadcasterPeerId: string) => void;
   onSenderConsumerChange?: (mediaId: string, consumerId: string, active: boolean) => void;
-}
-
-export interface NativeChatFile {
-  id: string;
-  name: string;
-  path: string;
-  size: number;
-  hash: string;
-  isImage: boolean;
-}
-export interface FileRequest {
-  requestId: string;
-  messageId: string;
-  peerId: string;
-  peerName: string;
-  path: string;
-  name: string;
-  preview: boolean;
-}
-export interface FileTimings {
-  readMs: number;
-  prepareMs: number;
-  wireMs: number;
-  verifyMs: number;
-  writeMs: number;
-  ackMs: number;
-}
-export interface FileTransportDiagnostics {
-  protocol?: string;
-  localCandidateType?: string;
-  remoteCandidateType?: string;
-  channelLabel?: string;
-  queuedBytes?: number;
-  queueLimitBytes?: number;
-  pairBytesSent?: number;
-  pairBytesReceived?: number;
-  pairTimestamp?: number;
-  pairBytesPerSecond?: number;
-  availableOutgoingBitsPerSecond?: number;
-  packetsDiscardedOnSend?: number;
-}
-export interface FileProgress {
-  requestId: string;
-  messageId: string;
-  direction: 'send' | 'receive';
-  bytes: number;
-  total: number;
-  status: 'pending' | 'active' | 'complete' | 'cancelled' | 'error';
-  error?: string;
-  preview?: string;
-  previewBytes?: Uint8Array;
-  saved?: boolean;
-  nativeDirect?: boolean;
-  previewOnly?: boolean;
-  peerId?: string;
-  fileName?: string;
-  peerName?: string;
-  startedAt?: number;
-  isImage?: boolean;
-  bytesPerSecond?: number;
-  connectionType?: string;
-  rttMs?: number | null;
-  timings?: FileTimings;
-  transport?: FileTransportDiagnostics;
-}
-type FilePacket = {
-  kind: 'request' | 'accept' | 'ready' | 'deny' | 'ack' | 'cancel';
-  requestId: string;
-  messageId: string;
-  offset?: number;
-  preview?: boolean;
-  direct?: DirectFileOffer;
-  signature: string;
-};
-type FileSession = {
-  messageId: string;
-  peerId: string;
-  peerName?: string;
-  sourceId?: string;
-  offset: number;
-  sentOffset?: number;
-  lastAckOffset?: number;
-  sessionToken?: string;
-  ackedOnce?: boolean;
-  direct?: boolean;
-  startedTransfer?: boolean;
-  sending?: boolean;
-  receiving?: boolean;
-  writingUntil?: number;
-  pendingChunks?: Map<number, Uint8Array>;
-  total: number;
-  direction: 'send' | 'receive';
-  preview?: boolean;
-  chunks?: Uint8Array[];
-  timings: FileTimings;
-};
-
-function newFileTimings(): FileTimings {
-  return { readMs: 0, prepareMs: 0, wireMs: 0, verifyMs: 0, writeMs: 0, ackMs: 0 };
 }
 
 function isVoiceStreamMetadata(meta: unknown): boolean {

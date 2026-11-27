@@ -7,7 +7,7 @@ import { useDropdownPresence } from '../../../hooks/presence/useDropdownPresence
 import { useEffect, useRef, useState } from 'react';
 import { Copy, Download, File, FolderSearch, Image as ImageIcon, X, ZoomIn, ZoomOut } from 'lucide-react';
 import type { ChatMessage } from '../../../core/types';
-import type { FileProgress } from '../../../p2p/group_room';
+import type { FileProgress } from '../../../p2p/chat_file_transfer_types';
 import { selfId } from '@trystero-p2p/core';
 import { formatFileSize } from '../../../core/file_size';
 import { FileProgressRing } from './FileProgressRing';

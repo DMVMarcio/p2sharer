@@ -2,7 +2,7 @@ import { ModalDialog } from '../../common/overlays/ModalDialog';
 import { localizeText, t } from '../../../i18n';
 import { useLocale } from '../../../hooks/useLocale';
 import { useEffect, useState } from 'react';
-import type { NativeChatFile } from '../../../p2p/group_room';
+import type { NativeChatFile } from '../../../p2p/chat_file_transfer_types';
 import { formatFileSize } from '../../../core/file_size';
 import { Paperclip } from 'lucide-react';
 

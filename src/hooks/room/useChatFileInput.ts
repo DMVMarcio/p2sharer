@@ -4,7 +4,7 @@ import { useEffect, useRef, useState, type RefObject } from 'react';
 import { isTauri } from '@tauri-apps/api/core';
 import { invoke } from '../../platform/commands.ts';
 import { getCurrentWebview } from '@tauri-apps/api/webview';
-import type { NativeChatFile } from '../../p2p/group_room';
+import type { NativeChatFile } from '../../p2p/chat_file_transfer_types';
 import { showToast } from '../useToast';
 import { pickBrowserFiles, registerBrowserFile } from '../../platform/web_files';
 import type { ChatOfferFile } from '../../components/room/chat/ChatFileOfferDialog';

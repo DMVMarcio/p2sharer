@@ -9,7 +9,7 @@ import {
   type StreamDescriptor,
 } from '../core/media/media_streams.ts';
 import { StreamPointerReceiver } from './stream_pointer_receiver.ts';
-import { generateUserColor } from '../p2p/group_room.ts';
+import { generateRandomRoomSlug, generateUserColor } from '../p2p/room_identity.ts';
 import {
   validStreamPointer,
   validStreamPointerState,
@@ -54,14 +54,8 @@ import { compareRoomInvites, parseRoomInvite } from '../core/room/room_invite.ts
 import { verifyRoomInvite } from '../core/room/room_invite_validation.ts';
 import { savedRooms } from '../core/room/saved_rooms.ts';
 import type { ChatMessage, PeerInfo, RoomSlotInfo } from '../core/types.ts';
-import {
-  generateRandomRoomSlug,
-  GroupRoomManager,
-  type RoomCallbacks,
-  type FileProgress,
-  type FileRequest,
-  type NativeChatFile,
-} from '../p2p/group_room.ts';
+import { GroupRoomManager, type RoomCallbacks } from '../p2p/group_room.ts';
+import type { FileProgress, FileRequest, NativeChatFile } from '../p2p/chat_file_transfer_types.ts';
 import { soundEffects } from '../ui/sound_effects.ts';
 import { NativeVideoBridge } from '../video/native_video_bridge.ts';
 import { MediaCoordinator } from '../p2p/media_coordinator.ts';

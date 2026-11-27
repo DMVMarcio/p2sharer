@@ -9,7 +9,7 @@ import { showToast } from '../../../hooks/useToast';
 import { Tooltip } from '../../common/overlays/Tooltip';
 import { TooltipButton } from '../../common/overlays/TooltipButton';
 import { formatFileSize } from '../../../core/file_size';
-import type { FileProgress } from '../../../p2p/group_room';
+import type { FileProgress } from '../../../p2p/chat_file_transfer_types';
 import { formatTransferSpeed, getTransferSpeedUnit, subscribeTransferSpeedUnit,
   type TransferSpeedUnit } from '../../../core/network/transfer_speed';
 
