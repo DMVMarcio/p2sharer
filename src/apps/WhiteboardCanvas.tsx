@@ -43,6 +43,20 @@ type Gesture = {
 };
 type ResizePreview = { id: string; layer: BoardLayer; shapes: BoardShape[]; fromBounds: BoardBox; bounds: BoardBox };
 type TextDraft = { x: number; y: number; layerId: string; value: string };
+export interface WhiteboardCanvasActions {
+  fitCanvas: () => void;
+  resetZoom: () => void;
+  zoomIn: () => void;
+  zoomOut: () => void;
+}
+
+function toolToBrushStyle(tool: string, brushType?: string): 'round' | 'pixel' | 'blend' {
+  if (tool === 'brush') {
+    if (brushType === 'pixel') return 'pixel';
+    if (brushType === 'smudge' || brushType === 'blur') return 'blend';
+  }
+  return 'round';
+}
 
 function toolToCursorShape(tool: string): StreamPointerShape {
   if (tool === 'hand') return 'hand';
@@ -138,6 +152,7 @@ export function WhiteboardCanvas({
   studio,
   engineActive,
   onEngineActiveChange,
+  actionsRef,
   activeLayer,
   settings,
   spaceHeld = false,
@@ -162,6 +177,7 @@ export function WhiteboardCanvas({
   studio: WhiteboardStudioCompositor;
   engineActive: boolean;
   onEngineActiveChange(active: boolean): void;
+  actionsRef?: RefObject<WhiteboardCanvasActions | null>;
   activeLayer: string;
   settings: BoardSettings;
   spaceHeld?: boolean;
@@ -296,9 +312,11 @@ export function WhiteboardCanvas({
     if (localCursorElRef.current && localCursorPosRef.current && localCursorMetaRef.current.shape === 'brush') {
       const brush = localCursorElRef.current.querySelector('.stream-pointer-brush') as HTMLElement | null;
       if (brush) {
-        const d = `${localCursorPosRef.current.worldWidth * view.zoom}px`;
+        const px = localCursorPosRef.current.worldWidth * view.zoom;
+        const d = `${px}px`;
         brush.style.width = d;
         brush.style.height = d;
+        brush.classList.toggle('is-large', px >= 14);
       }
     }
     if (textDraftRef.current && textDraftStateRef.current) {
@@ -466,9 +484,11 @@ export function WhiteboardCanvas({
         if (shape === 'brush') {
           const brush = localCursorElRef.current.querySelector('.stream-pointer-brush') as HTMLElement | null;
           if (brush) {
-            const d = `${value.width * zoom}px`;
+            const px = value.width * zoom;
+            const d = `${px}px`;
             brush.style.width = d;
             brush.style.height = d;
+            brush.classList.toggle('is-large', px >= 14);
           }
         }
       }
@@ -544,6 +564,21 @@ export function WhiteboardCanvas({
         : Math.min(1, Math.max(0.15, Math.min((w - 80) / boardWidth, (h - 80) / boardHeight)));
     navigation.set({ x: w / 2 - (boardWidth * zoom) / 2, y: h / 2 - (boardHeight * zoom) / 2, zoom });
   };
+
+  if (actionsRef) {
+    actionsRef.current = {
+      fitCanvas: () => fitCanvas(false),
+      resetZoom: () => fitCanvas(true),
+      zoomIn: () => {
+        const w = root.current?.clientWidth || 800, h = root.current?.clientHeight || 500;
+        navigation.zoom(-120, { x: w / 2, y: h / 2 });
+      },
+      zoomOut: () => {
+        const w = root.current?.clientWidth || 800, h = root.current?.clientHeight || 500;
+        navigation.zoom(120, { x: w / 2, y: h / 2 });
+      },
+    };
+  }
 
   useLayoutEffect(() => {
     let measured = false;
@@ -937,9 +972,16 @@ export function WhiteboardCanvas({
           ]);
           return;
         }
-        const sampleBuf = settings.fillSample === 'all'
-          ? model.getCompositePixels(undefined, false)
-          : model.getLayerPixels(activeLayer);
+        const sampleBuf = current.current.engineActive
+          ? (settings.fillSample === 'all'
+              ? studio.getCompositePixelData(model.layers, model.shapes, boardWidth, boardHeight)
+              : studio.getLayerPixelData(activeLayer, model.layers, model.shapes, boardWidth, boardHeight)) ??
+            (settings.fillSample === 'all'
+              ? model.getCompositePixels(undefined, false)
+              : model.getLayerPixels(activeLayer))
+          : (settings.fillSample === 'all'
+              ? model.getCompositePixels(undefined, false)
+              : model.getLayerPixels(activeLayer));
         const mask = computeFloodMask(
           sampleBuf,
           boardWidth,
@@ -978,7 +1020,7 @@ export function WhiteboardCanvas({
       return;
     }
 
-    // Paint Bucket tool
+    // Paint Bucket tool (true pixel flood fill inside renderer; attaches selection clipPolygon only when active)
     if (event.button === 0 && settings.tool === 'bucket') {
       if (!boardContains(point, boardWidth, boardHeight) || !layer || layer.locked || layer.hidden) return;
       try {
@@ -992,30 +1034,6 @@ export function WhiteboardCanvas({
               y: Math.round((p.y - layer.y) * 100) / 100,
             }))
           : undefined;
-        const hasRelevantShapes = settings.fillSample === 'all'
-          ? model.shapes.some(s => !s.hidden)
-          : model.shapes.some(s => !s.hidden && (s.layerId ?? DEFAULT_BOARD_LAYER) === layer.id);
-        let clipPolygon = activeClipLocal;
-        if (!clipPolygon && hasRelevantShapes) {
-          const sampleBuf = settings.fillSample === 'all'
-            ? model.getCompositePixels(undefined, false)
-            : model.getLayerPixels(layer.id);
-          const mask = computeFloodMask(
-            sampleBuf,
-            boardWidth,
-            boardHeight,
-            settings.fillSample === 'all' ? point.x : localSeed.x,
-            settings.fillSample === 'all' ? point.y : localSeed.y,
-            settings.fillTolerance ?? 32,
-            settings.fillContiguous !== false,
-            settings.fillExpand ?? 1,
-          );
-          const floodPoly = selectionMaskToPolygon(mask, boardWidth, boardHeight).map(p => ({
-            x: Math.round((p.x - (settings.fillSample === 'all' ? layer.x : 0)) * 100) / 100,
-            y: Math.round((p.y - (settings.fillSample === 'all' ? layer.y : 0)) * 100) / 100,
-          }));
-          if (floodPoly.length >= 3) clipPolygon = floodPoly;
-        }
         model.put({
           id: crypto.randomUUID(),
           layerId: layer.id,
@@ -1030,7 +1048,7 @@ export function WhiteboardCanvas({
           fillContiguous: settings.fillContiguous !== false,
           fillAntiAlias: settings.fillAntiAlias !== false,
           fillSample: settings.fillSample ?? 'layer',
-          ...(clipPolygon ? { clipPolygon } : {}),
+          ...(activeClipLocal ? { clipPolygon: activeClipLocal } : {}),
           x: 0,
           y: 0,
           order: (model.shapes[model.shapes.length - 1]?.order ?? 0) + 1,
@@ -1097,12 +1115,7 @@ export function WhiteboardCanvas({
             y: Math.round((pt.y - layer.y) * 100) / 100,
           }))
         : undefined;
-      const strokeColor = settings.tool === 'brush' && settings.brushType === 'smudge'
-        ? (() => {
-            const hasShapes = model.shapes.some(s => !s.hidden && (s.layerId ?? DEFAULT_BOARD_LAYER) === layer.id);
-            return hasShapes ? model.sampleColor(point.x, point.y, true, layer.id) : settings.color;
-          })()
-        : settings.color;
+      const strokeColor = settings.color;
       const shape: BoardShape = {
         id: crypto.randomUUID(),
         layerId: layer.id,
@@ -1559,6 +1572,7 @@ export function WhiteboardCanvas({
             color={localCursorMeta.color}
             interpolate={false}
             shape={localCursorMeta.shape}
+            brushStyle={toolToBrushStyle(settings.tool, settings.brushType)}
             diameter={localCursorPosRef.current.worldWidth * view.zoom}
             style={{
               left: localCursorPosRef.current.screen.x,

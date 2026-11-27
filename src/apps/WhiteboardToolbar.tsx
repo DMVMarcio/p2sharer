@@ -10,6 +10,7 @@ import { useContextMenu } from '../components/common/ContextMenu';
 import { IntegerSlider } from '../components/common/IntegerSlider';
 import { t } from '../i18n';
 import type { BoardBrushType, BoardSymmetryMode, BoardTool } from './whiteboard_scene';
+import { drawBrushPreviewCanvas } from './whiteboard_brushes';
 
 export interface BoardSettings {
   tool: BoardTool;
@@ -139,9 +140,25 @@ export const WhiteboardToolbar = memo(function WhiteboardToolbar({
   const menu = useContextMenu();
   const [lastSelectionTool, setLastSelectionTool] = useState<SelectionToolKind>('selectRect');
   const [openSlider, setOpenSlider] = useState<string | null>(null);
+  const [previewCanvasSupported, setPreviewCanvasSupported] = useState(true);
+  const previewCanvasRef = useRef<HTMLCanvasElement>(null);
   const propsRef = useRef<HTMLDivElement>(null);
   const shapeFilled = settings.shapeFilled ?? { rectangle: false, ellipse: false };
   const effectiveTool: BoardTool = altHeld ? 'eyedropper' : settings.tool;
+
+  useEffect(() => {
+    const c = previewCanvasRef.current;
+    if (!c) return;
+    const ok = drawBrushPreviewCanvas(c, {
+      tool: settings.tool,
+      brushType: settings.brushType,
+      color: settings.color,
+      width: settings.width,
+      opacity: settings.opacity ?? 100,
+      hardness: settings.hardness ?? 80,
+    });
+    if (!ok && previewCanvasSupported) setPreviewCanvasSupported(false);
+  }, [settings.tool, settings.brushType, settings.color, settings.width, settings.opacity, settings.hardness, previewCanvasSupported]);
 
   useEffect(() => {
     if (!openSlider) return;
@@ -249,19 +266,23 @@ export const WhiteboardToolbar = memo(function WhiteboardToolbar({
       <div ref={propsRef} className="whiteboard-tool-properties">
         <div className="whiteboard-brush-preview-card" aria-hidden="true">
           <div className="whiteboard-brush-preview-stage">
-            <span
-              className={`whiteboard-brush-preview-dot ${settings.tool === 'brush' && (settings.brushType === 'pixel' || settings.brushType === 'marker') ? 'is-square' : ''}`}
-              style={{
-                width: `${Math.max(3, Math.min(26, settings.width * 0.34))}px`,
-                height: `${Math.max(3, Math.min(26, settings.width * 0.34))}px`,
-                backgroundColor: settings.tool === 'eraser' ? 'transparent' : settings.color,
-                border: settings.tool === 'eraser' ? '1.5px dashed var(--text-secondary)' : 'none',
-                opacity: Math.max(0.15, (settings.opacity ?? 100) / 100),
-                filter: showBrushSliders && (settings.hardness ?? 80) < 70
-                  ? `blur(${Math.round(((70 - (settings.hardness ?? 80)) / 70) * 3 * 10) / 10}px)`
-                  : undefined,
-              }}
-            />
+            {previewCanvasSupported ? (
+              <canvas ref={previewCanvasRef} width={28} height={28} className="whiteboard-brush-preview-canvas" />
+            ) : (
+              <span
+                className={`whiteboard-brush-preview-dot ${settings.tool === 'brush' && (settings.brushType === 'pixel' || settings.brushType === 'marker') ? 'is-square' : ''}`}
+                style={{
+                  width: `${Math.max(3, Math.min(26, settings.width * 0.34))}px`,
+                  height: `${Math.max(3, Math.min(26, settings.width * 0.34))}px`,
+                  backgroundColor: settings.tool === 'eraser' ? 'transparent' : settings.color,
+                  border: settings.tool === 'eraser' ? '1.5px dashed var(--text-secondary)' : 'none',
+                  opacity: Math.max(0.15, (settings.opacity ?? 100) / 100),
+                  filter: showBrushSliders && (settings.hardness ?? 80) < 70
+                    ? `blur(${Math.round(((70 - (settings.hardness ?? 80)) / 70) * 3 * 10) / 10}px)`
+                    : undefined,
+                }}
+              />
+            )}
           </div>
           <div className="whiteboard-brush-preview-meta">
             <span className="whiteboard-brush-preview-title">

@@ -9,10 +9,11 @@ import { showToast } from '../hooks/useToast';
 import { t } from '../i18n';
 import { roomAppsService } from './room_apps_service';
 import type { WhiteboardModel } from './whiteboard_model';
-import { DEFAULT_BOARD_LAYER, type BoardLayer, type BoardPoint, type BoardTool } from './whiteboard_scene';
+import { BOARD_BRUSH_TYPES, DEFAULT_BOARD_LAYER, type BoardBrushType, type BoardLayer, type BoardPoint, type BoardTool } from './whiteboard_scene';
+import { BRUSH_STUDIO_PRESETS, type BrushStudioPreset } from './whiteboard_brushes';
 import { WhiteboardToolbar, type BoardSettings } from './WhiteboardToolbar';
 import { WhiteboardLayers } from './WhiteboardLayers';
-import { WhiteboardCanvas } from './WhiteboardCanvas';
+import { WhiteboardCanvas, type WhiteboardCanvasActions } from './WhiteboardCanvas';
 import { WhiteboardStudioCompositor } from './whiteboard_webgl';
 import { CANVAS_PRESETS, containBoardLayer, type BoardViewport } from './whiteboard_interaction';
 import { prepareWhiteboardImage, readClipboardImageDataUrl } from './whiteboard_image';
@@ -48,6 +49,27 @@ function loadRecentColors(): string[] {
   return ['#3b82f6', '#ef4444', '#22c55e', '#facc15', '#a855f7', '#000000', '#ffffff'];
 }
 
+function loadBrushPresets(): Record<BoardBrushType, BrushStudioPreset> {
+  const presets = { ...BRUSH_STUDIO_PRESETS } as Record<BoardBrushType, BrushStudioPreset>;
+  for (const key of BOARD_BRUSH_TYPES) {
+    presets[key] = { ...BRUSH_STUDIO_PRESETS[key] };
+  }
+  try {
+    const raw = localStorage.getItem('p2sharer_whiteboard_brush_presets');
+    if (!raw) return presets;
+    const parsed = JSON.parse(raw) as Partial<Record<BoardBrushType, Partial<BrushStudioPreset>>>;
+    for (const key of BOARD_BRUSH_TYPES) {
+      const p = parsed?.[key];
+      if (!p) continue;
+      if (Number.isFinite(p.opacity)) presets[key].opacity = Math.max(1, Math.min(100, Math.round(p.opacity!)));
+      if (Number.isFinite(p.flow)) presets[key].flow = Math.max(1, Math.min(100, Math.round(p.flow!)));
+      if (Number.isFinite(p.hardness)) presets[key].hardness = Math.max(0, Math.min(100, Math.round(p.hardness!)));
+      if (Number.isFinite(p.spacing)) presets[key].spacing = Math.max(1, Math.min(100, Math.round(p.spacing!)));
+    }
+  } catch { /* ignore */ }
+  return presets;
+}
+
 const isBlockedShortcutTarget = (target: EventTarget | null) =>
   target instanceof Element && Boolean(target.closest('input, textarea, select, [contenteditable], .ProseMirror, [role="textbox"], [role="dialog"], [role="alertdialog"], [role="menu"], [role="listbox"]'));
 
@@ -57,6 +79,7 @@ export function WhiteboardApp({ instanceId, compact = false }: { instanceId: str
   const model = roomAppsService.getModel<WhiteboardModel>(instanceId);
   const [, refresh] = useState(0);
   const toolWidthsRef = useRef<Record<WidthTool, number>>(loadToolWidths());
+  const brushPresetsRef = useRef<Record<BoardBrushType, BrushStudioPreset>>(loadBrushPresets());
   const lastWidthToolRef = useRef<WidthTool>('brush');
   const [spaceHeld, setSpaceHeld] = useState(false);
   const [altHeld, setAltHeld] = useState(false);
@@ -70,10 +93,10 @@ export function WhiteboardApp({ instanceId, compact = false }: { instanceId: str
     color: '#3b82f6',
     secondaryColor: '#ffffff',
     width: toolWidthsRef.current.brush,
-    opacity: 100,
-    flow: 100,
-    hardness: 80,
-    spacing: 15,
+    opacity: brushPresetsRef.current.pencil.opacity,
+    flow: brushPresetsRef.current.pencil.flow,
+    hardness: brushPresetsRef.current.pencil.hardness,
+    spacing: brushPresetsRef.current.pencil.spacing,
     pressureSize: true,
     pressureOpacity: true,
     filled: false,
@@ -116,6 +139,7 @@ export function WhiteboardApp({ instanceId, compact = false }: { instanceId: str
       let width = next.width;
       const widthChanged = next.width !== prev.width;
       const toolChanged = next.tool !== prev.tool;
+      const brushTypeChanged = next.brushType !== prev.brushType;
       if (toolChanged && isWidthTool(next.tool) && !widthChanged) {
         lastWidthToolRef.current = next.tool;
         width = toolWidthsRef.current[next.tool] ?? 1;
@@ -126,14 +150,43 @@ export function WhiteboardApp({ instanceId, compact = false }: { instanceId: str
       } else if (isWidthTool(next.tool)) {
         lastWidthToolRef.current = next.tool;
       }
+
+      let opacity = next.opacity;
+      let flow = next.flow;
+      let hardness = next.hardness;
+      let spacing = next.spacing;
+      if (brushTypeChanged) {
+        const preset = brushPresetsRef.current[next.brushType] ?? BRUSH_STUDIO_PRESETS[next.brushType];
+        if (next.opacity === prev.opacity) opacity = preset.opacity;
+        if (next.flow === prev.flow) flow = preset.flow;
+        if (next.hardness === prev.hardness) hardness = preset.hardness;
+        if (next.spacing === prev.spacing) spacing = preset.spacing;
+      } else if (
+        next.tool === 'brush' &&
+        (next.opacity !== prev.opacity || next.flow !== prev.flow || next.hardness !== prev.hardness || next.spacing !== prev.spacing)
+      ) {
+        const curPreset = brushPresetsRef.current[next.brushType] ?? BRUSH_STUDIO_PRESETS[next.brushType];
+        brushPresetsRef.current = {
+          ...brushPresetsRef.current,
+          [next.brushType]: {
+            opacity: next.opacity,
+            flow: next.flow ?? curPreset.flow,
+            hardness: next.hardness ?? curPreset.hardness,
+            spacing: next.spacing ?? curPreset.spacing,
+          },
+        };
+        try { localStorage.setItem('p2sharer_whiteboard_brush_presets', JSON.stringify(brushPresetsRef.current)); } catch { /* ignore */ }
+      }
+
       try { localStorage.setItem('p2sharer_whiteboard_smoothing', String(next.smoothing)); } catch { /* Keep the current session preference. */ }
-      return { ...next, width };
+      return { ...next, width, opacity, flow, hardness, spacing };
     });
   };
 
   const [activeLayer, setActiveLayer] = useState(DEFAULT_BOARD_LAYER);
   const [selected, setSelected] = useState<string | null>(null);
   const viewportRef = useRef<BoardViewport>({ x: 60, y: 60, zoom: 1 });
+  const canvasActionsRef = useRef<WhiteboardCanvasActions | null>(null);
   const studioRef = useRef<WhiteboardStudioCompositor | null>(null);
   if (!studioRef.current) studioRef.current = new WhiteboardStudioCompositor();
   useEffect(() => () => studioRef.current?.dispose(), []);
@@ -421,10 +474,21 @@ export function WhiteboardApp({ instanceId, compact = false }: { instanceId: str
         else if (mod && key === 'a') { event.preventDefault(); selectAll(); }
         else if (mod && key === 'd') { event.preventDefault(); clearSelection(); }
         else if (mod && event.shiftKey && key === 'i') { event.preventDefault(); invertSelection(); }
+        else if (mod && key === '0') { event.preventDefault(); canvasActionsRef.current?.fitCanvas(); }
+        else if (mod && key === '1') { event.preventDefault(); canvasActionsRef.current?.resetZoom(); }
+        else if (mod && (key === '=' || key === '+')) { event.preventDefault(); canvasActionsRef.current?.zoomIn(); }
+        else if (mod && key === '-') { event.preventDefault(); canvasActionsRef.current?.zoomOut(); }
         else if (mod && (key === 'z' || key === 'y')) {
           event.preventDefault();
           if (key === 'y' || event.shiftKey) model.redo();
           else model.undo();
+        } else if (!mod && !event.altKey && (event.key === '[' || event.key === ']')) {
+          event.preventDefault();
+          const curW = settingsRef.current.width;
+          const step = curW <= 10 ? 1 : curW <= 30 ? 2 : 5;
+          const nextW = event.key === '[' ? Math.max(1, curW - step) : Math.min(100, curW + step);
+          applySettings({ ...settingsRef.current, width: nextW });
+          return;
         } else if (!mod && !event.altKey && !event.repeat) {
           if (key === 'b') { event.preventDefault(); applySettings({ ...settingsRef.current, tool: 'brush' }); return; }
           if (key === 'e') { event.preventDefault(); applySettings({ ...settingsRef.current, tool: 'eraser' }); return; }
@@ -510,6 +574,7 @@ export function WhiteboardApp({ instanceId, compact = false }: { instanceId: str
             studio={studioRef.current}
             engineActive={engineActive}
             onEngineActiveChange={setEngineActive}
+            actionsRef={canvasActionsRef}
             activeLayer={currentLayer}
             settings={settings}
             spaceHeld={spaceHeld}

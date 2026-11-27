@@ -283,42 +283,154 @@ export function selectionMaskBounds(mask: Uint8Array, width: number, height: num
   return { x: minX, y: minY, width: maxX - minX + 1, height: maxY - minY + 1 };
 }
 
-/** Converts a binary selection mask into a compact hull/contour polygon (up to 128 points) for P2P sync. */
+const MOORE_DIRS: ReadonlyArray<readonly [number, number]> = [
+  [-1, 0], [-1, -1], [0, -1], [1, -1], [1, 0], [1, 1], [0, 1], [-1, 1],
+];
+
+const MOORE_DIR_LOOKUP = new Int8Array([
+  1, 2, 3,
+  0, -1, 4,
+  7, 6, 5,
+]);
+
+function pointToSegmentDistSq(p: BoardPoint, a: BoardPoint, b: BoardPoint): number {
+  const dx = b.x - a.x;
+  const dy = b.y - a.y;
+  const lenSq = dx * dx + dy * dy;
+  if (lenSq <= 1e-9) {
+    const ex = p.x - a.x, ey = p.y - a.y;
+    return ex * ex + ey * ey;
+  }
+  const t = Math.max(0, Math.min(1, ((p.x - a.x) * dx + (p.y - a.y) * dy) / lenSq));
+  const px = a.x + t * dx - p.x;
+  const py = a.y + t * dy - p.y;
+  return px * px + py * py;
+}
+
+function simplifyRdp(points: BoardPoint[], epsilon: number): BoardPoint[] {
+  if (points.length <= 4) return points;
+  const epsSq = epsilon * epsilon;
+  const keep = new Uint8Array(points.length);
+  keep[0] = 1;
+  keep[points.length - 1] = 1;
+  const stack: Array<[number, number]> = [[0, points.length - 1]];
+  while (stack.length > 0) {
+    const [start, end] = stack.pop()!;
+    if (end - start <= 1) continue;
+    let maxDist = 0;
+    let maxIdx = -1;
+    const a = points[start];
+    const b = points[end];
+    for (let i = start + 1; i < end; i++) {
+      const d = pointToSegmentDistSq(points[i], a, b);
+      if (d > maxDist) {
+        maxDist = d;
+        maxIdx = i;
+      }
+    }
+    if (maxDist > epsSq && maxIdx !== -1) {
+      keep[maxIdx] = 1;
+      stack.push([start, maxIdx], [maxIdx, end]);
+    }
+  }
+  const out: BoardPoint[] = [];
+  for (let i = 0; i < points.length; i++) {
+    if (keep[i]) out.push(points[i]);
+  }
+  return out;
+}
+
+/** Converts a binary selection mask into a Moore-Neighbor traced & RDP-simplified contour polygon (<= 256 vertices) for P2P sync. */
 export function selectionMaskToPolygon(mask: Uint8Array, width: number, height: number): BoardPoint[] {
   const bounds = selectionMaskBounds(mask, width, height);
   if (!bounds) return [];
-  const stepY = Math.max(1, Math.ceil(bounds.height / 48));
-  const leftEdge: BoardPoint[] = [];
-  const rightEdge: BoardPoint[] = [];
-  for (let y = bounds.y; y < bounds.y + bounds.height; y += stepY) {
+
+  let startX = -1;
+  let startY = -1;
+  for (let y = bounds.y; y < bounds.y + bounds.height; y++) {
     const row = y * width;
-    let firstX = -1, lastX = -1;
     for (let x = bounds.x; x < bounds.x + bounds.width; x++) {
       if (mask[row + x] > 0) {
-        if (firstX === -1) firstX = x;
-        lastX = x + 1;
+        startX = x;
+        startY = y;
+        break;
       }
     }
-    if (firstX !== -1) {
-      leftEdge.push({ x: firstX, y });
-      rightEdge.push({ x: lastX, y });
+    if (startX !== -1) break;
+  }
+  if (startX === -1) return [];
+
+  const isInside = (x: number, y: number) =>
+    x >= 0 && y >= 0 && x < width && y < height && mask[y * width + x] > 0;
+
+  const contour: BoardPoint[] = [{ x: startX + 0.5, y: startY + 0.5 }];
+  let curX = startX;
+  let curY = startY;
+  let enterDir = 0; // West (startX - 1, startY) is guaranteed outside
+  let firstNextX = -1;
+  let firstNextY = -1;
+  const maxSteps = Math.min(250_000, (bounds.width + 2) * (bounds.height + 2) * 4);
+
+  for (let step = 0; step < maxSteps; step++) {
+    let foundDir = -1;
+    let prevEmptyX = curX + MOORE_DIRS[enterDir][0];
+    let prevEmptyY = curY + MOORE_DIRS[enterDir][1];
+
+    for (let k = 1; k <= 8; k++) {
+      const d = (enterDir + k) & 7;
+      const nx = curX + MOORE_DIRS[d][0];
+      const ny = curY + MOORE_DIRS[d][1];
+      if (isInside(nx, ny)) {
+        foundDir = d;
+        break;
+      }
+      prevEmptyX = nx;
+      prevEmptyY = ny;
     }
-  }
-  const bottomY = bounds.y + bounds.height;
-  const lastRow = (bottomY - 1) * width;
-  let bFirstX = -1, bLastX = -1;
-  for (let x = bounds.x; x < bounds.x + bounds.width; x++) {
-    if (mask[lastRow + x] > 0) {
-      if (bFirstX === -1) bFirstX = x;
-      bLastX = x + 1;
+
+    if (foundDir === -1) {
+      return [
+        { x: startX, y: startY },
+        { x: startX + 1, y: startY },
+        { x: startX + 1, y: startY + 1 },
+        { x: startX, y: startY + 1 },
+      ];
     }
+
+    const nextX = curX + MOORE_DIRS[foundDir][0];
+    const nextY = curY + MOORE_DIRS[foundDir][1];
+    if (step === 0) {
+      firstNextX = nextX;
+      firstNextY = nextY;
+    } else if (curX === startX && curY === startY && nextX === firstNextX && nextY === firstNextY) {
+      break;
+    }
+
+    contour.push({ x: nextX + 0.5, y: nextY + 0.5 });
+
+    const odx = prevEmptyX - nextX;
+    const ody = prevEmptyY - nextY;
+    const nextEnter = odx >= -1 && odx <= 1 && ody >= -1 && ody <= 1
+      ? MOORE_DIR_LOOKUP[(ody + 1) * 3 + (odx + 1)]
+      : -1;
+    enterDir = nextEnter >= 0 ? nextEnter : (foundDir + 6) & 7;
+    curX = nextX;
+    curY = nextY;
   }
-  if (bFirstX !== -1) {
-    leftEdge.push({ x: bFirstX, y: bottomY });
-    rightEdge.push({ x: bLastX, y: bottomY });
+
+  let simplified = simplifyRdp(contour, 1.25);
+  let eps = 2.0;
+  while (simplified.length > 250 && eps <= 16) {
+    simplified = simplifyRdp(contour, eps);
+    eps *= 1.5;
   }
-  const poly = [...rightEdge, ...leftEdge.reverse()];
-  return poly.length >= 3 ? poly.slice(0, 256) : [
+  const rounded = simplified.slice(0, 256).map(p => ({
+    x: Math.round(p.x * 100) / 100,
+    y: Math.round(p.y * 100) / 100,
+  }));
+
+  if (rounded.length >= 3) return rounded;
+  return [
     { x: bounds.x, y: bounds.y },
     { x: bounds.x + bounds.width, y: bounds.y },
     { x: bounds.x + bounds.width, y: bounds.y + bounds.height },

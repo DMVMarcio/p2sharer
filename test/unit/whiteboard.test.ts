@@ -3,9 +3,10 @@ import test from 'node:test';
 import * as Y from 'yjs';
 import { WhiteboardModel } from '../../src/apps/whiteboard_model.ts';
 import { encodeUpdate } from '../../src/apps/models.ts';
-import { boardSvg, brushPath, shapeBounds, hitBoardShape, hitBoardLayer, boardBrushWidth, DEFAULT_BOARD_LAYER, parseBoardFile, hasVariablePressure, expandSymmetryPointLists, type BoardShape } from '../../src/apps/whiteboard_scene.ts';
+import { BOARD_BRUSH_TYPES, boardSvg, brushPath, shapeBounds, hitBoardShape, hitBoardLayer, boardBrushWidth, DEFAULT_BOARD_LAYER, parseBoardFile, hasVariablePressure, expandSymmetryPointLists, type BoardShape } from '../../src/apps/whiteboard_scene.ts';
 import { BOARD_WIDTH, BOARD_HEIGHT, BrushStabilizer, boardContains, clampBoardPoint, clampBoardViewport, containBoardShape, resizeBoardBounds } from '../../src/apps/whiteboard_interaction.ts';
 import { polygonToMask, invertSelectionMask, selectionMaskToPolygon } from '../../src/apps/whiteboard_raster.ts';
+import { BRUSH_STUDIO_PRESETS, getPencilPaperGrain, getWatercolorPaperGrain } from '../../src/apps/whiteboard_brushes.ts';
 
 function shape(overrides: Partial<BoardShape> = {}): BoardShape {
   return { id: crypto.randomUUID(), tool: 'rectangle', points: [{ x: 10, y: 20 }, { x: 110, y: 120 }],
@@ -378,4 +379,38 @@ test('model caches shapes, layers, and serialized content across reads and inval
     assert.equal(hitBoardShape(stroke, { x: 10, y: 10 }, 4), false);
     assert.equal(hitBoardShape(stroke, { x: 150, y: 118 }, 4), true);
   } finally { a.model.destroy(); }
+});
+
+test('studio brush presets, paper grain textures, and concave Magic Wand contour tracing behave accurately', () => {
+  for (const brushType of BOARD_BRUSH_TYPES) {
+    const preset = BRUSH_STUDIO_PRESETS[brushType];
+    assert.ok(preset, `Preset exists for ${brushType}`);
+    assert.ok(preset.opacity >= 1 && preset.opacity <= 100);
+    assert.ok(preset.flow >= 1 && preset.flow <= 100);
+    assert.ok(preset.hardness >= 0 && preset.hardness <= 100);
+    assert.ok(preset.spacing >= 1 && preset.spacing <= 100);
+  }
+
+  const pencilGrain = getPencilPaperGrain();
+  const wcGrain = getWatercolorPaperGrain();
+  assert.equal(pencilGrain.length, 256 * 256);
+  assert.equal(wcGrain.length, 256 * 256);
+  assert.equal(getPencilPaperGrain(), pencilGrain);
+  assert.equal(getWatercolorPaperGrain(), wcGrain);
+
+  // Concave L-shape mask: contour polygon must stay outside the empty top-right concavity (45, 15)
+  const w = 64, h = 64;
+  const mask = new Uint8Array(w * h);
+  for (let y = 10; y < 50; y++) {
+    for (let x = 10; x < 24; x++) mask[y * w + x] = 255;
+  }
+  for (let y = 36; y < 50; y++) {
+    for (let x = 24; x < 54; x++) mask[y * w + x] = 255;
+  }
+  const poly = selectionMaskToPolygon(mask, w, h);
+  assert.ok(poly.length >= 6 && poly.length <= 256);
+  const reRaster = polygonToMask(poly, w, h);
+  assert.equal(reRaster[42 * w + 42], 255, 'Bottom arm of L-shape is inside traced contour');
+  assert.equal(reRaster[18 * w + 16], 255, 'Vertical arm of L-shape is inside traced contour');
+  assert.equal(reRaster[15 * w + 45], 0, 'Empty concavity is NOT bridged across by contour');
 });

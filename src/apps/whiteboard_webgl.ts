@@ -807,6 +807,25 @@ export class WhiteboardStudioCompositor {
     return this.rasterizer.drawLayerThumbnail(layerId, targetCanvas, layers, shapes, boardWidth, boardHeight);
   }
 
+  getLayerPixelData(
+    layerId: string,
+    layers: readonly BoardLayer[],
+    shapes: readonly BoardShape[],
+    boardWidth: number,
+    boardHeight: number,
+  ): Uint8ClampedArray | null {
+    return this.rasterizer.getLayerPixelData(layerId, layers, shapes, boardWidth, boardHeight);
+  }
+
+  getCompositePixelData(
+    layers: readonly BoardLayer[],
+    shapes: readonly BoardShape[],
+    boardWidth: number,
+    boardHeight: number,
+  ): Uint8ClampedArray | null {
+    return this.rasterizer.getCompositePixelData(layers, shapes, boardWidth, boardHeight);
+  }
+
   samplePatch(
     centerX: number,
     centerY: number,

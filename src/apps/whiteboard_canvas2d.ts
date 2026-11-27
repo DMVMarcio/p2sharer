@@ -1,10 +1,11 @@
 import {
-  boardLayerBounds, brushHitPoints, brushProfile, chiselMarkerPath, DEFAULT_BOARD_LAYER,
-  expandSymmetryPointLists, gPenCalligraphicPath, shapeOpacity,
-  type BoardBlendMode, type BoardBrushType, type BoardLayer, type BoardPoint, type BoardShape,
+  boardLayerBounds, brushHitPoints, brushProfile, DEFAULT_BOARD_LAYER,
+  expandSymmetryPointLists, shapeOpacity,
+  type BoardBlendMode, type BoardLayer, type BoardPoint, type BoardShape,
 } from './whiteboard_scene';
 import type { BoardBox } from './whiteboard_interaction';
-import { computeFloodMask, parseHexRgb } from './whiteboard_raster';
+import { computeFloodMask, parseHexRgb, polygonToMask } from './whiteboard_raster';
+import { applySurfaceTransfer, BrushTipLibrary } from './whiteboard_brushes';
 
 export interface DirtyRect {
   x: number;
@@ -52,10 +53,14 @@ interface LiveStrokeSession {
   alphaLock: boolean;
   finalizedEndIdx: number;
   residuals: number[];
+  dabCounts: number[];
+  arcLengths: number[];
+  pixelCells: Array<{ gx: number; gy: number } | null>;
+  carryCanvases: HTMLCanvasElement[];
   dirtyRect: DirtyRect | null;
   tipRect: DirtyRect | null;
   lastOpacity: number;
-  incremental: boolean;
+  mode: 'stamp' | 'pixel' | 'smudge' | 'blur';
 }
 
 function unionRects(a: DirtyRect | null, b: DirtyRect | null): DirtyRect | null {
@@ -88,10 +93,33 @@ function liveSessionSignature(s: BoardShape, alphaLock: boolean): string {
   return `${s.tool}:${s.brushType ?? ''}:${s.color}:${s.width}:${s.flow ?? ''}:${s.hardness ?? ''}:${s.spacing ?? ''}:${s.symmetry ?? ''}:${s.smoothing ?? 0}:${s.pressureSize !== false ? 1 : 0}:${s.pressureOpacity !== false ? 1 : 0}:${alphaLock ? 1 : 0}:${clipLen}:${s.x}:${s.y}:${s.scaleX ?? 1}:${s.scaleY ?? 1}`;
 }
 
-function isIncrementalStampShape(s: BoardShape): boolean {
-  if (s.tool === 'eraser') return true;
-  if (s.tool !== 'brush') return false;
-  return s.brushType !== 'pen' && s.brushType !== 'marker' && s.brushType !== 'smudge' && s.brushType !== 'blur';
+function getLiveStrokeMode(s: BoardShape): LiveStrokeSession['mode'] | null {
+  if (s.tool === 'eraser') return 'stamp';
+  if (s.tool !== 'brush') return null;
+  if (s.brushType === 'pixel') return 'pixel';
+  if (s.brushType === 'smudge') return 'smudge';
+  if (s.brushType === 'blur') return 'blur';
+  return 'stamp';
+}
+
+function copyPatchClamped(
+  srcCanvas: HTMLCanvasElement,
+  centerX: number,
+  centerY: number,
+  size: number,
+  dstCtx: CanvasRenderingContext2D,
+): void {
+  dstCtx.clearRect(0, 0, size, size);
+  const sx0 = centerX - size / 2;
+  const sy0 = centerY - size / 2;
+  const cx0 = Math.max(0, sx0);
+  const cy0 = Math.max(0, sy0);
+  const cx1 = Math.min(srcCanvas.width, sx0 + size);
+  const cy1 = Math.min(srcCanvas.height, sy0 + size);
+  const cw = cx1 - cx0;
+  const ch = cy1 - cy0;
+  if (cw <= 0 || ch <= 0) return;
+  dstCtx.drawImage(srcCanvas, cx0, cy0, cw, ch, cx0 - sx0, cy0 - sy0, cw, ch);
 }
 
 function buildFinalizedSegments(
@@ -176,13 +204,33 @@ function buildTailSegment(points: readonly BoardPoint[], smoothing: boolean, has
   return result;
 }
 
+function applyClipPolygon(
+  ctx: CanvasRenderingContext2D,
+  clipPolygon: readonly BoardPoint[] | undefined,
+  tx: number,
+  ty: number,
+  sx: number,
+  sy: number,
+): void {
+  if (!clipPolygon?.length) return;
+  ctx.beginPath();
+  clipPolygon.forEach((p, idx) => {
+    const px = tx + p.x * sx, py = ty + p.y * sy;
+    if (idx === 0) ctx.moveTo(px, py);
+    else ctx.lineTo(px, py);
+  });
+  ctx.closePath();
+  ctx.clip('evenodd');
+}
+
 /**
  * Per-layer offscreen 2D rasterizer and incremental brush engine for Whiteboard.
  * Maintains exact-resolution offscreen layer canvases, incremental live stroke
- * buffers, dirty rectangles, thumbnail generation, and pixel sampling.
+ * buffers for all brush types, dirty rectangles, thumbnail generation, and pixel sampling.
  */
 export class WhiteboardCanvas2DRenderer {
   private layerCache = new Map<string, LayerCanvasEntry>();
+  private tipLib = new BrushTipLibrary();
   private scratchCanvas: HTMLCanvasElement | null = null;
   private scratchCtx: CanvasRenderingContext2D | null = null;
   private scratchVersion = 0;
@@ -190,11 +238,18 @@ export class WhiteboardCanvas2DRenderer {
   private strokeCtx: CanvasRenderingContext2D | null = null;
   private tipCanvas: HTMLCanvasElement | null = null;
   private tipCtx: CanvasRenderingContext2D | null = null;
+  private workCanvas: HTMLCanvasElement | null = null;
+  private workCtx: CanvasRenderingContext2D | null = null;
+  private pickupCanvas: HTMLCanvasElement | null = null;
+  private pickupCtx: CanvasRenderingContext2D | null = null;
+  private blurSrcCanvas: HTMLCanvasElement | null = null;
+  private blurSrcCtx: CanvasRenderingContext2D | null = null;
+  private blurDstCanvas: HTMLCanvasElement | null = null;
+  private blurDstCtx: CanvasRenderingContext2D | null = null;
   private sampleCanvas: HTMLCanvasElement | null = null;
   private sampleCtx: CanvasRenderingContext2D | null = null;
   private sampleMaskCanvas: HTMLCanvasElement | null = null;
   private sampleMaskCtx: CanvasRenderingContext2D | null = null;
-  private tipCache = new Map<string, HTMLCanvasElement>();
   private imageElements = new Map<string, HTMLImageElement>();
   private unsupportedCanvas = new WeakSet<HTMLCanvasElement>();
   private liveSession: LiveStrokeSession | null = null;
@@ -246,6 +301,62 @@ export class WhiteboardCanvas2DRenderer {
     return { canvas: this.tipCanvas, ctx: this.tipCtx };
   }
 
+  private ensureWorkPatch(diam: number): {
+    workCanvas: HTMLCanvasElement;
+    workCtx: CanvasRenderingContext2D;
+    pickupCanvas: HTMLCanvasElement;
+    pickupCtx: CanvasRenderingContext2D;
+  } | null {
+    if (typeof document === 'undefined') return null;
+    if (!this.workCanvas || this.workCanvas.width !== diam || this.workCanvas.height !== diam) {
+      this.workCanvas = document.createElement('canvas');
+      this.workCanvas.width = diam;
+      this.workCanvas.height = diam;
+      this.workCtx = this.workCanvas.getContext('2d');
+    }
+    if (!this.pickupCanvas || this.pickupCanvas.width !== diam || this.pickupCanvas.height !== diam) {
+      this.pickupCanvas = document.createElement('canvas');
+      this.pickupCanvas.width = diam;
+      this.pickupCanvas.height = diam;
+      this.pickupCtx = this.pickupCanvas.getContext('2d');
+    }
+    if (!this.workCtx || !this.pickupCtx) return null;
+    return {
+      workCanvas: this.workCanvas,
+      workCtx: this.workCtx,
+      pickupCanvas: this.pickupCanvas,
+      pickupCtx: this.pickupCtx,
+    };
+  }
+
+  private ensureBlurPatch(patchSize: number): {
+    srcCanvas: HTMLCanvasElement;
+    srcCtx: CanvasRenderingContext2D;
+    dstCanvas: HTMLCanvasElement;
+    dstCtx: CanvasRenderingContext2D;
+  } | null {
+    if (typeof document === 'undefined') return null;
+    if (!this.blurSrcCanvas || this.blurSrcCanvas.width !== patchSize || this.blurSrcCanvas.height !== patchSize) {
+      this.blurSrcCanvas = document.createElement('canvas');
+      this.blurSrcCanvas.width = patchSize;
+      this.blurSrcCanvas.height = patchSize;
+      this.blurSrcCtx = this.blurSrcCanvas.getContext('2d');
+    }
+    if (!this.blurDstCanvas || this.blurDstCanvas.width !== patchSize || this.blurDstCanvas.height !== patchSize) {
+      this.blurDstCanvas = document.createElement('canvas');
+      this.blurDstCanvas.width = patchSize;
+      this.blurDstCanvas.height = patchSize;
+      this.blurDstCtx = this.blurDstCanvas.getContext('2d');
+    }
+    if (!this.blurSrcCtx || !this.blurDstCtx) return null;
+    return {
+      srcCanvas: this.blurSrcCanvas,
+      srcCtx: this.blurSrcCtx,
+      dstCanvas: this.blurDstCanvas,
+      dstCtx: this.blurDstCtx,
+    };
+  }
+
   registerImage(hash: string, img: HTMLImageElement): void {
     this.imageElements.set(hash, img);
     this.layerCache.clear();
@@ -253,79 +364,227 @@ export class WhiteboardCanvas2DRenderer {
     this.lastCompositeKey = '';
   }
 
-  private getBrushTipStamp(
-    color: string,
-    hardness01: number,
-    brushType: BoardBrushType | undefined,
-  ): HTMLCanvasElement {
-    const hKey = Math.round(hardness01 * 20) / 20;
-    const key = `${color}:${hKey}:${brushType ?? 'brush'}`;
-    const existing = this.tipCache.get(key);
-    if (existing) return existing;
+  private stepPixelSegment(
+    ctx: CanvasRenderingContext2D,
+    pts: readonly BoardPoint[],
+    cell: number,
+    prevCell: { gx: number; gy: number } | null,
+  ): { bounds: DirtyRect | null; lastCell: { gx: number; gy: number } | null } {
+    if (!pts.length) return { bounds: null, lastCell: prevCell };
+    ctx.save();
+    ctx.imageSmoothingEnabled = false;
+    let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+    const visited = new Set<number>();
+    const fillCell = (gx: number, gy: number) => {
+      const key = (gy + 16384) * 32768 + (gx + 16384);
+      if (visited.has(key)) return;
+      visited.add(key);
+      const rx = gx * cell - Math.floor(cell / 2);
+      const ry = gy * cell - Math.floor(cell / 2);
+      ctx.fillRect(rx, ry, cell, cell);
+      if (rx < minX) minX = rx;
+      if (ry < minY) minY = ry;
+      if (rx + cell > maxX) maxX = rx + cell;
+      if (ry + cell > maxY) maxY = ry + cell;
+    };
 
-    const size = 64;
-    const half = size / 2;
-    const tip = document.createElement('canvas');
-    tip.width = size;
-    tip.height = size;
-    const ctx = tip.getContext('2d')!;
-    const [r, g, b] = parseHexRgb(color);
+    let gx0 = prevCell ? prevCell.gx : Math.round(pts[0].x / cell);
+    let gy0 = prevCell ? prevCell.gy : Math.round(pts[0].y / cell);
+    if (!prevCell) fillCell(gx0, gy0);
 
-    if (brushType === 'marker') {
-      ctx.save();
-      ctx.translate(half, half);
-      ctx.rotate(-0.61);
-      ctx.fillStyle = `rgb(${r}, ${g}, ${b})`;
-      ctx.fillRect(-half * 0.85, -half * 0.28, size * 0.85, size * 0.28);
-      ctx.restore();
-    } else if (brushType === 'watercolor') {
-      const grad = ctx.createRadialGradient(half, half, 0, half, half, half);
-      grad.addColorStop(0, `rgba(${r}, ${g}, ${b}, 0.55)`);
-      grad.addColorStop(0.72, `rgba(${r}, ${g}, ${b}, 0.68)`);
-      grad.addColorStop(0.9, `rgba(${r}, ${g}, ${b}, 0.88)`);
-      grad.addColorStop(1, `rgba(${r}, ${g}, ${b}, 0)`);
-      ctx.fillStyle = grad;
-      ctx.fillRect(0, 0, size, size);
-    } else if (brushType === 'pencil') {
-      const imgData = ctx.createImageData(size, size);
-      const data = imgData.data;
-      for (let y = 0; y < size; y++) {
-        for (let x = 0; x < size; x++) {
-          const dx = (x + 0.5 - half) / half;
-          const dy = (y + 0.5 - half) / half;
-          const dist = Math.hypot(dx, dy);
-          if (dist > 1) continue;
-          const edge = dist > 0.75 ? (1 - dist) / 0.25 : 1;
-          const grain = 0.45 + 0.55 * Math.abs(Math.sin(x * 12.9898 + y * 78.233) * Math.cos(x * 4.1414 - y * 9.731));
-          const idx = (y * size + x) * 4;
-          data[idx] = r;
-          data[idx + 1] = g;
-          data[idx + 2] = b;
-          data[idx + 3] = Math.round(255 * edge * grain);
-        }
+    const startI = prevCell ? 0 : 1;
+    for (let i = startI; i < pts.length; i++) {
+      const gx1 = Math.round(pts[i].x / cell);
+      const gy1 = Math.round(pts[i].y / cell);
+      const dx = Math.abs(gx1 - gx0), stepX = gx0 < gx1 ? 1 : -1;
+      const dy = -Math.abs(gy1 - gy0), stepY = gy0 < gy1 ? 1 : -1;
+      let err = dx + dy;
+      while (true) {
+        fillCell(gx0, gy0);
+        if (gx0 === gx1 && gy0 === gy1) break;
+        const e2 = 2 * err;
+        if (e2 >= dy) { err += dy; gx0 += stepX; }
+        if (e2 <= dx) { err += dx; gy0 += stepY; }
       }
-      ctx.putImageData(imgData, 0, 0);
-    } else {
-      const effHardness = brushType === 'airbrush'
-        ? Math.min(0.15, hKey * 0.25)
-        : brushType === 'pen'
-          ? Math.max(0.88, hKey)
-          : Math.max(0.05, Math.min(0.98, hKey));
-      const grad = ctx.createRadialGradient(half, half, half * effHardness * 0.85, half, half, half);
-      grad.addColorStop(0, `rgba(${r}, ${g}, ${b}, 1)`);
-      grad.addColorStop(Math.max(0.01, effHardness), `rgba(${r}, ${g}, ${b}, 0.92)`);
-      grad.addColorStop(Math.min(0.99, effHardness + (1 - effHardness) * 0.55), `rgba(${r}, ${g}, ${b}, 0.35)`);
-      grad.addColorStop(1, `rgba(${r}, ${g}, ${b}, 0)`);
-      ctx.fillStyle = grad;
-      ctx.fillRect(0, 0, size, size);
+    }
+    ctx.restore();
+    const bounds = maxX >= minX
+      ? clampRect({ x: minX - 1, y: minY - 1, w: maxX - minX + 2, h: maxY - minY + 2 }, ctx.canvas.width, ctx.canvas.height)
+      : null;
+    return { bounds, lastCell: { gx: gx0, gy: gy0 } };
+  }
+
+  private stepSmudgeSegment(
+    targetCtx: CanvasRenderingContext2D,
+    targetCanvas: HTMLCanvasElement,
+    carryCanvas: HTMLCanvasElement,
+    interp: readonly BoardPoint[],
+    s: BoardShape,
+    rad: number,
+    diam: number,
+    stepDist: number,
+    pickupWeight: number,
+    depositAlpha: number,
+    softMask: HTMLCanvasElement,
+    alphaLock: boolean,
+    tx: number,
+    ty: number,
+    sx: number,
+    sy: number,
+    initialResidual = 0,
+    initializeCarry = true,
+  ): { bounds: DirtyRect | null; residual: number } {
+    if (!interp.length) return { bounds: null, residual: initialResidual };
+    const carryCtx = carryCanvas.getContext('2d');
+    const patches = this.ensureWorkPatch(diam);
+    if (!carryCtx || !patches) return { bounds: null, residual: initialResidual };
+    const { workCanvas, workCtx, pickupCanvas, pickupCtx } = patches;
+
+    let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+
+    if (initializeCarry) {
+      copyPatchClamped(targetCanvas, interp[0].x, interp[0].y, diam, carryCtx);
     }
 
-    if (this.tipCache.size > 64) {
-      const oldest = this.tipCache.keys().next().value;
-      if (oldest) this.tipCache.delete(oldest);
+    targetCtx.save();
+    applyClipPolygon(targetCtx, s.clipPolygon, tx, ty, sx, sy);
+    if (alphaLock) {
+      targetCtx.globalCompositeOperation = 'source-atop';
     }
-    this.tipCache.set(key, tip);
-    return tip;
+
+    const applyDab = (nx: number, ny: number) => {
+      // 1. Sample underlying canvas at (nx, ny) into pickupCanvas and blend into carryCanvas
+      copyPatchClamped(targetCanvas, nx, ny, diam, pickupCtx);
+      carryCtx.save();
+      carryCtx.globalCompositeOperation = 'destination-out';
+      carryCtx.globalAlpha = pickupWeight * 0.25;
+      carryCtx.fillRect(0, 0, diam, diam);
+      carryCtx.globalCompositeOperation = 'source-over';
+      carryCtx.globalAlpha = pickupWeight;
+      carryCtx.drawImage(pickupCanvas, 0, 0);
+      carryCtx.restore();
+
+      // 2. Apply smooth radial feather mask (zero hard circle edges)
+      workCtx.clearRect(0, 0, diam, diam);
+      workCtx.globalCompositeOperation = 'source-over';
+      workCtx.drawImage(carryCanvas, 0, 0);
+      workCtx.globalCompositeOperation = 'destination-in';
+      workCtx.drawImage(softMask, 0, 0, diam, diam);
+      workCtx.globalCompositeOperation = 'source-over';
+
+      // 3. Deposit smudged paint smoothly onto target layer
+      targetCtx.globalAlpha = depositAlpha;
+      targetCtx.drawImage(workCanvas, nx - rad, ny - rad);
+
+      if (nx - rad < minX) minX = nx - rad;
+      if (ny - rad < minY) minY = ny - rad;
+      if (nx + rad > maxX) maxX = nx + rad;
+      if (ny + rad > maxY) maxY = ny + rad;
+    };
+
+    let residual = initialResidual;
+    for (let i = 1; i < interp.length; i++) {
+      const a = interp[i - 1], b = interp[i];
+      const segLen = Math.hypot(b.x - a.x, b.y - a.y);
+      if (segLen < 1e-4) continue;
+      let d = stepDist - residual;
+      while (d <= segLen) {
+        const t = d / segLen;
+        applyDab(a.x + (b.x - a.x) * t, a.y + (b.y - a.y) * t);
+        d += stepDist;
+      }
+      residual = segLen - (d - stepDist);
+    }
+
+    targetCtx.restore();
+    const bounds = maxX >= minX
+      ? clampRect({ x: minX - 2, y: minY - 2, w: maxX - minX + 4, h: maxY - minY + 4 }, targetCanvas.width, targetCanvas.height)
+      : null;
+    return { bounds, residual };
+  }
+
+  private stepBlurSegment(
+    targetCtx: CanvasRenderingContext2D,
+    targetCanvas: HTMLCanvasElement,
+    interp: readonly BoardPoint[],
+    s: BoardShape,
+    rad: number,
+    diam: number,
+    blurPx: number,
+    pad: number,
+    stepDist: number,
+    dabAlpha: number,
+    softMask: HTMLCanvasElement,
+    alphaLock: boolean,
+    tx: number,
+    ty: number,
+    sx: number,
+    sy: number,
+    initialResidual = 0,
+    stampStart = true,
+  ): { bounds: DirtyRect | null; residual: number } {
+    if (!interp.length) return { bounds: null, residual: initialResidual };
+    const patchSize = diam + pad * 2;
+    const blurBuf = this.ensureBlurPatch(patchSize);
+    const workBuf = this.ensureWorkPatch(diam);
+    if (!blurBuf || !workBuf) return { bounds: null, residual: initialResidual };
+    const { srcCanvas, srcCtx, dstCanvas, dstCtx } = blurBuf;
+    const { workCanvas, workCtx } = workBuf;
+
+    let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+
+    targetCtx.save();
+    applyClipPolygon(targetCtx, s.clipPolygon, tx, ty, sx, sy);
+    if (alphaLock) {
+      targetCtx.globalCompositeOperation = 'source-atop';
+    }
+
+    const applyDab = (nx: number, ny: number) => {
+      copyPatchClamped(targetCanvas, nx, ny, patchSize, srcCtx);
+      dstCtx.clearRect(0, 0, patchSize, patchSize);
+      dstCtx.save();
+      dstCtx.filter = `blur(${blurPx}px)`;
+      dstCtx.drawImage(srcCanvas, 0, 0);
+      dstCtx.restore();
+
+      workCtx.clearRect(0, 0, diam, diam);
+      workCtx.globalCompositeOperation = 'source-over';
+      workCtx.drawImage(dstCanvas, pad, pad, diam, diam, 0, 0, diam, diam);
+      workCtx.globalCompositeOperation = 'destination-in';
+      workCtx.drawImage(softMask, 0, 0, diam, diam);
+      workCtx.globalCompositeOperation = 'source-over';
+
+      targetCtx.globalAlpha = dabAlpha;
+      targetCtx.drawImage(workCanvas, nx - rad, ny - rad);
+
+      if (nx - rad < minX) minX = nx - rad;
+      if (ny - rad < minY) minY = ny - rad;
+      if (nx + rad > maxX) maxX = nx + rad;
+      if (ny + rad > maxY) maxY = ny + rad;
+    };
+
+    if (stampStart) {
+      applyDab(interp[0].x, interp[0].y);
+    }
+    let residual = initialResidual;
+    for (let i = 1; i < interp.length; i++) {
+      const a = interp[i - 1], b = interp[i];
+      const segLen = Math.hypot(b.x - a.x, b.y - a.y);
+      if (segLen < 1e-4) continue;
+      let d = stepDist - residual;
+      while (d <= segLen) {
+        const t = d / segLen;
+        applyDab(a.x + (b.x - a.x) * t, a.y + (b.y - a.y) * t);
+        d += stepDist;
+      }
+      residual = segLen - (d - stepDist);
+    }
+
+    targetCtx.restore();
+    const bounds = maxX >= minX
+      ? clampRect({ x: minX - 2, y: minY - 2, w: maxX - minX + 4, h: maxY - minY + 4 }, targetCanvas.width, targetCanvas.height)
+      : null;
+    return { bounds, residual };
   }
 
   private renderShapeOntoLayerCtx(
@@ -338,25 +597,16 @@ export class WhiteboardCanvas2DRenderer {
     height: number,
     alphaLock: boolean,
     clearStrokeRect?: DirtyRect | null,
+    getCompositeSample?: () => Uint8ClampedArray | null,
   ): DirtyRect | null {
     if (s.hidden) return null;
     const opacity = shapeOpacity(s);
     const sx = s.scaleX ?? 1, sy = s.scaleY ?? 1;
     const tx = s.x ?? 0, ty = s.y ?? 0;
 
-    layerCtx.save();
-    if (s.clipPolygon?.length) {
-      layerCtx.beginPath();
-      s.clipPolygon.forEach((p, idx) => {
-        const px = tx + p.x * sx, py = ty + p.y * sy;
-        if (idx === 0) layerCtx.moveTo(px, py);
-        else layerCtx.lineTo(px, py);
-      });
-      layerCtx.closePath();
-      layerCtx.clip('evenodd');
-    }
-
     if (s.tool === 'clear') {
+      layerCtx.save();
+      applyClipPolygon(layerCtx, s.clipPolygon, tx, ty, sx, sy);
       layerCtx.globalCompositeOperation = 'destination-out';
       layerCtx.fillStyle = '#000000';
       if (s.clipPolygon?.length) {
@@ -368,16 +618,15 @@ export class WhiteboardCanvas2DRenderer {
       return { x: 0, y: 0, w: width, h: height };
     }
 
-    if (alphaLock) {
-      layerCtx.globalCompositeOperation = 'source-atop';
-    }
-
     const [a, b = a] = s.points;
 
     if (s.tool === 'bucket') {
-      layerCtx.globalAlpha = opacity;
-      layerCtx.fillStyle = s.color;
-      if (s.clipPolygon?.length) {
+      // Fill Selection button (has clipPolygon and no fillTolerance) or explicit 2-point rect bucket
+      if (s.fillTolerance === undefined && s.clipPolygon?.length) {
+        layerCtx.save();
+        if (alphaLock) layerCtx.globalCompositeOperation = 'source-atop';
+        layerCtx.globalAlpha = opacity;
+        layerCtx.fillStyle = s.color;
         layerCtx.beginPath();
         s.clipPolygon.forEach((p, idx) => {
           const px = tx + p.x * sx, py = ty + p.y * sy;
@@ -386,49 +635,103 @@ export class WhiteboardCanvas2DRenderer {
         });
         layerCtx.closePath();
         layerCtx.fill('evenodd');
-      } else if (s.points.length === 2) {
+        layerCtx.restore();
+        return { x: 0, y: 0, w: width, h: height };
+      }
+      if (s.points.length === 2 && !s.clipPolygon?.length) {
+        layerCtx.save();
+        if (alphaLock) layerCtx.globalCompositeOperation = 'source-atop';
+        layerCtx.globalAlpha = opacity;
+        layerCtx.fillStyle = s.color;
         const x0 = tx + Math.min(a.x, b.x) * sx;
         const y0 = ty + Math.min(a.y, b.y) * sy;
         layerCtx.fillRect(x0, y0, Math.abs(b.x - a.x) * sx, Math.abs(b.y - a.y) * sy);
-      } else {
-        try {
-          const imgData = layerCtx.getImageData(0, 0, width, height);
-          const seedX = tx + a.x * sx, seedY = ty + a.y * sy;
-          const mask = computeFloodMask(
-            imgData.data,
-            width,
-            height,
-            seedX,
-            seedY,
-            s.fillTolerance ?? 32,
-            s.fillContiguous !== false,
-            s.fillExpand ?? 0,
-          );
-          const [cr, cg, cb] = parseHexRgb(s.color);
-          const fillAlpha = Math.round(opacity * 255);
-          const data = imgData.data;
-          for (let i = 0; i < width * height; i++) {
-            if (mask[i] > 0) {
-              const idx4 = i * 4;
-              if (alphaLock && data[idx4 + 3] === 0) continue;
-              const sA = fillAlpha / 255;
-              const dA = data[idx4 + 3] / 255;
-              const outA = sA + dA * (1 - sA);
-              if (outA > 0) {
-                data[idx4] = Math.round((cr * sA + data[idx4] * dA * (1 - sA)) / outA);
-                data[idx4 + 1] = Math.round((cg * sA + data[idx4 + 1] * dA * (1 - sA)) / outA);
-                data[idx4 + 2] = Math.round((cb * sA + data[idx4 + 2] * dA * (1 - sA)) / outA);
-                data[idx4 + 3] = alphaLock ? data[idx4 + 3] : Math.round(outA * 255);
+        layerCtx.restore();
+        return clampRect({ x: x0 - 1, y: y0 - 1, w: Math.abs(b.x - a.x) * sx + 2, h: Math.abs(b.y - a.y) * sy + 2 }, width, height);
+      }
+
+      // True pixel flood fill against real rendered pixels (supports active selection clipPolygon & fillSample='all')
+      try {
+        const imgData = layerCtx.getImageData(0, 0, width, height);
+        const sampleData = s.fillSample === 'all' && getCompositeSample
+          ? (getCompositeSample() ?? imgData.data)
+          : imgData.data;
+        const clipMask = s.clipPolygon?.length
+          ? polygonToMask(s.clipPolygon.map(p => ({ x: tx + p.x * sx, y: ty + p.y * sy })), width, height)
+          : null;
+        const seedX = tx + a.x * sx;
+        const seedY = ty + a.y * sy;
+        const mask = computeFloodMask(
+          sampleData,
+          width,
+          height,
+          seedX,
+          seedY,
+          s.fillTolerance ?? 32,
+          s.fillContiguous !== false,
+          s.fillExpand ?? 0,
+          clipMask,
+        );
+        const [cr, cg, cb] = parseHexRgb(s.color);
+        const antiAlias = s.fillAntiAlias !== false;
+        const data = imgData.data;
+        let minX = width, minY = height, maxX = -1, maxY = -1;
+        for (let y = 0; y < height; y++) {
+          const row = y * width;
+          for (let x = 0; x < width; x++) {
+            const i = row + x;
+            let m = mask[i];
+            if (m === 0 && antiAlias) {
+              let neighbors = 0;
+              if (x > 0 && mask[i - 1] > 0) neighbors++;
+              if (x < width - 1 && mask[i + 1] > 0) neighbors++;
+              if (y > 0 && mask[i - width] > 0) neighbors++;
+              if (y < height - 1 && mask[i + width] > 0) neighbors++;
+              if (neighbors >= 2 && (!clipMask || clipMask[i] > 0)) {
+                m = neighbors * 52;
               }
             }
+            if (m > 0) {
+              const idx4 = i * 4;
+              if (alphaLock && data[idx4 + 3] === 0) continue;
+              const sA = opacity * (m / 255);
+              if (alphaLock) {
+                data[idx4] = Math.round(data[idx4] * (1 - sA) + cr * sA);
+                data[idx4 + 1] = Math.round(data[idx4 + 1] * (1 - sA) + cg * sA);
+                data[idx4 + 2] = Math.round(data[idx4 + 2] * (1 - sA) + cb * sA);
+              } else {
+                const dA = data[idx4 + 3] / 255;
+                const outA = sA + dA * (1 - sA);
+                if (outA > 0) {
+                  data[idx4] = Math.round((cr * sA + data[idx4] * dA * (1 - sA)) / outA);
+                  data[idx4 + 1] = Math.round((cg * sA + data[idx4 + 1] * dA * (1 - sA)) / outA);
+                  data[idx4 + 2] = Math.round((cb * sA + data[idx4 + 2] * dA * (1 - sA)) / outA);
+                  data[idx4 + 3] = Math.round(outA * 255);
+                }
+              }
+              if (x < minX) minX = x;
+              if (x > maxX) maxX = x;
+              if (y < minY) minY = y;
+              if (y > maxY) maxY = y;
+            }
           }
-          layerCtx.putImageData(imgData, 0, 0);
-        } catch {
-          layerCtx.fillRect(0, 0, width, height);
         }
+        layerCtx.putImageData(imgData, 0, 0);
+        return maxX >= minX ? { x: minX, y: minY, w: maxX - minX + 1, h: maxY - minY + 1 } : null;
+      } catch {
+        layerCtx.save();
+        layerCtx.globalAlpha = opacity;
+        layerCtx.fillStyle = s.color;
+        layerCtx.fillRect(0, 0, width, height);
+        layerCtx.restore();
+        return { x: 0, y: 0, w: width, h: height };
       }
-      layerCtx.restore();
-      return { x: 0, y: 0, w: width, h: height };
+    }
+
+    layerCtx.save();
+    applyClipPolygon(layerCtx, s.clipPolygon, tx, ty, sx, sy);
+    if (alphaLock) {
+      layerCtx.globalCompositeOperation = 'source-atop';
     }
 
     if (s.tool === 'gradient') {
@@ -529,6 +832,8 @@ export class WhiteboardCanvas2DRenderer {
       return clampRect({ x: x0, y: y0, w: Math.abs(bx - ax) + pad * 2, h: Math.abs(by - ay) + pad * 2 }, width, height);
     }
 
+    layerCtx.restore();
+
     // Brush & Eraser rendering on pixel canvas
     const mappedPoints = s.points.map(p => ({
       x: tx + p.x * sx,
@@ -541,228 +846,139 @@ export class WhiteboardCanvas2DRenderer {
     const scaleAvg = (sx + sy) / 2;
 
     if (s.tool === 'eraser') {
-      layerCtx.globalCompositeOperation = 'destination-out';
-      layerCtx.globalAlpha = opacity;
       const hardness01 = Math.max(0.05, Math.min(1, (s.hardness ?? 85) / 100));
-      let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
-      if (hardness01 >= 0.85 && !hasPressure) {
-        const lw = Math.max(1, s.width * scaleAvg);
-        const pad = lw / 2 + 2;
-        layerCtx.strokeStyle = '#000000';
-        layerCtx.lineWidth = lw;
-        layerCtx.lineCap = 'round';
-        layerCtx.lineJoin = 'round';
-        for (const pts of symmetryLists) {
-          layerCtx.beginPath();
-          pts.forEach((p, idx) => {
-            if (p.x - pad < minX) minX = p.x - pad;
-            if (p.y - pad < minY) minY = p.y - pad;
-            if (p.x + pad > maxX) maxX = p.x + pad;
-            if (p.y + pad > maxY) maxY = p.y + pad;
-            if (idx === 0) layerCtx.moveTo(p.x, p.y);
-            else layerCtx.lineTo(p.x, p.y);
-          });
-          if (pts.length === 1) layerCtx.lineTo(pts[0].x + 0.01, pts[0].y);
-          layerCtx.stroke();
-        }
-        layerCtx.restore();
-        return maxX >= minX ? clampRect({ x: minX, y: minY, w: maxX - minX, h: maxY - minY }, width, height) : null;
+      const tip = this.tipLib.getTip('#000000', hardness01, 'pen');
+      if (clearStrokeRect) {
+        strokeCtx.clearRect(clearStrokeRect.x, clearStrokeRect.y, clearStrokeRect.w, clearStrokeRect.h);
+      } else {
+        strokeCtx.clearRect(0, 0, width, height);
       }
-      const tip = this.getBrushTipStamp('#000000', hardness01, 'brush');
-      const bounds = this.stampStrokeLists(layerCtx, symmetryLists, s, tip, profile, hasPressure, scaleAvg, 1);
-      layerCtx.restore();
+      const bounds = this.stampStrokeLists(strokeCtx, symmetryLists, s, tip, profile, hasPressure, scaleAvg, 1);
+      if (bounds) {
+        layerCtx.save();
+        applyClipPolygon(layerCtx, s.clipPolygon, tx, ty, sx, sy);
+        layerCtx.globalCompositeOperation = 'destination-out';
+        layerCtx.globalAlpha = opacity;
+        layerCtx.drawImage(strokeCanvas, bounds.x, bounds.y, bounds.w, bounds.h, bounds.x, bounds.y, bounds.w, bounds.h);
+        layerCtx.restore();
+      }
       return bounds;
     }
 
-    // 1. Pixel Art Brush
     if (s.brushType === 'pixel') {
       const cell = Math.max(1, Math.round(s.width * scaleAvg));
+      layerCtx.save();
+      applyClipPolygon(layerCtx, s.clipPolygon, tx, ty, sx, sy);
+      if (alphaLock) layerCtx.globalCompositeOperation = 'source-atop';
       layerCtx.globalAlpha = opacity;
       layerCtx.fillStyle = s.color;
-      layerCtx.imageSmoothingEnabled = false;
-      let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+      let union: DirtyRect | null = null;
       for (const pts of symmetryLists) {
-        if (!pts.length) continue;
-        const visited = new Set<number>();
-        const fillCell = (gx: number, gy: number) => {
-          const key = (gy + 16384) * 32768 + (gx + 16384);
-          if (visited.has(key)) return;
-          visited.add(key);
-          const rx = gx * cell - Math.floor(cell / 2);
-          const ry = gy * cell - Math.floor(cell / 2);
-          layerCtx.fillRect(rx, ry, cell, cell);
-          if (rx < minX) minX = rx;
-          if (ry < minY) minY = ry;
-          if (rx + cell > maxX) maxX = rx + cell;
-          if (ry + cell > maxY) maxY = ry + cell;
-        };
-        let gx0 = Math.round(pts[0].x / cell);
-        let gy0 = Math.round(pts[0].y / cell);
-        fillCell(gx0, gy0);
-        for (let i = 1; i < pts.length; i++) {
-          const gx1 = Math.round(pts[i].x / cell);
-          const gy1 = Math.round(pts[i].y / cell);
-          const dx = Math.abs(gx1 - gx0), stepX = gx0 < gx1 ? 1 : -1;
-          const dy = -Math.abs(gy1 - gy0), stepY = gy0 < gy1 ? 1 : -1;
-          let err = dx + dy;
-          while (true) {
-            fillCell(gx0, gy0);
-            if (gx0 === gx1 && gy0 === gy1) break;
-            const e2 = 2 * err;
-            if (e2 >= dy) { err += dy; gx0 += stepX; }
-            if (e2 <= dx) { err += dx; gy0 += stepY; }
-          }
-        }
+        const { bounds } = this.stepPixelSegment(layerCtx, pts, cell, null);
+        union = unionRects(union, bounds);
       }
-      layerCtx.imageSmoothingEnabled = true;
       layerCtx.restore();
-      return maxX >= minX ? clampRect({ x: minX - 1, y: minY - 1, w: maxX - minX + 2, h: maxY - minY + 2 }, width, height) : null;
+      return union;
     }
 
-    // 2. Smudge Brush
     if (s.brushType === 'smudge') {
       const rad = Math.max(2, s.width * 0.55 * scaleAvg);
-      const diam = rad * 2;
-      const stepDist = Math.max(1.5, rad * 0.35);
-      const strength = Math.max(0.15, Math.min(0.85, ((s.flow ?? 65) / 100) * opacity));
-      let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+      const diam = Math.max(4, Math.ceil(rad * 2));
+      const stepDist = Math.max(1.2, rad * 0.22);
+      const hardness01 = Math.max(0.05, Math.min(1, (s.hardness ?? 30) / 100));
+      const flow01 = Math.max(0.05, Math.min(1, (s.flow ?? 68) / 100));
+      const carryWeight = 0.4 + 0.52 * flow01;
+      const pickupWeight = 1 - carryWeight;
+      const depositAlpha = Math.max(0.08, Math.min(0.95, opacity * (0.35 + 0.65 * flow01)));
+      const softMask = this.tipLib.getSoftMaskTip(hardness01);
+      let union: DirtyRect | null = null;
       for (const pts of symmetryLists) {
         const interp = brushHitPoints({ ...s, points: pts });
-        if (interp.length < 2) continue;
-        let prev = interp[0];
-        for (let i = 1; i < interp.length; i++) {
-          const cur = interp[i];
-          const seg = Math.hypot(cur.x - prev.x, cur.y - prev.y);
-          const steps = Math.max(1, Math.ceil(seg / stepDist));
-          for (let k = 1; k <= steps; k++) {
-            const t = k / steps;
-            const nx = prev.x + (cur.x - prev.x) * t;
-            const ny = prev.y + (cur.y - prev.y) * t;
-            const sx0 = Math.max(0, Math.min(width - diam, prev.x - rad));
-            const sy0 = Math.max(0, Math.min(height - diam, prev.y - rad));
-            layerCtx.save();
-            layerCtx.beginPath();
-            layerCtx.arc(nx, ny, rad, 0, Math.PI * 2);
-            layerCtx.clip();
-            layerCtx.globalAlpha = strength;
-            layerCtx.drawImage(layerCanvas, sx0, sy0, diam, diam, nx - rad, ny - rad, diam, diam);
-            layerCtx.restore();
-            if (nx - rad < minX) minX = nx - rad;
-            if (ny - rad < minY) minY = ny - rad;
-            if (nx + rad > maxX) maxX = nx + rad;
-            if (ny + rad > maxY) maxY = ny + rad;
-            prev = { x: nx, y: ny };
-          }
-        }
+        const carry = document.createElement('canvas');
+        carry.width = diam;
+        carry.height = diam;
+        const { bounds } = this.stepSmudgeSegment(
+          layerCtx,
+          layerCanvas,
+          carry,
+          interp,
+          s,
+          rad,
+          diam,
+          stepDist,
+          pickupWeight,
+          depositAlpha,
+          softMask,
+          alphaLock,
+          tx,
+          ty,
+          sx,
+          sy,
+          0,
+          true,
+        );
+        union = unionRects(union, bounds);
       }
-      layerCtx.restore();
-      return maxX >= minX ? clampRect({ x: minX - 2, y: minY - 2, w: maxX - minX + 4, h: maxY - minY + 4 }, width, height) : null;
+      return union;
     }
 
-    // 3. Blur Brush (region-scoped Gaussian blur + spaced dabs)
     if (s.brushType === 'blur') {
-      const rad = Math.max(3, s.width * 0.65 * scaleAvg);
-      const blurPx = Math.max(2, Math.round(rad * 0.45));
-      const pad = rad + blurPx * 3 + 4;
-      let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
-      for (const pts of symmetryLists) {
-        for (let i = 0; i < pts.length; i++) {
-          if (pts[i].x < minX) minX = pts[i].x;
-          if (pts[i].y < minY) minY = pts[i].y;
-          if (pts[i].x > maxX) maxX = pts[i].x;
-          if (pts[i].y > maxY) maxY = pts[i].y;
-        }
-      }
-      const region = clampRect({ x: minX - pad, y: minY - pad, w: maxX - minX + pad * 2, h: maxY - minY + pad * 2 }, width, height);
-      if (!region) {
-        layerCtx.restore();
-        return null;
-      }
-      strokeCtx.clearRect(region.x, region.y, region.w, region.h);
-      strokeCtx.save();
-      strokeCtx.beginPath();
-      strokeCtx.rect(region.x, region.y, region.w, region.h);
-      strokeCtx.clip();
-      strokeCtx.filter = `blur(${blurPx}px)`;
-      strokeCtx.drawImage(layerCanvas, region.x, region.y, region.w, region.h, region.x, region.y, region.w, region.h);
-      strokeCtx.restore();
-
-      const stepDist = Math.max(2, rad * 0.45);
-      const diam = rad * 2;
+      const rad = Math.max(3, s.width * 0.6 * scaleAvg);
+      const diam = Math.max(6, Math.ceil(rad * 2));
+      const hardness01 = Math.max(0.05, Math.min(1, (s.hardness ?? 25) / 100));
+      const flow01 = Math.max(0.05, Math.min(1, (s.flow ?? 60) / 100));
+      const blurPx = Math.max(1.5, Math.min(18, rad * 0.38 * (0.4 + 0.6 * flow01)));
+      const pad = Math.ceil(blurPx * 2.5) + 2;
+      const stepDist = Math.max(2, rad * 0.32);
+      const dabAlpha = Math.max(0.1, Math.min(0.9, opacity * flow01 * 0.72));
+      const softMask = this.tipLib.getSoftMaskTip(hardness01);
+      let union: DirtyRect | null = null;
       for (const pts of symmetryLists) {
         const interp = brushHitPoints({ ...s, points: pts });
-        if (!interp.length) continue;
-        let lastX = interp[0].x, lastY = interp[0].y;
-        const applyBlurDab = (px: number, py: number) => {
-          const sx0 = Math.max(0, px - rad);
-          const sy0 = Math.max(0, py - rad);
-          const sx1 = Math.min(width, px + rad);
-          const sy1 = Math.min(height, py + rad);
-          const sw = sx1 - sx0, sh = sy1 - sy0;
-          if (sw <= 0 || sh <= 0) return;
-          layerCtx.save();
-          layerCtx.beginPath();
-          layerCtx.arc(px, py, rad, 0, Math.PI * 2);
-          layerCtx.clip();
-          layerCtx.globalAlpha = opacity * 0.45;
-          layerCtx.drawImage(strokeCanvas, sx0, sy0, sw, sh, sx0, sy0, sw, sh);
-          layerCtx.restore();
-        };
-        applyBlurDab(lastX, lastY);
-        for (let i = 1; i < interp.length; i++) {
-          const cur = interp[i];
-          if (Math.hypot(cur.x - lastX, cur.y - lastY) >= stepDist) {
-            applyBlurDab(cur.x, cur.y);
-            lastX = cur.x;
-            lastY = cur.y;
-          }
-        }
+        const { bounds } = this.stepBlurSegment(
+          layerCtx,
+          layerCanvas,
+          interp,
+          s,
+          rad,
+          diam,
+          blurPx,
+          pad,
+          stepDist,
+          dabAlpha,
+          softMask,
+          alphaLock,
+          tx,
+          ty,
+          sx,
+          sy,
+          0,
+          true,
+        );
+        union = unionRects(union, bounds);
       }
-      void diam;
-      layerCtx.restore();
-      return region;
+      return union;
     }
 
-    // 4. G-Pen ('pen') & Chisel Marker ('marker') when Path2D is available
-    if ((s.brushType === 'pen' || s.brushType === 'marker') && typeof Path2D === 'function') {
-      layerCtx.save();
-      if (s.brushType === 'marker') {
-        layerCtx.globalCompositeOperation = alphaLock ? 'source-atop' : 'multiply';
-        layerCtx.globalAlpha = opacity * 0.72;
-      } else {
-        layerCtx.globalAlpha = opacity;
-      }
-      layerCtx.fillStyle = s.color;
-      let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
-      const pad = Math.max(4, s.width * scaleAvg);
-      for (const pts of symmetryLists) {
-        for (let i = 0; i < pts.length; i++) {
-          if (pts[i].x - pad < minX) minX = pts[i].x - pad;
-          if (pts[i].y - pad < minY) minY = pts[i].y - pad;
-          if (pts[i].x + pad > maxX) maxX = pts[i].x + pad;
-          if (pts[i].y + pad > maxY) maxY = pts[i].y + pad;
-        }
-        const sub: BoardShape = { ...s, points: pts, x: 0, y: 0, scaleX: 1, scaleY: 1, width: s.width * scaleAvg };
-        const d = s.brushType === 'marker' ? chiselMarkerPath(sub) : gPenCalligraphicPath(sub);
-        if (d) {
-          layerCtx.fill(new Path2D(d), 'nonzero');
-        }
-      }
-      layerCtx.restore();
-      layerCtx.restore();
-      return maxX >= minX ? clampRect({ x: minX, y: minY, w: maxX - minX, h: maxY - minY }, width, height) : null;
-    }
-
-    // 5. Stamp-based brushes: Pencil, Brush (Oil/Acrylic), Airbrush, Watercolor
+    // Stamp-based brushes (Pencil, Pen, Brush, Airbrush, Watercolor, Marker)
     const hardness01 = Math.max(0, Math.min(1, (s.hardness ?? profile.defaultHardness) / 100));
     const flow01 = Math.max(0.02, Math.min(1, (s.flow ?? profile.defaultFlow) / 100));
-    const tip = this.getBrushTipStamp(s.color, hardness01, s.brushType);
+    const tipColor = s.brushType === 'pencil' || s.brushType === 'watercolor' ? '#000000' : s.color;
+    const tip = this.tipLib.getTip(tipColor, hardness01, s.brushType);
 
     if (clearStrokeRect) {
       strokeCtx.clearRect(clearStrokeRect.x, clearStrokeRect.y, clearStrokeRect.w, clearStrokeRect.h);
     } else {
       strokeCtx.clearRect(0, 0, width, height);
     }
+    const dabAlphaBase = s.brushType === 'airbrush'
+      ? flow01 * 0.34
+      : s.brushType === 'watercolor'
+        ? flow01 * 0.55
+        : s.brushType === 'pencil'
+          ? flow01 * 0.78
+          : flow01;
+
     const bounds = this.stampStrokeLists(
       strokeCtx,
       symmetryLists,
@@ -771,29 +987,25 @@ export class WhiteboardCanvas2DRenderer {
       profile,
       hasPressure,
       scaleAvg,
-      s.brushType === 'airbrush' ? flow01 * 0.42 : s.brushType === 'watercolor' ? flow01 * 0.55 : flow01,
+      dabAlphaBase,
     );
 
     if (bounds) {
-      layerCtx.save();
-      if (s.brushType === 'watercolor' && !alphaLock) {
-        layerCtx.globalCompositeOperation = 'multiply';
-      }
-      layerCtx.globalAlpha = opacity;
-      layerCtx.drawImage(
-        strokeCanvas,
-        bounds.x,
-        bounds.y,
-        bounds.w,
-        bounds.h,
-        bounds.x,
-        bounds.y,
-        bounds.w,
-        bounds.h,
+      applySurfaceTransfer(
+        strokeCtx,
+        layerCtx,
+        bounds,
+        s.brushType,
+        s.color,
+        opacity,
+        alphaLock,
+        s.clipPolygon,
+        tx,
+        ty,
+        sx,
+        sy,
       );
-      layerCtx.restore();
     }
-    layerCtx.restore();
     return bounds;
   }
 
@@ -808,28 +1020,66 @@ export class WhiteboardCanvas2DRenderer {
     dabAlphaBase: number,
     initialResidual = 0,
     stampStart = true,
-  ): { bounds: DirtyRect | null; residual: number } {
-    if (!interp.length) return { bounds: null, residual: initialResidual };
+    initialDabCount = 0,
+    initialArcLen = 0,
+  ): { bounds: DirtyRect | null; residual: number; dabCount: number; arcLen: number } {
+    if (!interp.length) return { bounds: null, residual: initialResidual, dabCount: initialDabCount, arcLen: initialArcLen };
     const baseRadius = Math.max(0.75, profile.base * scaleAvg);
-    const spacingRatio = s.brushType === 'airbrush'
-      ? 0.14
-      : s.brushType === 'watercolor'
-        ? 0.16
-        : s.brushType === 'pencil'
-          ? 0.18
-          : Math.max(0.08, Math.min(0.5, (s.spacing ?? 14) / 100));
-    const stepDist = Math.max(0.6, baseRadius * 2 * spacingRatio);
-    let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+    const defaultSpacing = s.brushType === 'pen'
+      ? 0.06
+      : s.brushType === 'marker'
+        ? 0.07
+        : s.brushType === 'brush'
+          ? 0.09
+          : s.brushType === 'airbrush'
+            ? 0.1
+            : s.brushType === 'watercolor'
+              ? 0.12
+              : s.brushType === 'pencil'
+                ? 0.1
+                : 0.12;
+    const spacingRatio = s.spacing !== undefined
+      ? Math.max(0.04, Math.min(0.45, s.spacing / 100))
+      : defaultSpacing;
+    const stepDist = Math.max(0.55, baseRadius * 2 * spacingRatio);
+    const isBristleBrush = s.brushType === 'brush';
+    const hasJitterRot = s.brushType === 'pencil' || s.brushType === 'watercolor';
+    const isTaperedPen = s.brushType === 'pen' && !hasPressure;
+    const taperStartDist = Math.min(18, Math.max(6, baseRadius * 2.4));
 
-    const stampDab = (x: number, y: number, p: number) => {
+    let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+    let dabCount = initialDabCount;
+    let arcLen = initialArcLen;
+
+    const stampDab = (x: number, y: number, p: number, angle: number, curArc: number) => {
       const pVal = Math.max(0.05, Math.min(1, p));
-      const pScale = hasPressure && s.pressureSize !== false
+      let pScale = hasPressure && s.pressureSize !== false
         ? profile.min + (profile.max - profile.min) * Math.pow(pVal, profile.exp)
         : 1;
+      if (isTaperedPen && curArc < taperStartDist) {
+        pScale *= 0.48 + 0.52 * Math.sin((curArc / taperStartDist) * (Math.PI / 2));
+      }
       const r = Math.max(0.6, baseRadius * pScale * (s.brushType === 'airbrush' ? 1.35 : 1));
       const alpha = dabAlphaBase * (hasPressure && s.pressureOpacity !== false ? Math.pow(pVal, 0.85) : 1);
       ctx.globalAlpha = Math.max(0.02, Math.min(1, alpha));
-      ctx.drawImage(tip, x - r, y - r, r * 2, r * 2);
+
+      if (isBristleBrush) {
+        ctx.save();
+        ctx.translate(x, y);
+        ctx.rotate(angle);
+        ctx.drawImage(tip, -r, -r, r * 2, r * 2);
+        ctx.restore();
+      } else if (hasJitterRot) {
+        const jitter = ((dabCount * 2654435761) & 1023) * 0.00613592;
+        ctx.save();
+        ctx.translate(x, y);
+        ctx.rotate(jitter);
+        ctx.drawImage(tip, -r, -r, r * 2, r * 2);
+        ctx.restore();
+      } else {
+        ctx.drawImage(tip, x - r, y - r, r * 2, r * 2);
+      }
+      dabCount++;
       if (x - r < minX) minX = x - r;
       if (y - r < minY) minY = y - r;
       if (x + r > maxX) maxX = x + r;
@@ -837,29 +1087,40 @@ export class WhiteboardCanvas2DRenderer {
     };
 
     if (stampStart) {
-      stampDab(interp[0].x, interp[0].y, interp[0].p ?? 0.5);
+      const initAngle = interp.length > 1
+        ? Math.atan2(interp[1].y - interp[0].y, interp[1].x - interp[0].x)
+        : 0;
+      stampDab(interp[0].x, interp[0].y, interp[0].p ?? 0.5, initAngle, arcLen);
     }
+
     let residual = initialResidual;
     for (let i = 1; i < interp.length; i++) {
       const a = interp[i - 1], b = interp[i];
-      const segLen = Math.hypot(b.x - a.x, b.y - a.y);
+      const dx = b.x - a.x;
+      const dy = b.y - a.y;
+      const segLen = Math.hypot(dx, dy);
       if (segLen < 1e-4) continue;
+      const angle = Math.atan2(dy, dx);
       let d = stepDist - residual;
       while (d <= segLen) {
         const t = d / segLen;
         stampDab(
-          a.x + (b.x - a.x) * t,
-          a.y + (b.y - a.y) * t,
+          a.x + dx * t,
+          a.y + dy * t,
           (a.p ?? 0.5) + ((b.p ?? 0.5) - (a.p ?? 0.5)) * t,
+          angle,
+          arcLen + d,
         );
         d += stepDist;
       }
+      arcLen += segLen;
       residual = segLen - (d - stepDist);
     }
 
-    if (maxX < minX || maxY < minY) return { bounds: null, residual };
-    const bounds = clampRect({ x: minX - 2, y: minY - 2, w: maxX - minX + 4, h: maxY - minY + 4 }, ctx.canvas.width, ctx.canvas.height);
-    return { bounds, residual };
+    if (maxX < minX || maxY < minY) return { bounds: null, residual, dabCount, arcLen };
+    const pad = s.brushType === 'watercolor' ? 4 : 2;
+    const bounds = clampRect({ x: minX - pad, y: minY - pad, w: maxX - minX + pad * 2, h: maxY - minY + pad * 2 }, ctx.canvas.width, ctx.canvas.height);
+    return { bounds, residual, dabCount, arcLen };
   }
 
   private stampStrokeLists(
@@ -875,7 +1136,7 @@ export class WhiteboardCanvas2DRenderer {
     let union: DirtyRect | null = null;
     for (const pts of symmetryLists) {
       const interp = brushHitPoints({ ...s, points: pts });
-      const { bounds } = this.stampInterpolatedList(ctx, interp, s, tip, profile, hasPressure, scaleAvg, dabAlphaBase, 0, true);
+      const { bounds } = this.stampInterpolatedList(ctx, interp, s, tip, profile, hasPressure, scaleAvg, dabAlphaBase, 0, true, 0, 0);
       union = unionRects(union, bounds);
     }
     return union;
@@ -891,9 +1152,10 @@ export class WhiteboardCanvas2DRenderer {
     width: number,
     height: number,
     alphaLock: boolean,
+    getCompositeSample?: () => Uint8ClampedArray | null,
   ): DirtyRect | null {
     const sig = liveSessionSignature(d, alphaLock);
-    const canIncremental = isIncrementalStampShape(d);
+    const liveMode = getLiveStrokeMode(d);
     const sx = d.scaleX ?? 1, sy = d.scaleY ?? 1;
     const tx = d.x ?? 0, ty = d.y ?? 0;
     const scaleAvg = (sx + sy) / 2;
@@ -902,8 +1164,8 @@ export class WhiteboardCanvas2DRenderer {
     let session = this.liveSession;
     const matchesExisting = Boolean(
       session &&
-      canIncremental &&
-      session.incremental &&
+      liveMode !== null &&
+      session.mode === liveMode &&
       session.shapeId === d.id &&
       session.layerId === (d.layerId ?? DEFAULT_BOARD_LAYER) &&
       session.layerVersion === entry.version &&
@@ -911,8 +1173,8 @@ export class WhiteboardCanvas2DRenderer {
       d.points.length >= Math.max(1, session.finalizedEndIdx + 1),
     );
 
-    if (!session || !matchesExisting || !canIncremental) {
-      if (!canIncremental) {
+    if (!session || !matchesExisting || liveMode === null) {
+      if (liveMode === null) {
         this.liveSession = null;
         const approxBounds = this.estimateShapeDirtyRect(d, width, height);
         const clearRegion = unionRects(this.nonIncrementalPrevRect, approxBounds);
@@ -928,6 +1190,7 @@ export class WhiteboardCanvas2DRenderer {
           height,
           alphaLock,
           clearRegion,
+          getCompositeSample,
         );
         const dirty = unionRects(this.nonIncrementalPrevRect, nextRect);
         this.nonIncrementalPrevRect = nextRect;
@@ -940,6 +1203,17 @@ export class WhiteboardCanvas2DRenderer {
       scratchCtx.drawImage(entry.canvas, 0, 0);
       strokeCtx.clearRect(0, 0, width, height);
       const copyCount = expandSymmetryPointLists([{ x: 0, y: 0 }], d.symmetry, width / 2, height / 2).length;
+      const rad = Math.max(2, d.width * 0.55 * scaleAvg);
+      const diam = Math.max(4, Math.ceil(rad * 2));
+      const carryCanvases: HTMLCanvasElement[] = [];
+      if (liveMode === 'smudge') {
+        for (let c = 0; c < copyCount; c++) {
+          const cc = document.createElement('canvas');
+          cc.width = diam;
+          cc.height = diam;
+          carryCanvases.push(cc);
+        }
+      }
       session = {
         shapeId: d.id,
         layerId: d.layerId ?? DEFAULT_BOARD_LAYER,
@@ -948,10 +1222,14 @@ export class WhiteboardCanvas2DRenderer {
         alphaLock,
         finalizedEndIdx: -1,
         residuals: new Array(copyCount).fill(0),
+        dabCounts: new Array(copyCount).fill(0),
+        arcLengths: new Array(copyCount).fill(0),
+        pixelCells: new Array(copyCount).fill(null),
+        carryCanvases,
         dirtyRect: null,
         tipRect: null,
         lastOpacity: opacity,
-        incremental: true,
+        mode: liveMode,
       };
       this.liveSession = session;
     }
@@ -965,6 +1243,189 @@ export class WhiteboardCanvas2DRenderer {
     const hasPressure = d.points.some(p => p.p !== undefined);
     const profile = brushProfile(d, hasPressure);
     const hasSubdivide = Boolean(d.smoothing) || Boolean(d.brushType) || hasPressure;
+    const targetEndIdx = d.points.length - 1;
+
+    // 1. Incremental Pixel Art Brush
+    if (session.mode === 'pixel') {
+      const cell = Math.max(1, Math.round(d.width * scaleAvg));
+      strokeCtx.save();
+      strokeCtx.fillStyle = d.color;
+      let stepRect: DirtyRect | null = null;
+      if (d.points.length === 1 && session.finalizedEndIdx < 0) {
+        for (let c = 0; c < symmetryLists.length; c++) {
+          const { bounds, lastCell } = this.stepPixelSegment(strokeCtx, symmetryLists[c], cell, null);
+          session.pixelCells[c] = lastCell;
+          stepRect = unionRects(stepRect, bounds);
+        }
+        session.finalizedEndIdx = 0;
+        session.dirtyRect = unionRects(session.dirtyRect, stepRect);
+      } else if (d.points.length >= 2 && targetEndIdx > session.finalizedEndIdx) {
+        const fromIdx = Math.max(0, session.finalizedEndIdx);
+        for (let c = 0; c < symmetryLists.length; c++) {
+          const segPts = symmetryLists[c].slice(fromIdx, targetEndIdx + 1);
+          const { bounds, lastCell } = this.stepPixelSegment(strokeCtx, segPts, cell, session.pixelCells[c]);
+          session.pixelCells[c] = lastCell;
+          stepRect = unionRects(stepRect, bounds);
+        }
+        session.finalizedEndIdx = targetEndIdx;
+        session.dirtyRect = unionRects(session.dirtyRect, stepRect);
+      }
+      strokeCtx.restore();
+
+      const opacityChanged = Math.abs(opacity - session.lastOpacity) > 0.001;
+      session.lastOpacity = opacity;
+      const dirtyOnScratch = clampRect(opacityChanged ? session.dirtyRect : stepRect, width, height);
+      if (dirtyOnScratch) {
+        const { x, y, w, h } = dirtyOnScratch;
+        scratchCtx.save();
+        scratchCtx.beginPath();
+        scratchCtx.rect(x, y, w, h);
+        scratchCtx.clip();
+        scratchCtx.clearRect(x, y, w, h);
+        scratchCtx.drawImage(entry.canvas, x, y, w, h, x, y, w, h);
+        applyClipPolygon(scratchCtx, d.clipPolygon, tx, ty, sx, sy);
+        if (alphaLock) scratchCtx.globalCompositeOperation = 'source-atop';
+        scratchCtx.globalAlpha = opacity;
+        scratchCtx.drawImage(strokeCanvas, x, y, w, h, x, y, w, h);
+        scratchCtx.restore();
+      }
+      return dirtyOnScratch;
+    }
+
+    // 2. Incremental Pro Smudge Brush (mutates scratchCanvas directly per step!)
+    if (session.mode === 'smudge') {
+      const rad = Math.max(2, d.width * 0.55 * scaleAvg);
+      const diam = Math.max(4, Math.ceil(rad * 2));
+      const stepDist = Math.max(1.2, rad * 0.22);
+      const hardness01 = Math.max(0.05, Math.min(1, (d.hardness ?? 30) / 100));
+      const flow01 = Math.max(0.05, Math.min(1, (d.flow ?? 68) / 100));
+      const carryWeight = 0.4 + 0.52 * flow01;
+      const pickupWeight = 1 - carryWeight;
+      const depositAlpha = Math.max(0.08, Math.min(0.95, opacity * (0.35 + 0.65 * flow01)));
+      const softMask = this.tipLib.getSoftMaskTip(hardness01);
+
+      let stepRect: DirtyRect | null = null;
+      if (d.points.length === 1 && session.finalizedEndIdx < 0) {
+        for (let c = 0; c < symmetryLists.length; c++) {
+          const carryCtx = session.carryCanvases[c]?.getContext('2d');
+          if (carryCtx && symmetryLists[c].length) {
+            copyPatchClamped(scratchCanvas, symmetryLists[c][0].x, symmetryLists[c][0].y, diam, carryCtx);
+          }
+        }
+        session.finalizedEndIdx = 0;
+      } else if (d.points.length >= 2 && targetEndIdx > session.finalizedEndIdx) {
+        const fromIdx = Math.max(0, session.finalizedEndIdx);
+        const initializeCarry = session.finalizedEndIdx < 0;
+        for (let c = 0; c < symmetryLists.length; c++) {
+          const segPts = buildFinalizedSegments(symmetryLists[c], fromIdx, targetEndIdx, Boolean(d.smoothing), true);
+          const carry = session.carryCanvases[c];
+          if (segPts.length && carry) {
+            const { bounds, residual } = this.stepSmudgeSegment(
+              scratchCtx,
+              scratchCanvas,
+              carry,
+              segPts,
+              d,
+              rad,
+              diam,
+              stepDist,
+              pickupWeight,
+              depositAlpha,
+              softMask,
+              alphaLock,
+              tx,
+              ty,
+              sx,
+              sy,
+              session.residuals[c] ?? 0,
+              initializeCarry,
+            );
+            session.residuals[c] = residual;
+            stepRect = unionRects(stepRect, bounds);
+          }
+        }
+        session.finalizedEndIdx = targetEndIdx;
+        session.dirtyRect = unionRects(session.dirtyRect, stepRect);
+      }
+      return stepRect;
+    }
+
+    // 3. Incremental Pro Blur Brush (mutates scratchCanvas directly per step!)
+    if (session.mode === 'blur') {
+      const rad = Math.max(3, d.width * 0.6 * scaleAvg);
+      const diam = Math.max(6, Math.ceil(rad * 2));
+      const hardness01 = Math.max(0.05, Math.min(1, (d.hardness ?? 25) / 100));
+      const flow01 = Math.max(0.05, Math.min(1, (d.flow ?? 60) / 100));
+      const blurPx = Math.max(1.5, Math.min(18, rad * 0.38 * (0.4 + 0.6 * flow01)));
+      const pad = Math.ceil(blurPx * 2.5) + 2;
+      const stepDist = Math.max(2, rad * 0.32);
+      const dabAlpha = Math.max(0.1, Math.min(0.9, opacity * flow01 * 0.72));
+      const softMask = this.tipLib.getSoftMaskTip(hardness01);
+
+      let stepRect: DirtyRect | null = null;
+      if (d.points.length === 1 && session.finalizedEndIdx < 0) {
+        for (let c = 0; c < symmetryLists.length; c++) {
+          const { bounds } = this.stepBlurSegment(
+            scratchCtx,
+            scratchCanvas,
+            symmetryLists[c],
+            d,
+            rad,
+            diam,
+            blurPx,
+            pad,
+            stepDist,
+            dabAlpha,
+            softMask,
+            alphaLock,
+            tx,
+            ty,
+            sx,
+            sy,
+            0,
+            true,
+          );
+          stepRect = unionRects(stepRect, bounds);
+        }
+        session.finalizedEndIdx = 0;
+        session.dirtyRect = unionRects(session.dirtyRect, stepRect);
+      } else if (d.points.length >= 2 && targetEndIdx > session.finalizedEndIdx) {
+        const fromIdx = Math.max(0, session.finalizedEndIdx);
+        const stampStart = session.finalizedEndIdx < 0;
+        for (let c = 0; c < symmetryLists.length; c++) {
+          const segPts = buildFinalizedSegments(symmetryLists[c], fromIdx, targetEndIdx, Boolean(d.smoothing), true);
+          if (segPts.length) {
+            const { bounds, residual } = this.stepBlurSegment(
+              scratchCtx,
+              scratchCanvas,
+              segPts,
+              d,
+              rad,
+              diam,
+              blurPx,
+              pad,
+              stepDist,
+              dabAlpha,
+              softMask,
+              alphaLock,
+              tx,
+              ty,
+              sx,
+              sy,
+              session.residuals[c] ?? 0,
+              stampStart,
+            );
+            session.residuals[c] = residual;
+            stepRect = unionRects(stepRect, bounds);
+          }
+        }
+        session.finalizedEndIdx = targetEndIdx;
+        session.dirtyRect = unionRects(session.dirtyRect, stepRect);
+      }
+      return stepRect;
+    }
+
+    // 4. Incremental Stamp Brushes (Pencil, Pen, Brush, Airbrush, Watercolor, Marker, Eraser)
     const isEraser = d.tool === 'eraser';
     const hardness01 = isEraser
       ? Math.max(0.05, Math.min(1, (d.hardness ?? 85) / 100))
@@ -973,20 +1434,24 @@ export class WhiteboardCanvas2DRenderer {
     const dabAlphaBase = isEraser
       ? 1
       : d.brushType === 'airbrush'
-        ? flow01 * 0.42
+        ? flow01 * 0.34
         : d.brushType === 'watercolor'
           ? flow01 * 0.55
-          : flow01;
-    const tip = this.getBrushTipStamp(isEraser ? '#000000' : d.color, hardness01, isEraser ? 'brush' : d.brushType);
+          : d.brushType === 'pencil'
+            ? flow01 * 0.78
+            : flow01;
+    const tipColor = isEraser || d.brushType === 'pencil' || d.brushType === 'watercolor' ? '#000000' : d.color;
+    const tip = this.tipLib.getTip(tipColor, hardness01, isEraser ? 'pen' : d.brushType);
 
-    // Finalize any newly completed segments [0 .. d.points.length - 1]
-    const targetEndIdx = d.points.length - 1;
     let stepRect: DirtyRect | null = null;
-
     if (d.points.length === 1 && session.finalizedEndIdx < 0) {
       for (let c = 0; c < symmetryLists.length; c++) {
         const pts = symmetryLists[c];
-        const { bounds } = this.stampInterpolatedList(strokeCtx, pts, d, tip, profile, hasPressure, scaleAvg, dabAlphaBase, 0, true);
+        const { bounds, dabCount, arcLen } = this.stampInterpolatedList(
+          strokeCtx, pts, d, tip, profile, hasPressure, scaleAvg, dabAlphaBase, 0, true, 0, 0,
+        );
+        session.dabCounts[c] = dabCount;
+        session.arcLengths[c] = arcLen;
         stepRect = unionRects(stepRect, bounds);
       }
       session.finalizedEndIdx = 0;
@@ -999,7 +1464,7 @@ export class WhiteboardCanvas2DRenderer {
         const pts = symmetryLists[c];
         const segPts = buildFinalizedSegments(pts, fromIdx, toIdx, Boolean(d.smoothing), hasSubdivide);
         if (segPts.length) {
-          const { bounds, residual } = this.stampInterpolatedList(
+          const { bounds, residual, dabCount, arcLen } = this.stampInterpolatedList(
             strokeCtx,
             segPts,
             d,
@@ -1010,8 +1475,12 @@ export class WhiteboardCanvas2DRenderer {
             dabAlphaBase,
             session.residuals[c] ?? 0,
             stampStart,
+            session.dabCounts[c] ?? 0,
+            session.arcLengths[c] ?? 0,
           );
           session.residuals[c] = residual;
+          session.dabCounts[c] = dabCount;
+          session.arcLengths[c] = arcLen;
           stepRect = unionRects(stepRect, bounds);
         }
       }
@@ -1019,9 +1488,10 @@ export class WhiteboardCanvas2DRenderer {
       session.dirtyRect = unionRects(session.dirtyRect, stepRect);
     }
 
-    // Build unfinalized tail segment on tipCanvas (only when subdivided Bezier curves leave a trailing half-segment)
+    // Tail segment preview (for subdivided Bezier smoothness right up to the live pointer)
     let currentTipRect: DirtyRect | null = null;
-    const tipBuf = hasSubdivide && d.points.length >= 2 ? this.ensureTipBuffer(width, height) : null;
+    const needsSurfaceTransfer = !isEraser && (d.brushType === 'pencil' || d.brushType === 'watercolor');
+    const tipBuf = hasSubdivide && d.points.length >= 2 && !needsSurfaceTransfer ? this.ensureTipBuffer(width, height) : null;
     if (tipBuf && d.points.length >= 2) {
       const lastPt = mappedPoints[mappedPoints.length - 1];
       const prevPt = mappedPoints[mappedPoints.length - 2];
@@ -1051,19 +1521,24 @@ export class WhiteboardCanvas2DRenderer {
             dabAlphaBase,
             session.residuals[c] ?? 0,
             false,
+            session.dabCounts[c] ?? 0,
+            session.arcLengths[c] ?? 0,
           );
           currentTipRect = unionRects(currentTipRect, bounds);
         }
       }
     }
 
-    // Determine exact dirty region to update on scratchCanvas
     const opacityChanged = Math.abs(opacity - session.lastOpacity) > 0.001;
     session.lastOpacity = opacity;
+    // Expand watercolor transfer slightly so outer-edge wet-rim re-evaluates cleanly without inner seams
+    const expandedStep = d.brushType === 'watercolor' && stepRect
+      ? clampRect({ x: stepRect.x - 3, y: stepRect.y - 3, w: stepRect.w + 6, h: stepRect.h + 6 }, width, height)
+      : stepRect;
     const dirtyOnScratch = clampRect(
       unionRects(
         unionRects(session.tipRect, currentTipRect),
-        opacityChanged ? session.dirtyRect : stepRect,
+        opacityChanged ? session.dirtyRect : expandedStep,
       ),
       width,
       height,
@@ -1078,37 +1553,55 @@ export class WhiteboardCanvas2DRenderer {
       scratchCtx.clip();
       scratchCtx.clearRect(x, y, w, h);
       scratchCtx.drawImage(entry.canvas, x, y, w, h, x, y, w, h);
-
-      if (d.clipPolygon?.length) {
-        scratchCtx.beginPath();
-        d.clipPolygon.forEach((p, idx) => {
-          const px = tx + p.x * sx, py = ty + p.y * sy;
-          if (idx === 0) scratchCtx.moveTo(px, py);
-          else scratchCtx.lineTo(px, py);
-        });
-        scratchCtx.closePath();
-        scratchCtx.clip('evenodd');
-      }
+      scratchCtx.restore();
 
       if (isEraser) {
+        scratchCtx.save();
+        applyClipPolygon(scratchCtx, d.clipPolygon, tx, ty, sx, sy);
         scratchCtx.globalCompositeOperation = 'destination-out';
-      } else if (alphaLock) {
-        scratchCtx.globalCompositeOperation = 'source-atop';
-      } else if (d.brushType === 'watercolor') {
-        scratchCtx.globalCompositeOperation = 'multiply';
-      }
-      scratchCtx.globalAlpha = opacity;
-      scratchCtx.drawImage(strokeCanvas, x, y, w, h, x, y, w, h);
-      if (tipBuf && currentTipRect) {
-        const tx0 = Math.max(x, currentTipRect.x);
-        const ty0 = Math.max(y, currentTipRect.y);
-        const tx1 = Math.min(x + w, currentTipRect.x + currentTipRect.w);
-        const ty1 = Math.min(y + h, currentTipRect.y + currentTipRect.h);
-        if (tx1 > tx0 && ty1 > ty0) {
-          scratchCtx.drawImage(tipBuf.canvas, tx0, ty0, tx1 - tx0, ty1 - ty0, tx0, ty0, tx1 - tx0, ty1 - ty0);
+        scratchCtx.globalAlpha = opacity;
+        scratchCtx.drawImage(strokeCanvas, x, y, w, h, x, y, w, h);
+        if (tipBuf && currentTipRect) {
+          const tx0 = Math.max(x, currentTipRect.x);
+          const ty0 = Math.max(y, currentTipRect.y);
+          const tx1 = Math.min(x + w, currentTipRect.x + currentTipRect.w);
+          const ty1 = Math.min(y + h, currentTipRect.y + currentTipRect.h);
+          if (tx1 > tx0 && ty1 > ty0) {
+            scratchCtx.drawImage(tipBuf.canvas, tx0, ty0, tx1 - tx0, ty1 - ty0, tx0, ty0, tx1 - tx0, ty1 - ty0);
+          }
+        }
+        scratchCtx.restore();
+      } else {
+        applySurfaceTransfer(
+          strokeCtx,
+          scratchCtx,
+          dirtyOnScratch,
+          d.brushType,
+          d.color,
+          opacity,
+          alphaLock,
+          d.clipPolygon,
+          tx,
+          ty,
+          sx,
+          sy,
+        );
+        if (tipBuf && currentTipRect) {
+          scratchCtx.save();
+          applyClipPolygon(scratchCtx, d.clipPolygon, tx, ty, sx, sy);
+          if (alphaLock) scratchCtx.globalCompositeOperation = 'source-atop';
+          else if (d.brushType === 'marker') scratchCtx.globalCompositeOperation = 'multiply';
+          scratchCtx.globalAlpha = d.brushType === 'marker' ? Math.max(0.05, Math.min(1, opacity * 0.82)) : opacity;
+          const tx0 = Math.max(x, currentTipRect.x);
+          const ty0 = Math.max(y, currentTipRect.y);
+          const tx1 = Math.min(x + w, currentTipRect.x + currentTipRect.w);
+          const ty1 = Math.min(y + h, currentTipRect.y + currentTipRect.h);
+          if (tx1 > tx0 && ty1 > ty0) {
+            scratchCtx.drawImage(tipBuf.canvas, tx0, ty0, tx1 - tx0, ty1 - ty0, tx0, ty0, tx1 - tx0, ty1 - ty0);
+          }
+          scratchCtx.restore();
         }
       }
-      scratchCtx.restore();
     }
 
     return dirtyOnScratch;
@@ -1131,6 +1624,31 @@ export class WhiteboardCanvas2DRenderer {
     return clampRect({ x: minX - pad, y: minY - pad, w: maxX - minX + pad * 2, h: maxY - minY + pad * 2 }, width, height);
   }
 
+  private buildCompositeSampleForBucket(
+    layers: readonly BoardLayer[],
+    currentLayerId: string,
+    currentLayerCanvas: HTMLCanvasElement,
+    width: number,
+    height: number,
+  ): Uint8ClampedArray | null {
+    const comp = document.createElement('canvas');
+    comp.width = width;
+    comp.height = height;
+    const cCtx = comp.getContext('2d');
+    if (!cCtx) return null;
+    for (const l of layers) {
+      if (l.hidden || l.deleted) continue;
+      const src = l.id === currentLayerId ? currentLayerCanvas : this.layerCache.get(l.id)?.canvas;
+      if (!src) continue;
+      cCtx.save();
+      cCtx.globalAlpha = Math.max(0, Math.min(100, l.opacity ?? 100)) / 100;
+      if (l.blendMode && l.blendMode !== 'normal') cCtx.globalCompositeOperation = l.blendMode;
+      cCtx.drawImage(src, l.x, l.y);
+      cCtx.restore();
+    }
+    return cCtx.getImageData(0, 0, width, height).data;
+  }
+
   private ensureLayerEntry(
     layer: BoardLayer,
     committedShapes: readonly BoardShape[],
@@ -1138,6 +1656,7 @@ export class WhiteboardCanvas2DRenderer {
     height: number,
     scratch: { scratchCanvas: HTMLCanvasElement; scratchCtx: CanvasRenderingContext2D; strokeCanvas: HTMLCanvasElement; strokeCtx: CanvasRenderingContext2D },
     skipRebuild: boolean,
+    allLayers?: readonly BoardLayer[],
   ): { entry: LayerCanvasEntry; changed: boolean; dirtyRect: DirtyRect | null } | null {
     const alphaLock = Boolean(layer.alphaLock);
     let entry = this.layerCache.get(layer.id);
@@ -1163,11 +1682,26 @@ export class WhiteboardCanvas2DRenderer {
       entry.renderedIds.length <= nextIds.length &&
       entry.renderedIds.every((id, idx) => id === nextIds[idx]);
 
+    const getCompositeSample = allLayers
+      ? () => this.buildCompositeSampleForBucket(allLayers, layer.id, entry!.canvas, width, height)
+      : undefined;
+
     if (!isPrefixMatch) {
       entry.ctx.clearRect(0, 0, width, height);
       entry.alphaLock = alphaLock;
       for (const s of committedShapes) {
-        this.renderShapeOntoLayerCtx(entry.ctx, entry.canvas, scratch.strokeCtx, scratch.strokeCanvas, s, width, height, alphaLock);
+        this.renderShapeOntoLayerCtx(
+          entry.ctx,
+          entry.canvas,
+          scratch.strokeCtx,
+          scratch.strokeCanvas,
+          s,
+          width,
+          height,
+          alphaLock,
+          null,
+          getCompositeSample,
+        );
       }
       entry.renderedIds = nextIds;
       entry.version++;
@@ -1183,14 +1717,12 @@ export class WhiteboardCanvas2DRenderer {
       if (
         startIdx === committedShapes.length - 1 &&
         this.liveSession &&
-        this.liveSession.incremental &&
         this.liveSession.layerId === layer.id &&
         this.liveSession.layerVersion === entry.version &&
         this.liveSession.alphaLock === alphaLock &&
         committedShapes[startIdx].id === this.liveSession.shapeId
       ) {
         const committed = committedShapes[startIdx];
-        // Finish the tail segment onto scratch if needed, or copy liveSession.dirtyRect
         const fullLiveRect = this.updateIncrementalLiveStroke(
           entry,
           scratch.scratchCanvas,
@@ -1201,6 +1733,7 @@ export class WhiteboardCanvas2DRenderer {
           width,
           height,
           alphaLock,
+          getCompositeSample,
         );
         const blitRect = clampRect(unionRects(this.liveSession.dirtyRect, fullLiveRect), width, height);
         if (blitRect) {
@@ -1233,6 +1766,8 @@ export class WhiteboardCanvas2DRenderer {
           width,
           height,
           alphaLock,
+          null,
+          getCompositeSample,
         );
         dirty = unionRects(dirty, r);
       }
@@ -1316,7 +1851,7 @@ export class WhiteboardCanvas2DRenderer {
       if (layerOpacity <= 0) continue;
 
       const committedShapes = shapesByLayer.get(rawLayer.id) ?? [];
-      const synced = this.ensureLayerEntry(view, committedShapes, width, height, scratch, isResizing);
+      const synced = this.ensureLayerEntry(view, committedShapes, width, height, scratch, isResizing, layers);
       if (!synced) continue;
       const { entry } = synced;
       let dirtyRect = synced.dirtyRect;
@@ -1402,6 +1937,48 @@ export class WhiteboardCanvas2DRenderer {
     return { layers: items, changed, compositeKey };
   }
 
+  /** Returns the raw RGBA pixel buffer of a single layer directly from its cached canvas (for Magic Wand). */
+  getLayerPixelData(
+    layerId: string,
+    layers: readonly BoardLayer[],
+    shapes: readonly BoardShape[],
+    boardWidth: number,
+    boardHeight: number,
+  ): Uint8ClampedArray | null {
+    const scratch = this.ensureScratch(boardWidth, boardHeight);
+    if (!scratch) return null;
+    const layer = layers.find(l => l.id === layerId);
+    if (!layer) return null;
+    const layerShapes = shapes.filter(s => !s.hidden && (s.layerId ?? DEFAULT_BOARD_LAYER) === layerId);
+    const synced = this.ensureLayerEntry(layer, layerShapes, boardWidth, boardHeight, scratch, false, layers);
+    if (!synced) return null;
+    return synced.entry.ctx.getImageData(0, 0, boardWidth, boardHeight).data;
+  }
+
+  /** Returns the composited RGBA pixel buffer across all visible layers (for Magic Wand Sample-All). */
+  getCompositePixelData(
+    layers: readonly BoardLayer[],
+    shapes: readonly BoardShape[],
+    boardWidth: number,
+    boardHeight: number,
+  ): Uint8ClampedArray | null {
+    const sync = this.syncLayers(null, layers, shapes, new Map(), null, null, boardWidth, boardHeight, '#ffffff', true);
+    if (!sync) return null;
+    const comp = document.createElement('canvas');
+    comp.width = boardWidth;
+    comp.height = boardHeight;
+    const ctx = comp.getContext('2d');
+    if (!ctx) return null;
+    for (const item of sync.layers) {
+      ctx.save();
+      ctx.globalAlpha = item.opacity;
+      if (item.blendMode !== 'normal') ctx.globalCompositeOperation = item.blendMode;
+      ctx.drawImage(item.canvas, item.x, item.y);
+      ctx.restore();
+    }
+    return ctx.getImageData(0, 0, boardWidth, boardHeight).data;
+  }
+
   /** Renders a crisp thumbnail of a single layer (even if hidden) into an offscreen preview canvas. */
   drawLayerThumbnail(
     layerId: string,
@@ -1419,7 +1996,7 @@ export class WhiteboardCanvas2DRenderer {
     if (!layer) return false;
 
     const layerShapes = shapes.filter(s => !s.hidden && (s.layerId ?? DEFAULT_BOARD_LAYER) === layerId);
-    const synced = this.ensureLayerEntry(layer, layerShapes, boardWidth, boardHeight, scratch, false);
+    const synced = this.ensureLayerEntry(layer, layerShapes, boardWidth, boardHeight, scratch, false, layers);
     if (!synced) return false;
 
     const tw = targetCanvas.width;
@@ -1510,8 +2087,6 @@ export class WhiteboardCanvas2DRenderer {
       const drawItemInto = (target: CanvasRenderingContext2D) => {
         if (item.resizeTransform) {
           const { from, to } = item.resizeTransform;
-          const fx = to.width / Math.max(1, from.width);
-          const fy = to.height / Math.max(1, from.height);
           target.drawImage(
             item.canvas,
             from.x - item.x,
@@ -1523,7 +2098,6 @@ export class WhiteboardCanvas2DRenderer {
             to.width,
             to.height,
           );
-          void fx; void fy;
         } else {
           target.drawImage(item.canvas, item.x - sx, item.y - sy);
         }
@@ -1577,7 +2151,7 @@ export class WhiteboardCanvas2DRenderer {
     this.lastCompositeKey = '';
   }
 
-  /** Legacy full-canvas render helper retained for direct 2D canvas targets. */
+  /** Renders the complete board scene onto a target 2D canvas (used for WYSIWYG PNG export and direct 2D targets). */
   renderScene(
     targetCanvas: HTMLCanvasElement,
     layers: readonly BoardLayer[],
