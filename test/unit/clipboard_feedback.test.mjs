@@ -9,7 +9,7 @@ import React, { act } from 'react';
 test('clipboard feedback follows successful writes, resets, and ignores obsolete writes', async (context) => {
   const require = createRequire(import.meta.url);
   const bundle = await build({
-    stdin: { contents: "export { useClipboardFeedback } from './src/hooks/useClipboardFeedback';",
+    stdin: { contents: "export { useClipboardFeedback } from './src/hooks/ui/useClipboardFeedback';",
       resolveDir: fileURLToPath(new URL('../../', import.meta.url)) },
     bundle: true, write: false, format: 'esm', platform: 'node',
     plugins: [{ name: 'shared-react', setup(builder) {

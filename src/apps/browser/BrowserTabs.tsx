@@ -2,7 +2,7 @@ import { Fragment, useEffect, useRef, useState, type PointerEvent } from 'react'
 import { createPortal } from 'react-dom';
 import { Globe, Plus, X } from 'lucide-react';
 import { TooltipButton } from '../../components/common/TooltipButton';
-import { useListPresence } from '../../hooks/useListPresence';
+import { useListPresence } from '../../hooks/presence/useListPresence';
 import { t } from '../../i18n';
 import { BROWSER_HOME, type BrowserCommand, type BrowserTab } from './browser_protocol';
 

@@ -1,13 +1,13 @@
-import { blobToDataUrl } from '../core/ui/image_clipboard';
-import { t } from '../i18n/index.ts';
+import { blobToDataUrl } from '../../core/ui/image_clipboard';
+import { t } from '../../i18n/index.ts';
 import { useEffect, useRef, useState, type RefObject } from 'react';
 import { isTauri } from '@tauri-apps/api/core';
-import { invoke } from '../platform/commands.ts';
+import { invoke } from '../../platform/commands.ts';
 import { getCurrentWebview } from '@tauri-apps/api/webview';
-import type { NativeChatFile } from '../p2p/group_room';
-import { showToast } from './useToast';
-import { pickBrowserFiles, registerBrowserFile } from '../platform/web_files';
-import type { ChatOfferFile } from '../components/room/ChatFileOfferDialog';
+import type { NativeChatFile } from '../../p2p/group_room';
+import { showToast } from '../useToast';
+import { pickBrowserFiles, registerBrowserFile } from '../../platform/web_files';
+import type { ChatOfferFile } from '../../components/room/ChatFileOfferDialog';
 
 export function useChatFileInput(paneRef: RefObject<HTMLDivElement | null>) {
   const [files, setFiles] = useState<ChatOfferFile[]>([]);

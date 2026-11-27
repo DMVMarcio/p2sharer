@@ -1,5 +1,5 @@
 import { isTauri } from '@tauri-apps/api/core';
-import { useContentPresence } from '../../hooks/useContentPresence';
+import { useContentPresence } from '../../hooks/presence/useContentPresence';
 import { useModalDialogBehavior } from '../common/useModalDialogBehavior';
 import { profileStats } from '../../core/profile/profile_stats';
 import { NICKNAME_STYLE_KEY } from '../../core/profile/nickname_style';

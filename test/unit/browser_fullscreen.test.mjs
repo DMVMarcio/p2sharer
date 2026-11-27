@@ -8,7 +8,7 @@ import React, { act, useRef } from 'react';
 
 test('fullscreen controls hide after idle, reveal on movement and retain active keyboard controls', async context => {
   const require = createRequire(import.meta.url);
-  const bundle = await build({ stdin: { contents: "export { useIdleControls } from './src/hooks/useIdleControls';", resolveDir: process.cwd() },
+  const bundle = await build({ stdin: { contents: "export { useIdleControls } from './src/hooks/ui/useIdleControls';", resolveDir: process.cwd() },
     bundle: true, write: false, format: 'esm', platform: 'node',
     plugins: [{ name: 'idle-controls-fixture', setup(builder) {
       builder.onResolve({ filter: /^[^./]/ }, args => ({ path: pathToFileURL(require.resolve(args.path)).href, external: true }));
@@ -51,7 +51,7 @@ test('fullscreen controls hide after idle, reveal on movement and retain active 
 test('fullscreen remains operable under StrictMode and uses the canonical dialog close lifecycle', async () => {
   const require = createRequire(import.meta.url);
   const bundle = await build({ stdin: { contents: `
-    export { useNativeFullscreen } from './src/hooks/useNativeFullscreen';
+    export { useNativeFullscreen } from './src/hooks/media/useNativeFullscreen';
     export { FullscreenDialog } from './src/components/common/FullscreenDialog';`, resolveDir: process.cwd() },
     bundle: true, write: false, format: 'esm', platform: 'node', jsx: 'automatic',
     plugins: [{ name: 'native-fullscreen-fixture', setup(builder) {

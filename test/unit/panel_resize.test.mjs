@@ -16,7 +16,7 @@ HTMLElement.prototype.setPointerCapture = () => {};
 HTMLElement.prototype.hasPointerCapture = () => false;
 globalThis.ResizeObserver = class { constructor(callback) { measure = callback; } observe() {} disconnect() {} };
 const require = createRequire(import.meta.url);
-const bundle = await build({ stdin: { contents: `export * from './src/hooks/usePanelSize.ts';
+const bundle = await build({ stdin: { contents: `export * from './src/hooks/ui/usePanelSize.ts';
 export * from './src/components/common/PanelResizeHandle.tsx';`, resolveDir: process.cwd() },
   bundle: true, write: false, format: 'esm', platform: 'node', jsx: 'automatic', plugins: [{ name: 'packages', setup(builder) {
     builder.onResolve({ filter: /^[^./]/ }, args => ({ path: pathToFileURL(require.resolve(args.path)).href, external: true }));

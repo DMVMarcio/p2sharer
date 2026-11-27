@@ -1,6 +1,6 @@
 import { localizeError, localizeText, t } from '../../i18n';
 import { useLocale } from '../../hooks/useLocale';
-import { useElementFullscreen } from '../../hooks/useElementFullscreen';
+import { useElementFullscreen } from '../../hooks/media/useElementFullscreen';
 import { showToast } from '../../hooks/useToast';
 import React, { useEffect, useRef, useState } from 'react';
 import { invoke, isTauri } from '@tauri-apps/api/core';

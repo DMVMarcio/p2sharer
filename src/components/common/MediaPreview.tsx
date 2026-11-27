@@ -2,7 +2,7 @@ import { localizeText, t } from '../../i18n';
 import { useLocale } from '../../hooks/useLocale';
 import { useEffect, useRef, useState } from 'react';
 import { formatFrameRate } from '../../core/media/media_streams';
-import { useSkeletonPresence } from '../../hooks/useSkeletonPresence';
+import { useSkeletonPresence } from '../../hooks/presence/useSkeletonPresence';
 import { Camera, Monitor } from 'lucide-react';
 
 export function MediaPreview({ stream, label, busy, error, settings, sourceKey = label, onError, onRetry }: {

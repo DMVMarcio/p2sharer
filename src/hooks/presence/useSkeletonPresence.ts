@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { isReducedMotion } from '../core/appearance/appearance_preferences.ts';
+import { isReducedMotion } from '../../core/appearance/appearance_preferences.ts';
 
 // Keep in sync with --source-loading-duration in style.css.
 const FADE_DURATION_MS = 400;

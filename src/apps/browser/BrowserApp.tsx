@@ -12,21 +12,21 @@ import { t, localizeError } from '../../i18n';
 import { showToast } from '../../hooks/useToast';
 import { AudioContextManager } from '../../audio/audio_context_manager';
 import { FullscreenDialog } from '../../components/common/FullscreenDialog';
-import { useNativeFullscreen } from '../../hooks/useNativeFullscreen';
-import { useBrowserChrome } from '../../hooks/useBrowserChrome';
+import { useNativeFullscreen } from '../../hooks/media/useNativeFullscreen';
+import { useBrowserChrome } from './useBrowserChrome';
 import { MediaVolumeControl } from '../../components/common/MediaVolumeControl';
-import { useMediaVolume } from '../../hooks/useMediaVolume';
+import { useMediaVolume } from '../../hooks/media/useMediaVolume';
 import { ActivityToast } from '../../components/common/ActivityToast';
-import { useBrowserCursor } from '../../hooks/useBrowserCursor';
+import { useBrowserCursor } from './useBrowserCursor';
 import { BrowserTabs } from './BrowserTabs';
 import { BrowserContextMenu } from './BrowserContextMenu';
 import { browserHistoryButton, browserShortcut } from './browser_shortcuts';
-import { useSelectAllOnFocus } from '../../hooks/useSelectAllOnFocus';
+import { useSelectAllOnFocus } from '../../hooks/ui/useSelectAllOnFocus';
 import type { BrowserContentMode, BrowserVideoQuality } from './browser_quality';
-import { useVideoPresentation } from '../../hooks/useVideoPresentation';
+import { useVideoPresentation } from '../../hooks/media/useVideoPresentation';
 import { MediaLoadingOverlay } from '../../components/common/MediaLoadingOverlay';
 import { VirtualCursorGlyph } from '../../components/common/VirtualCursorGlyph';
-import { useBrowserPointerLock } from '../../hooks/useBrowserPointerLock';
+import { useBrowserPointerLock } from './useBrowserPointerLock';
 
 function BrowserSettings({ model, onClose }: { model: BrowserModel; onClose: () => void }) {
   const [mode, setMode] = useState('cache');

@@ -1,6 +1,6 @@
 import { useCallback, useSyncExternalStore } from 'react';
 import type { RouterProviderProps } from 'react-router';
-import { useDropdownPresence } from '../../src/hooks/useDropdownPresence';
+import { useDropdownPresence } from '../../src/hooks/presence/useDropdownPresence';
 import { useLocale } from '../../src/hooks/useLocale';
 import { t } from '../../src/i18n';
 

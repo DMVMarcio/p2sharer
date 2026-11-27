@@ -13,7 +13,7 @@ import { ActivityParticipants } from '../common/ActivityParticipants';
 import { useContextMenu } from '../common/ContextMenu';
 import { EditSavedRoomDialog } from '../modals/EditSavedRoomDialog';
 import { orderSavedRooms } from '../../core/room/saved_room_order';
-import { useSortableGrid } from '../../hooks/useSortableGrid';
+import { useSortableGrid } from '../../hooks/ui/useSortableGrid';
 import { ModalDialog } from '../common/ModalDialog';
 import { TooltipButton } from '../common/TooltipButton';
 

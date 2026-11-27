@@ -1,8 +1,8 @@
-import { localizeError, t } from '../i18n/index.ts';
+import { localizeError, t } from '../../i18n/index.ts';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { NativeVideoBridge } from '../video/native_video_bridge';
-import { logDiagnostic } from '../core/logger.ts';
-import { acquireCamera, cameraFrameRates, cameraResolution, cameraResolutions, configureCamera, preferredCameraFrameRate, type CameraResolution } from '../video/camera_devices';
+import { NativeVideoBridge } from '../../video/native_video_bridge';
+import { logDiagnostic } from '../../core/logger.ts';
+import { acquireCamera, cameraFrameRates, cameraResolution, cameraResolutions, configureCamera, preferredCameraFrameRate, type CameraResolution } from '../../video/camera_devices';
 
 export interface PreparedCapture { sourceId: string; stream: MediaStream; bridge?: NativeVideoBridge }
 

@@ -1,6 +1,6 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
-import { isReducedMotion } from '../core/appearance/appearance_preferences.ts';
-import { stateStore } from '../core/state_store.ts';
+import { isReducedMotion } from '../../core/appearance/appearance_preferences.ts';
+import { stateStore } from '../../core/state_store.ts';
 
 // Matches --content-exit-duration, shared with content transitions.
 const EXIT_DURATION_MS = 150;

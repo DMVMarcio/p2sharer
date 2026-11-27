@@ -5,7 +5,7 @@ import { NICKNAME_STYLE_KEY } from '../../core/profile/nickname_style';
 import { t } from '../../i18n';
 import { useLocale } from '../../hooks/useLocale';
 import React, { useState } from 'react';
-import { useFormSubmit } from '../../hooks/useFormSubmit';
+import { useFormSubmit } from '../../hooks/ui/useFormSubmit';
 import { useModal } from '../../hooks/useModal';
 import { stateStore } from '../../core/state_store';
 import { showToast } from '../../hooks/useToast';

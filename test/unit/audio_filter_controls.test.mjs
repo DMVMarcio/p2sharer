@@ -9,7 +9,7 @@ import React, { act } from 'react';
 test('audio filtering defaults, draft switching, mute-all and native apply use the real hook', async () => {
   const require = createRequire(import.meta.url);
   const bundle = await build({
-    stdin: { contents: "export { useAudioFilter } from './src/hooks/useAudioFilter'; export { stateStore } from './src/core/state_store';",
+    stdin: { contents: "export { useAudioFilter } from './src/hooks/media/useAudioFilter'; export { stateStore } from './src/core/state_store';",
       resolveDir: fileURLToPath(new URL('../../', import.meta.url)) },
     bundle: true, write: false, format: 'esm', platform: 'node', jsx: 'automatic',
     plugins: [{ name: 'fixtures', setup(builder) {
@@ -110,7 +110,7 @@ test('audio filtering defaults, draft switching, mute-all and native apply use t
 test('sub-process accordion toggling supports granular and parent all-or-nothing exclusion', async () => {
   const require = createRequire(import.meta.url);
   const bundle = await build({
-    stdin: { contents: "export { useAudioFilter } from './src/hooks/useAudioFilter'; export { stateStore } from './src/core/state_store';",
+    stdin: { contents: "export { useAudioFilter } from './src/hooks/media/useAudioFilter'; export { stateStore } from './src/core/state_store';",
       resolveDir: fileURLToPath(new URL('../../', import.meta.url)) },
     bundle: true, write: false, format: 'esm', platform: 'node', jsx: 'automatic',
     plugins: [{ name: 'fixtures', setup(builder) {
@@ -233,7 +233,7 @@ test('sub-process accordion toggling supports granular and parent all-or-nothing
 test('sub-process stable keys persist across process restarts and decouple root parent', async () => {
   const require = createRequire(import.meta.url);
   const bundle = await build({
-    stdin: { contents: "export { useAudioFilter } from './src/hooks/useAudioFilter'; export { stateStore } from './src/core/state_store';",
+    stdin: { contents: "export { useAudioFilter } from './src/hooks/media/useAudioFilter'; export { stateStore } from './src/core/state_store';",
       resolveDir: fileURLToPath(new URL('../../', import.meta.url)) },
     bundle: true, write: false, format: 'esm', platform: 'node', jsx: 'automatic',
     plugins: [{ name: 'fixtures', setup(builder) {

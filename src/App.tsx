@@ -1,4 +1,4 @@
-import { useRoomExit } from './hooks/useRoomExit';
+import { useRoomExit } from './hooks/room/useRoomExit';
 import { UnsavedRoomDialog } from './components/modals/UnsavedRoomDialog';
 import { ContentTransition } from './components/common/ContentTransition';
 import React, { useEffect, useState, useSyncExternalStore } from 'react';

@@ -1,4 +1,4 @@
-import { useContentPresence } from '../../hooks/useContentPresence';
+import { useContentPresence } from '../../hooks/presence/useContentPresence';
 import { localizeText, t } from '../../i18n';
 import { useLocale } from '../../hooks/useLocale';
 import React, { useId, useRef, useState } from 'react';

@@ -4,12 +4,12 @@ import { useLocale } from '../../hooks/useLocale';
 import { Select } from '../common/Select';
 import React, { useEffect } from 'react';
 import { useModal } from '../../hooks/useModal';
-import { useScreenPicker } from '../../hooks/useScreenPicker';
+import { useScreenPicker } from '../../hooks/media/useScreenPicker';
 import { getSkeletonCountForTab } from './screen_picker_utils';
 import { MediaPreview } from '../common/MediaPreview';
 import { Camera, Monitor } from 'lucide-react';
 import { formatFrameRate } from '../../core/media/media_streams';
-import { useSkeletonPresence } from '../../hooks/useSkeletonPresence';
+import { useSkeletonPresence } from '../../hooks/presence/useSkeletonPresence';
 
 export const ScreenPickerModal: React.FC = () => {
   useLocale();

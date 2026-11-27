@@ -3,7 +3,7 @@ import { Nickname } from '../common/Nickname';
 import { normalizeNicknameStyle } from '../../core/profile/nickname_style';
 import { localizeText, t } from '../../i18n';
 import { useLocale } from '../../hooks/useLocale';
-import { useStreamPointer } from '../../hooks/useStreamPointer';
+import { useStreamPointer } from '../../hooks/stream/useStreamPointer';
 import { streamOwner, formatFrameRate } from '../../core/media/media_streams';
 import { StreamPointerToggle } from './StreamPointerToggle';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
@@ -11,8 +11,8 @@ import { invoke, isTauri } from '@tauri-apps/api/core';
 import { emit, listen, type UnlistenFn } from '@tauri-apps/api/event';
 import type { StreamWatcher } from '../../core/types';
 import { stateStore } from '../../core/state_store';
-import { useElementFullscreen } from '../../hooks/useElementFullscreen';
-import { useStreamZoom } from '../../hooks/useStreamZoom';
+import { useElementFullscreen } from '../../hooks/media/useElementFullscreen';
+import { useStreamZoom } from '../../hooks/stream/useStreamZoom';
 import { ZoomControlBar } from './ZoomControlBar';
 import { StreamStatsOverlay } from './StreamStatsOverlay';
 import { buildIceServers } from '../../p2p/ice_config';
@@ -20,7 +20,7 @@ import { initFrontendLogger } from '../../core/logger';
 import { Maximize, PanelsTopLeft, Pin, PictureInPicture2, RotateCcw, VolumeX, Volume2 } from 'lucide-react';
 import { useContextMenu, type ContextMenuAction } from '../common/ContextMenu';
 import { validPipAudioSettings } from '../../services/pip_audio';
-import { usePipWindowDrag } from '../../hooks/usePipWindowDrag';
+import { usePipWindowDrag } from '../../hooks/room/usePipWindowDrag';
 import { PipWindowControls } from '../common/PipWindowControls';
 
 interface PipViewProps {

@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, type CSSProperties, type PointerEvent as ReactPointerEvent, type KeyboardEvent as ReactKeyboardEvent, type MouseEvent as ReactMouseEvent, type RefObject } from 'react';
-import { moveOrderedItem } from '../core/ordered_items';
-import { placeCardAtPoint, resizeCardScale, type CardLayout, type CardResizeEdge } from '../core/room/room_card_layout';
-import { isMobileDevice } from '../core/platform';
+import { moveOrderedItem } from '../../core/ordered_items';
+import { placeCardAtPoint, resizeCardScale, type CardLayout, type CardResizeEdge } from '../../core/room/room_card_layout';
+import { isMobileDevice } from '../../core/platform';
 
 interface Options {
   mode: 'grid' | 'spotlight';

@@ -6,7 +6,7 @@ import { X } from 'lucide-react';
 import { stateStore } from '../../core/state_store';
 import { UnreadChatBadge } from './UnreadChatBadge';
 import { useRoom } from '../../hooks/useRoom';
-import { useIsMobile } from '../../hooks/useIsMobile';
+import { useIsMobile } from '../../hooks/ui/useIsMobile';
 import { ChatPane } from './ChatPane';
 import { ParticipantsPane } from './ParticipantsPane';
 

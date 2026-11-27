@@ -1,5 +1,5 @@
 import { useRef, useState } from 'react';
-import { getSessionAppVolume, saveSessionAppVolume } from '../core/media/stream_volume_preferences';
+import { getSessionAppVolume, saveSessionAppVolume } from '../../core/media/stream_volume_preferences';
 
 /** Keep the last audible level across control remounts, fullscreen changes, and while the app stays open. */
 export function useMediaVolume(initial = 1, sessionKey?: string) {

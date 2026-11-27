@@ -1,14 +1,14 @@
-import { localizeError, t } from '../i18n/index.ts';
+import { localizeError, t } from '../../i18n/index.ts';
 import { useState, useCallback, useEffect } from 'react';
 import { invoke } from '@tauri-apps/api/core';
-import { INITIAL_TRANSMISSION_DEFAULTS, stateStore } from '../core/state_store';
-import { MonitorSource, ScreenSourcesResponse, WindowSource } from '../core/types';
-import { useStore } from './useStore';
-import { roomService } from '../services/room_service';
-import { listCameras, preferredCameraFrameRate, type CameraResolution } from '../video/camera_devices';
+import { INITIAL_TRANSMISSION_DEFAULTS, stateStore } from '../../core/state_store';
+import { MonitorSource, ScreenSourcesResponse, WindowSource } from '../../core/types';
+import { useStore } from '../useStore';
+import { roomService } from '../../services/room_service';
+import { listCameras, preferredCameraFrameRate, type CameraResolution } from '../../video/camera_devices';
 import { useCapturePreview } from './useCapturePreview';
-import { showToast } from './useToast';
-import { logDiagnostic } from '../core/logger.ts';
+import { showToast } from '../useToast';
+import { logDiagnostic } from '../../core/logger.ts';
 
 export function useScreenPicker(onClose?: () => void, isClosing = false) {
   const editingId = useStore((state) => state.editingStreamId);

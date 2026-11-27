@@ -20,7 +20,7 @@ import { AppUpdateButton } from './AppUpdateButton';
 import { useContextMenu } from '../common/ContextMenu';
 import { profileAction } from '../common/profile_actions';
 import { TooltipButton } from '../common/TooltipButton';
-import { useClipboardFeedback } from '../../hooks/useClipboardFeedback';
+import { useClipboardFeedback } from '../../hooks/ui/useClipboardFeedback';
 
 export const AppHeader: React.FC<{ showUpdate?: boolean; homeScrolled?: boolean; onLeaveRoom: () => void }> = ({ showUpdate = true, homeScrolled = false, onLeaveRoom }) => {
   useLocale();

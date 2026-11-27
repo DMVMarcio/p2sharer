@@ -8,7 +8,7 @@ import { CollapsibleRegion } from '../../components/common/CollapsibleRegion';
 import { IntegerSlider } from '../../components/common/IntegerSlider';
 import { Select } from '../../components/common/Select';
 import { TooltipButton } from '../../components/common/TooltipButton';
-import { useSortableGrid } from '../../hooks/useSortableGrid';
+import { useSortableGrid } from '../../hooks/ui/useSortableGrid';
 import { t } from '../../i18n';
 import { BOARD_BLEND_MODES, type BoardBlendMode, type BoardLayer, type BoardShape } from './whiteboard_scene';
 import { WhiteboardColorPanel } from './WhiteboardColorPanel';

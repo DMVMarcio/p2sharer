@@ -4,7 +4,7 @@ import { useEffect, useId, useLayoutEffect, useRef, useState, type ButtonHTMLAtt
 import { createPortal } from 'react-dom';
 import { autoUpdate, computePosition, flip, offset, shift, size } from '@floating-ui/dom';
 import { Check, ChevronDown } from 'lucide-react';
-import { useDropdownPresence } from '../../hooks/useDropdownPresence';
+import { useDropdownPresence } from '../../hooks/presence/useDropdownPresence';
 
 export interface SelectOption {
   value: string | number;

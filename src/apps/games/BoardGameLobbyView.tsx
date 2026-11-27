@@ -25,7 +25,7 @@ import {
 import { t } from '../../i18n/index.ts';
 import { useLocale } from '../../hooks/useLocale.ts';
 import { useRoom } from '../../hooks/useRoom.ts';
-import { useDropdownPresence } from '../../hooks/useDropdownPresence.ts';
+import { useDropdownPresence } from '../../hooks/presence/useDropdownPresence.ts';
 import { ProfileAvatar } from '../../components/common/ProfileAvatar.tsx';
 import { Select, type SelectOption } from '../../components/common/Select.tsx';
 import { Tooltip } from '../../components/common/Tooltip.tsx';

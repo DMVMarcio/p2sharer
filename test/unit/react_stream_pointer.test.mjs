@@ -19,7 +19,7 @@ HTMLElement.prototype.setPointerCapture = () => {};
 HTMLElement.prototype.hasPointerCapture = () => false;
 const packets = globalThis.pointerReviewPackets = [];
 const require = createRequire(import.meta.url);
-const bundle = await build({ stdin: { contents: "export { useStreamPointer } from './src/hooks/useStreamPointer.tsx';", resolveDir: process.cwd() },
+const bundle = await build({ stdin: { contents: "export { useStreamPointer } from './src/hooks/stream/useStreamPointer.tsx';", resolveDir: process.cwd() },
   bundle: true, write: false, format: 'esm', platform: 'node', jsx: 'automatic', plugins: [{ name: 'boundary-fixtures', setup(builder) {
     builder.onResolve({ filter: /room_service$|stream_pointer_view$|@tauri-apps\/api\/event/ }, args => ({ namespace: 'fixture',
       path: args.path.endsWith('room_service') ? 'room' : args.path.endsWith('stream_pointer_view') ? 'scene' : 'events' }));

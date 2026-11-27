@@ -1,6 +1,6 @@
 import { getLanguage, localizeText, t } from '../../i18n';
 import { useLocale } from '../../hooks/useLocale';
-import { useDropdownPresence } from '../../hooks/useDropdownPresence';
+import { useDropdownPresence } from '../../hooks/presence/useDropdownPresence';
 import { useEffect, useRef, useState, useSyncExternalStore } from 'react';
 import { Download, File, FolderSearch, Image as ImageIcon, Info, Square, Upload, X } from 'lucide-react';
 import { isTauri } from '@tauri-apps/api/core';

@@ -33,7 +33,7 @@ const mocks = {
   cameras: 'export const listCameras = async (requestPermission = false) => { globalThis.transmissionDefaultsFixture.cameraRequests.push(requestPermission); return [{ kind: "videoinput", deviceId: "fixture-camera", label: "Camera" }]; }; export const preferredCameraFrameRate = (rates, fps) => rates.includes(fps) ? fps : rates[0];',
   tauri: 'export const invoke = async () => ({ monitors: [{ id: "screen:0", name: "Monitor" }], windows: [] }); export const isTauri = () => true;',
 };
-const bundle = await build({ stdin: { contents: `export { useScreenPicker } from './src/hooks/useScreenPicker.ts';
+const bundle = await build({ stdin: { contents: `export { useScreenPicker } from './src/hooks/media/useScreenPicker.ts';
 export { stateStore, StateStore } from './src/core/state_store.ts';`, resolveDir: process.cwd() },
   bundle: true, write: false, format: 'esm', platform: 'node', jsx: 'automatic', plugins: [{ name: 'fixture', setup(builder) {
     builder.onResolve({ filter: /room_service|useCapturePreview|camera_devices|@tauri-apps\/api\/core/ }, args => ({

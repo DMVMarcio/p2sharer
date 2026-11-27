@@ -1,9 +1,9 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { stateStore } from '../core/state_store';
-import { parseRoomInvite } from '../core/room/room_invite';
-import { savedRooms } from '../core/room/saved_rooms';
-import { showToast } from './useToast';
-import { t } from '../i18n';
+import { stateStore } from '../../core/state_store';
+import { parseRoomInvite } from '../../core/room/room_invite';
+import { savedRooms } from '../../core/room/saved_rooms';
+import { showToast } from '../useToast';
+import { t } from '../../i18n';
 
 /** Shares one consent boundary between leaving a room and closing the main window. */
 export function useRoomExit() {

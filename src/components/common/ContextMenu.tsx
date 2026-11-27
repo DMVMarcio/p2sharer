@@ -3,7 +3,7 @@ import { useLocale } from '../../hooks/useLocale';
 import { createContext, useCallback, useContext, useEffect, useLayoutEffect, useRef, useState, type ReactNode, type CSSProperties } from 'react';
 import { createPortal } from 'react-dom';
 import { Copy, ChevronRight } from 'lucide-react';
-import { useDropdownPresence } from '../../hooks/useDropdownPresence';
+import { useDropdownPresence } from '../../hooks/presence/useDropdownPresence';
 import { showToast } from '../../hooks/useToast';
 import { captureTextEditing, TEXT_EDITOR_SELECTOR } from '../../core/ui/text_editing';
 import { getTextEditingActions } from './text_editing_actions';

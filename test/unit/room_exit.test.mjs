@@ -14,7 +14,7 @@ test('room exit requires consent, persists before leaving, and retains the sessi
   };
   const require = createRequire(import.meta.url);
   const bundle = await build({
-    stdin: { contents: "export { useRoomExit } from './src/hooks/useRoomExit';", resolveDir: process.cwd() },
+    stdin: { contents: "export { useRoomExit } from './src/hooks/room/useRoomExit';", resolveDir: process.cwd() },
     bundle: true, write: false, format: 'esm', platform: 'node',
     plugins: [{ name: 'exit-fixture', setup(builder) {
       builder.onResolve({ filter: /core\/state_store$/ }, () => ({ path: 'state', namespace: 'fixture' }));

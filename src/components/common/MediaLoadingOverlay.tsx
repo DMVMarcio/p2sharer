@@ -1,4 +1,4 @@
-import { useDropdownPresence } from '../../hooks/useDropdownPresence';
+import { useDropdownPresence } from '../../hooks/presence/useDropdownPresence';
 
 export function MediaLoadingOverlay({ visible, label }: { visible: boolean; label: string }) {
   const presence = useDropdownPresence(visible ? label : null);

@@ -3,7 +3,7 @@ import { useModalDialogBehavior } from '../common/useModalDialogBehavior';
 import { t } from '../../i18n';
 import { useLocale } from '../../hooks/useLocale';
 import { isTauri } from '@tauri-apps/api/core';
-import { useDropdownPresence } from '../../hooks/useDropdownPresence';
+import { useDropdownPresence } from '../../hooks/presence/useDropdownPresence';
 import { useEffect, useRef, useState } from 'react';
 import { Copy, Download, File, FolderSearch, Image as ImageIcon, X, ZoomIn, ZoomOut } from 'lucide-react';
 import type { ChatMessage } from '../../core/types';

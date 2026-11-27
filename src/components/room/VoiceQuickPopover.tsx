@@ -4,7 +4,7 @@ import { autoUpdate, computePosition, flip, offset, shift } from '@floating-ui/d
 import { Headphones, Mic, Settings2, Square, Volume2 } from 'lucide-react';
 import { t } from '../../i18n';
 import { useLocale } from '../../hooks/useLocale';
-import { useDropdownPresence } from '../../hooks/useDropdownPresence';
+import { useDropdownPresence } from '../../hooks/presence/useDropdownPresence';
 import { modalManager } from '../../hooks/useModal';
 import { useRoom } from '../../hooks/useRoom';
 import { roomService } from '../../services/room_service';

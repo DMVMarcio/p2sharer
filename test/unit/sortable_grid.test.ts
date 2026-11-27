@@ -3,7 +3,7 @@ import test from 'node:test';
 import React, { act } from 'react';
 import { createRoot } from 'react-dom/client';
 import { JSDOM } from 'jsdom';
-import { useSortableGrid } from '../../src/hooks/useSortableGrid.ts';
+import { useSortableGrid } from '../../src/hooks/ui/useSortableGrid.ts';
 
 test('grid drag previews order, Escape cancels, drop commits, and keyboard preserves focus', async () => {
   const dom = new JSDOM('<div id="root"></div>', { url: 'http://localhost' });

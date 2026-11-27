@@ -1,10 +1,10 @@
-import { audioProcessKey, audioSubProcessKey, type AudioCaptureChoice } from '../core/media/audio_filter_presets.ts';
-import { t } from '../i18n/index.ts';
+import { audioProcessKey, audioSubProcessKey, type AudioCaptureChoice } from '../../core/media/audio_filter_presets.ts';
+import { t } from '../../i18n/index.ts';
 import { useState, useCallback, useRef } from 'react';
 import { invoke } from '@tauri-apps/api/core';
-import { stateStore } from '../core/state_store';
-import { ProcessItem, SubProcessItem } from '../core/types';
-import { showToast } from './useToast';
+import { stateStore } from '../../core/state_store';
+import { ProcessItem, SubProcessItem } from '../../core/types';
+import { showToast } from '../useToast';
 
 export function getPidsForProcess(item: ProcessItem): number[] {
   const pids = new Set<number>();

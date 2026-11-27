@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react';
-import { useContentPresence } from '../../hooks/useContentPresence';
+import { useContentPresence } from '../../hooks/presence/useContentPresence';
 
 interface Props<T extends string> {
   value: T;

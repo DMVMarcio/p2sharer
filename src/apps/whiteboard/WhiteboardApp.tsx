@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { getCurrentWebview } from '@tauri-apps/api/webview';
 import { ModalDialog } from '../../components/common/ModalDialog';
 import { Select } from '../../components/common/Select';
-import { useElementFullscreen } from '../../hooks/useElementFullscreen';
+import { useElementFullscreen } from '../../hooks/media/useElementFullscreen';
 import { useLocale } from '../../hooks/useLocale';
 import { useRoom } from '../../hooks/useRoom';
 import { showToast } from '../../hooks/useToast';

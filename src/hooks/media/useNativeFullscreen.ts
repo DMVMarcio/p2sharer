@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { invoke, isTauri } from '@tauri-apps/api/core';
 import { getCurrentWindow } from '@tauri-apps/api/window';
-import { NativeFullscreenSession, type WindowPlacement } from '../core/ui/native_fullscreen';
+import { NativeFullscreenSession, type WindowPlacement } from '../../core/ui/native_fullscreen';
 
 export function useNativeFullscreen() {
   const sessionRef = useRef<NativeFullscreenSession | null>(null);

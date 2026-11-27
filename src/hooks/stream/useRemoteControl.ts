@@ -5,7 +5,7 @@ import {
   streamPointerClampedPosition,
   streamPointerPosition,
   streamPointerVideoRect,
-} from '../core/stream/stream_pointer.ts';
+} from '../../core/stream/stream_pointer.ts';
 import {
   hasMeaningfulGamepadInput,
   readGamepadSnapshotState,
@@ -16,17 +16,17 @@ import {
   type RemoteCursorShape,
   type RemoteCursorSyncState,
   type RemoteMouseButton,
-} from '../core/stream/remote_control.ts';
+} from '../../core/stream/remote_control.ts';
 import {
   loadInputBindings,
   matchesShortcut,
   resolveGamepadProfile,
   resolveKeyRemapping,
   subscribeInputBindings,
-} from '../core/ui/input_bindings.ts';
-import { invoke } from '../platform/commands.ts';
-import { logDiagnostic } from '../core/logger.ts';
-import { roomService } from '../services/room_service.ts';
+} from '../../core/ui/input_bindings.ts';
+import { invoke } from '../../platform/commands.ts';
+import { logDiagnostic } from '../../core/logger.ts';
+import { roomService } from '../../services/room_service.ts';
 
 interface ImmersiveKeyPayload {
   vk: number;

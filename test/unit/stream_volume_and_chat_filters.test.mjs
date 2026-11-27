@@ -192,7 +192,7 @@ test('chat filters classify notices and ChatPane filters messages interactively 
       plugins: [{
         name: 'chat-filter-fixture',
         setup(builder) {
-          builder.onResolve({ filter: /hooks\/useRoom$|hooks\/useChatFileInput$|room\/ChatTransferCenter$|common\/EmojiComposerInput$/ }, (args) => ({
+          builder.onResolve({ filter: /hooks\/useRoom$|hooks\/room\/useChatFileInput$|room\/ChatTransferCenter$|common\/EmojiComposerInput$/ }, (args) => ({
             path: args.path.split('/').at(-1),
             namespace: 'fixture',
           }));

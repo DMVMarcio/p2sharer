@@ -8,7 +8,7 @@ import React, { act } from 'react';
 
 test('local cursor follows the latest display frame without changing authority and retires on handoff or tab changes', async context => {
   const require = createRequire(import.meta.url);
-  const bundle = await build({ stdin: { contents: "export { useBrowserCursor } from './src/hooks/useBrowserCursor';", resolveDir: process.cwd() },
+  const bundle = await build({ stdin: { contents: "export { useBrowserCursor } from './src/apps/browser/useBrowserCursor';", resolveDir: process.cwd() },
     bundle: true, write: false, format: 'esm', platform: 'node', plugins: [{ name: 'shared-react', setup(builder) {
       builder.onResolve({ filter: /^[^./]/ }, args => ({ path: pathToFileURL(require.resolve(args.path)).href, external: true }));
     } }] });

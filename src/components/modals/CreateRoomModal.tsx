@@ -5,7 +5,7 @@ import React, { useEffect, useState } from 'react';
 import { invoke, isTauri } from '@tauri-apps/api/core';
 import { Select } from '../common/Select';
 import { createLanConnection, type LanInterface } from '../../core/room/lan_room';
-import { useFormSubmit } from '../../hooks/useFormSubmit';
+import { useFormSubmit } from '../../hooks/ui/useFormSubmit';
 import { useModal } from '../../hooks/useModal';
 import { useRoom } from '../../hooks/useRoom';
 import { showToast } from '../../hooks/useToast';

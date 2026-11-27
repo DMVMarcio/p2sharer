@@ -6,7 +6,7 @@ import { TooltipButton } from './TooltipButton';
 import { SystemIcon } from './SystemIcon';
 import { t } from '../../i18n';
 import { useLocale } from '../../hooks/useLocale';
-import { useContentPresence } from '../../hooks/useContentPresence';
+import { useContentPresence } from '../../hooks/presence/useContentPresence';
 
 interface DownloadCatalog { version: string | null; platforms: { id: string; artifacts: DownloadArtifact[] }[] }
 const systems = [{ id: 'windows', label: 'Windows' }, { id: 'macos', label: 'macOS' }, { id: 'linux', label: 'Linux' }];

@@ -14,7 +14,7 @@ import { generateUserColor } from '../../p2p/group_room';
 import { useLocale } from '../../hooks/useLocale';
 import { useModal } from '../../hooks/useModal';
 import { useRoom } from '../../hooks/useRoom';
-import { useSortableGrid } from '../../hooks/useSortableGrid';
+import { useSortableGrid } from '../../hooks/ui/useSortableGrid';
 import { roomService } from '../../services/room_service';
 import { t } from '../../i18n';
 import { ModalDialog } from '../common/ModalDialog';

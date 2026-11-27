@@ -14,7 +14,7 @@ globalThis.ResizeObserver = class { observe() {} disconnect() {} };
 window.matchMedia = () => ({ matches: false });
 globalThis.__pointerTestSent = [];
 const require = createRequire(import.meta.url);
-const bundle = await build({ stdin: { contents: "export * from './src/hooks/useStreamPointer.tsx'; export * from './src/services/stream_pointer_view.ts'; export * from './src/components/common/ContextMenu.tsx';", resolveDir: process.cwd() },
+const bundle = await build({ stdin: { contents: "export * from './src/hooks/stream/useStreamPointer.tsx'; export * from './src/services/stream_pointer_view.ts'; export * from './src/components/common/ContextMenu.tsx';", resolveDir: process.cwd() },
   bundle: true, write: false, format: 'esm', platform: 'node', jsx: 'automatic', plugins: [{ name: 'dependencies', setup(builder) {
     builder.onResolve({ filter: /services\/room_service$/ }, () => ({ path: 'room-service', namespace: 'stub' }));
     builder.onLoad({ filter: /.*/, namespace: 'stub' }, () => ({ contents: 'export const roomService = { refreshStreamPointerView() {}, sendStreamPointer(packet) { globalThis.__pointerTestSent.push(packet); } };' }));

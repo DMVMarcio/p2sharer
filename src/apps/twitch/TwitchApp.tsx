@@ -1,6 +1,6 @@
 import { t } from '../../i18n/index.ts';
 import { useLocale } from '../../hooks/useLocale';
-import { useElementFullscreen } from '../../hooks/useElementFullscreen';
+import { useElementFullscreen } from '../../hooks/media/useElementFullscreen';
 import React, { useEffect, useRef, useState } from 'react';
 import { invoke, isTauri } from '@tauri-apps/api/core';
 import { getSessionAppVolume, saveSessionAppVolume } from '../../core/media/stream_volume_preferences';

@@ -13,7 +13,7 @@ import { safeChatUrl } from '../../core/chat/chat_links';
 import { ChatEmojiDecorations } from './ChatEmojiDecorations';
 import { CodeBlockExtension } from './CodeBlockExtension';
 import { CodeEditing } from './CodeEditing';
-import { useTextEditorContextMenu } from '../../hooks/useTextEditorContextMenu';
+import { useTextEditorContextMenu } from '../../hooks/ui/useTextEditorContextMenu';
 
 export type EmojiComposerHandle = {
   insertEmoji: (emoji: string) => void;

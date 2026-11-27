@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { isMobileDevice } from '../core/platform';
+import { isMobileDevice } from '../../core/platform';
 
 /**
  * Reactive hook that updates whenever the client window dimensions or

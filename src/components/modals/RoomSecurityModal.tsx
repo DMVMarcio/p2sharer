@@ -2,7 +2,7 @@ import { useModalDialogBehavior } from '../common/useModalDialogBehavior';
 import { t } from '../../i18n';
 import { useLocale } from '../../hooks/useLocale';
 import React, { useState } from 'react';
-import { useFormSubmit } from '../../hooks/useFormSubmit';
+import { useFormSubmit } from '../../hooks/ui/useFormSubmit';
 import { useModal } from '../../hooks/useModal';
 import { useRoom } from '../../hooks/useRoom';
 import { showToast } from '../../hooks/useToast';

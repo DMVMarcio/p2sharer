@@ -8,7 +8,7 @@ import { savedRooms, type SavedRoom } from '../../core/room/saved_rooms';
 import { compareRoomInvites, parseRoomInvite } from '../../core/room/room_invite';
 import { verifyRoomInvite } from '../../core/room/room_invite_validation';
 import { showToast } from '../../hooks/useToast';
-import { useFormSubmit } from '../../hooks/useFormSubmit';
+import { useFormSubmit } from '../../hooks/ui/useFormSubmit';
 
 interface EditSavedRoomDialogProps {
   room: SavedRoom;

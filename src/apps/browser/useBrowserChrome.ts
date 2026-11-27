@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useIdleControls } from './useIdleControls';
+import { useIdleControls } from '../../hooks/ui/useIdleControls';
 
 /** Explicit collapse takes precedence over fullscreen pointer/idle visibility. */
 export function useBrowserChrome(fullscreen: boolean) {

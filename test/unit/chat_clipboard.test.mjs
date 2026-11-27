@@ -8,7 +8,7 @@ const dom = new JSDOM('<div id="root"></div>', { url: 'http://localhost' });
 for (const key of ['window', 'document', 'HTMLElement', 'Element', 'Node', 'DOMParser', 'FileReader']) globalThis[key] = dom.window[key];
 globalThis.IS_REACT_ACT_ENVIRONMENT = true;
 const fixture = globalThis.clipboardFixture = { calls: [] };
-const bundle = await build({ stdin: { contents: "export { useChatFileInput } from './src/hooks/useChatFileInput.ts';", resolveDir: process.cwd() },
+const bundle = await build({ stdin: { contents: "export { useChatFileInput } from './src/hooks/room/useChatFileInput.ts';", resolveDir: process.cwd() },
   bundle: true, write: false, platform: 'node', format: 'esm', jsx: 'automatic', plugins: [{ name: 'clipboard-native-fixture', setup(builder) {
     builder.onResolve({ filter: /\/platform\/commands\.ts$/ }, () => ({ path: 'core', namespace: 'fixture' }));
     builder.onResolve({ filter: /^@tauri-apps\/api\/(core|webview)$/ }, args => ({ path: args.path.split('/').at(-1), namespace: 'fixture' }));

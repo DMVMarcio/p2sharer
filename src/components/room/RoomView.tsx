@@ -1,7 +1,7 @@
 import { t } from '../../i18n';
 import { useLocale } from '../../hooks/useLocale';
 import React, { useEffect, useRef, useState } from 'react';
-import { usePanelSize } from '../../hooks/usePanelSize';
+import { usePanelSize } from '../../hooks/ui/usePanelSize';
 import { PanelResizeHandle } from '../common/PanelResizeHandle';
 import { UnreadChatBadge } from './UnreadChatBadge';
 import { StreamHeaderBar } from './StreamHeaderBar';
@@ -11,7 +11,7 @@ import { MobileRoomDock } from './MobileRoomDock';
 import { ChatFileRequests } from './ChatFileRequests';
 import { useRoom } from '../../hooks/useRoom';
 import { useModal } from '../../hooks/useModal';
-import { useIsMobile } from '../../hooks/useIsMobile';
+import { useIsMobile } from '../../hooks/ui/useIsMobile';
 import { stateStore } from '../../core/state_store';
 import { TooltipButton } from '../common/TooltipButton';
 import { AlertTriangle, Plus, X } from 'lucide-react';

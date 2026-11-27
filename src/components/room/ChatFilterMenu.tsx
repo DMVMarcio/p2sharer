@@ -2,7 +2,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { ListFilter } from 'lucide-react';
 import { t } from '../../i18n';
 import { useLocale } from '../../hooks/useLocale';
-import { useDropdownPresence } from '../../hooks/useDropdownPresence';
+import { useDropdownPresence } from '../../hooks/presence/useDropdownPresence';
 import { Tooltip } from '../common/Tooltip';
 import {
   countHiddenChatCategories,

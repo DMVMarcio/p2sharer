@@ -16,7 +16,7 @@ globalThis.cancelAnimationFrame = id => frames.delete(id);
 globalThis.pipDragCalls = 0;
 const require = createRequire(import.meta.url);
 const bundle = await build({ stdin: {
-  contents: "export * from './src/components/common/Tooltip.tsx'; export * from './src/hooks/usePipWindowDrag.ts';",
+  contents: "export * from './src/components/common/Tooltip.tsx'; export * from './src/hooks/room/usePipWindowDrag.ts';",
   resolveDir: process.cwd(),
 }, bundle: true, write: false, platform: 'node', format: 'esm', jsx: 'automatic', plugins: [{ name: 'dependencies', setup(builder) {
   builder.onResolve({ filter: /^@tauri-apps\/api\/(core|window)$/ }, args => ({ path: args.path, namespace: 'desktop' }));
