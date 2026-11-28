@@ -21,6 +21,7 @@ export class AudioBridge {
   private stableChunks = 0;
   private receivedPcm = false;
   private remoteConsumersActive = true;
+  private nativeCaptureStarted = false;
 
   // Preallocated buffer cache to eliminate per-chunk allocations (200 allocs/sec)
   private byteBuffer: Uint8Array = new Uint8Array(16384);
@@ -90,6 +91,7 @@ export class AudioBridge {
       throw error;
     }
     try {
+      this.nativeCaptureStarted = true;
       await invoke('start_audio_capture', {
         config: {
           mode,
@@ -100,6 +102,7 @@ export class AudioBridge {
         },
       });
     } catch (err) {
+      this.nativeCaptureStarted = false;
       console.warn('Rust start_audio_capture warning:', err);
     }
     return track;
@@ -243,6 +246,10 @@ export class AudioBridge {
     this.stableChunks = 0;
     this.lastAudioTimestampUs = 0;
     this.receivedPcm = false;
+    if (this.nativeCaptureStarted) {
+      this.nativeCaptureStarted = false;
+      void invoke('stop_audio_capture').catch(() => {});
+    }
     if (this.unlisten) {
       this.unlisten();
       this.unlisten = null;

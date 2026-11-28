@@ -708,19 +708,7 @@ export class GroupRoomManager {
     }
   }
 
-  private async peerUsesRelayRoute(peerId: string): Promise<boolean> {
-    try {
-      const pc = this.room?.getPeers?.()?.[peerId] as RTCPeerConnection | undefined;
-      if (!pc || typeof pc.getStats !== 'function') return false;
-      const stats = await pc.getStats();
-      const selected = selectedIcePair(Array.from(stats.values()) as IceStat[]);
-      return selected?.local?.candidateType === 'relay' || selected?.remote?.candidateType === 'relay';
-    } catch {
-      return false;
-    }
-  }
-
-  private async getFreshRtcConfiguration(peerId?: string): Promise<RTCConfiguration> {
+  private async getFreshRtcConfiguration(_peerId?: string): Promise<RTCConfiguration> {
     if (this.snapshot?.connection || this.backgroundProbe) {
       return this.getRtcConfiguration();
     }
@@ -729,13 +717,13 @@ export class GroupRoomManager {
       this.turnConfig = freshTurn;
       this.applyTurnConfiguration(freshTurn);
     }
-    if (this.fallbackRtcConfig && peerId) {
-      if (await this.peerUsesRelayRoute(peerId)) {
-        return structuredClone(this.fallbackRtcConfig);
-      }
-      return structuredClone(this.rtcConfig ?? buildDirectRtcConfiguration());
+    if (this.fallbackRtcConfig) {
+      // Include TURN alongside STUN (iceTransportPolicy remains 'all' unless forceRelay is set);
+      // NativeVideoTransport delays relay candidates so direct IPv4 pairs still win while NATed
+      // peers can fall back to TURN instead of timing out after 10s into CPU VP8 re-encoding.
+      return structuredClone(this.fallbackRtcConfig);
     }
-    return structuredClone(this.fallbackRtcConfig ?? this.rtcConfig ?? buildRtcConfiguration(freshTurn));
+    return structuredClone(this.rtcConfig ?? buildRtcConfiguration(freshTurn));
   }
 
   public sendStreamPointerState(state: StreamPointerState): void {

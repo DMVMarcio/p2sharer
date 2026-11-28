@@ -376,24 +376,49 @@ pub async fn create_native_video_offer(
             parameter: "fir".into(),
         },
     ];
+    for (payload_type, fmtp) in [
+        (
+            102u8,
+            "level-asymmetry-allowed=1;packetization-mode=1;profile-level-id=640033",
+        ),
+        (
+            103u8,
+            "level-asymmetry-allowed=1;packetization-mode=1;profile-level-id=4d0033",
+        ),
+        (
+            104u8,
+            "level-asymmetry-allowed=1;packetization-mode=1;profile-level-id=42e01f",
+        ),
+        (
+            105u8,
+            "level-asymmetry-allowed=1;packetization-mode=1;profile-level-id=42001f",
+        ),
+    ] {
+        engine
+            .register_codec(
+                RTCRtpCodecParameters {
+                    capability: RTCRtpCodecCapability {
+                        mime_type: "video/H264".into(),
+                        clock_rate: 90_000,
+                        sdp_fmtp_line: fmtp.into(),
+                        rtcp_feedback: rtcp_feedback.clone(),
+                        ..Default::default()
+                    },
+                    payload_type,
+                    ..Default::default()
+                },
+                RTPCodecType::Video,
+            )
+            .map_err(|e| e.to_string())?;
+    }
+    // Leave sdp_fmtp_line empty on TrackLocalStaticRTP so webrtc-rs binds to whichever
+    // H.264 profile the remote receiver accepts and rewrites packet payload_type automatically.
     let codec = RTCRtpCodecCapability {
         mime_type: "video/H264".into(),
         clock_rate: 90_000,
-        sdp_fmtp_line: "level-asymmetry-allowed=1;packetization-mode=1;profile-level-id=640033"
-            .into(),
         rtcp_feedback,
         ..Default::default()
     };
-    engine
-        .register_codec(
-            RTCRtpCodecParameters {
-                capability: codec.clone(),
-                payload_type: 102,
-                ..Default::default()
-            },
-            RTPCodecType::Video,
-        )
-        .map_err(|e| e.to_string())?;
     engine
         .register_header_extension(
             RTCRtpHeaderExtensionCapability {
