@@ -2419,14 +2419,22 @@ pub fn ensure_ws_server_running() {
                         };
                         let (credential, session_id) = candidate.split_once(':').unwrap_or((&candidate, "default"));
                         let authorized = credential == token;
-                        let sender = if session_id == "default" { Some(get_frame_sender().clone()) } else {
-                            SESSIONS.lock().ok().and_then(|sessions| sessions.get(session_id).map(|session| session.sender.clone()))
+                        let session_handles = if session_id == "default" {
+                            Some((get_frame_sender().clone(), None))
+                        } else {
+                            SESSIONS.lock().ok().and_then(|sessions| {
+                                sessions.get(session_id).map(|session| {
+                                    (session.sender.clone(), Some(session.consumers_active.clone()))
+                                })
+                            })
                         };
-                        if !authorized || sender.is_none() {
+                        if !authorized || session_handles.is_none() {
                             let _ = write.send(Message::Close(None)).await;
                             return;
                         }
-                        let mut rx = sender.unwrap().subscribe();
+                        let (sender, consumers_active) = session_handles.unwrap();
+                        let mut rx = sender.subscribe();
+                        let mut sent_first_binary = false;
                         if write.send(Message::Text("auth-ok".into())).await.is_err() {
                             return;
                         }
@@ -2441,6 +2449,18 @@ pub fn ensure_ws_server_running() {
                                 msg = rx.recv() => {
                                     match msg {
                                         Ok(msg) => {
+                                            if matches!(msg, Message::Binary(_)) {
+                                                // Skip loopback video traffic to WebView2 when no local preview
+                                                // or browser fallback consumer is active; native RTP routes read
+                                                // from their own broadcast receiver.
+                                                let webview_wants_frames = consumers_active
+                                                    .as_ref()
+                                                    .map_or(true, |flag| flag.load(Ordering::Relaxed));
+                                                if sent_first_binary && !webview_wants_frames {
+                                                    continue;
+                                                }
+                                                sent_first_binary = true;
+                                            }
                                             if write.send(msg).await.is_err() {
                                                 break;
                                             }
