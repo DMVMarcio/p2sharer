@@ -5,78 +5,91 @@
       "**Direct GPU screen sharing actually sticks now.** Fixed a handshake hiccup that pushed streams onto heavy CPU re-encoding, keeping shares crisp and light.",
       "**More graphics cards joined the hardware party.** Older NVIDIA cards (like the GTX 660) and Intel graphics now get direct hardware encoding instead of sweating on CPU.",
       "**Your PC can finally catch its breath.** Screen sharing pauses heavy work when nobody is watching, and offscreen or disabled animations actually sit still now.",
+      "**Shares connect faster and without sudden drops.** GPU streams now use direct IPv6 paths and starting a share no longer kicks or reconnects people in the room.",
       "**No more 'connecting' while you're already talking.** Fixed a bug where a participant stayed stuck on connecting even while their voice was coming through loud and clear."
     ],
     "pt-BR": [
       "**Compartilhamento por GPU agora segura firme.** Corrigimos uma falha na negociação que jogava a transmissão pro processador, deixando tudo mais leve e nítido.",
       "**Mais placas entraram na festa do hardware.** Placas NVIDIA mais antigas (como a GTX 660) e gráficos Intel agora usam aceleração por GPU sem fritar a CPU.",
       "**Seu PC finalmente pode respirar.** A captura desacelera quando ninguém está assistindo, e animações fora da tela ou desativadas agora ficam quietinhas de verdade.",
+      "**Transmissões conectam mais rápido e sem sustos.** O vídeo por GPU agora usa rotas diretas em IPv6 e começar a compartilhar não derruba nem reconecta mais ninguém.",
       "**Chega de 'conectando' enquanto vocês já conversam.** Corrigimos o bug em que um participante ficava preso em conectando mesmo com a voz dele chegando normalmente."
     ],
     "es": [
-      "**El video por GPU ahora sí se queda en la GPU.** Corregimos un fallo que mandaba la transmisión a recodificar en CPU, dejándola mucho más ligera y nítida.",
+      "**El video por GPU ahora sí se queda en la GPU.** Corrigimos un fallo que mandaba la transmisión a recodificar en CPU, dejándola mucho más ligera y nítida.",
       "**Más tarjetas se sumaron a la fiesta.** GPU NVIDIA antiguas (como la GTX 660) y gráficos Intel ahora usan codificación por hardware en lugar de exprimir tu CPU.",
       "**Tu PC al fin puede tomar un respiro.** Compartir pantalla pausa el trabajo pesado cuando nadie mira, y las animaciones ocultas o desactivadas ahora sí se detienen.",
+      "**Las transmisiones conectan más rápido y sin sobresaltos.** El video por GPU ahora usa rutas directas IPv6 y empezar a compartir ya no reconecta a los demás.",
       "**Basta de ver 'conectando' mientras ya hablan.** Corregimos un fallo donde alguien seguía apareciendo en conexión aunque su voz ya se escuchara perfectamente."
     ],
     "fr": [
       "**Le partage d'écran par GPU tient enfin bon.** Correction d'un souci de négociation qui basculait le flux sur le processeur, pour un partage plus léger et plus net.",
       "**Plus de cartes rejoignent la fête matérielle.** Les anciennes cartes NVIDIA (comme la GTX 660) et les GPU Intel profitent maintenant de l'encodage matériel.",
       "**Votre PC peut enfin souffler.** Le partage met le gros travail en pause quand personne ne regarde, et les animations cachées ou désactivées restent vraiment calmes.",
+      "**Des partages plus rapides et sans coupure.** Le flux GPU passe maintenant en IPv6 direct, et lancer un partage ne déconnecte plus personne dans le salon.",
       "**Fini le 'connexion' alors que vous parlez déjà.** Correction d'un bug où un participant restait bloqué sur connexion même quand sa voix passait déjà très bien."
     ],
     "de": [
       "**Direktes GPU-Screensharing bleibt jetzt wirklich dabei.** Ein Aushandlungsfehler fiel bisher auf schwere CPU-Neukodierung zurück – jetzt bleibt alles flüssig und leicht.",
       "**Mehr Grafikkarten feiern jetzt mit.** Ältere NVIDIA-Karten (wie die GTX 660) und Intel-Grafik nutzen nun direktes Hardware-Encoding statt die CPU ins Schwitzen zu bringen.",
       "**Dein PC darf endlich durchatmen.** Wenn niemand zuschaut, pausiert die Bildschirmaufnahme die schwere Arbeit, und verborgene oder deaktivierte Animationen bleiben still.",
+      "**Streams verbinden schneller und ohne Aussetzer.** GPU-Streams nutzen jetzt direkte IPv6-Wege, und das Starten einer Freigabe trennt niemanden mehr im Raum.",
       "**Schluss mit 'Verbindet…' mitten im Gespräch.** Behoben, dass Teilnehmende auf Verbinden hängen blieben, obwohl ihre Stimme längst klar und deutlich ankam."
     ],
     "it": [
       "**La condivisione via GPU ora resta davvero sulla GPU.** Risolto un intoppo che spostava lo stream sulla CPU, rendendo tutto più nitido e leggero.",
       "**Più schede video si sono unite alla festa.** Anche le NVIDIA più datate (come la GTX 660) e le grafiche Intel ora usano l'accelerazione hardware al posto della CPU.",
       "**Il tuo PC può finalmente tirare il fiato.** La condivisione mette in pausa il lavoro pesante quando nessuno guarda, e le animazioni nascoste o disattivate stanno ferme.",
+      "**Condivisioni più rapide e senza intoppi.** Lo stream GPU ora usa percorsi IPv6 diretti e avviare una condivisione non fa più riconnettere nessuno.",
       "**Basta 'connessione' mentre state già parlando.** Risolto il bug per cui un partecipante restava bloccato in connessione anche se la sua voce si sentiva benissimo."
     ],
     "zh-CN": [
       "**GPU 硬件直推终于稳住了。** 修复了协商异常导致画面退回高负载 CPU 重编码的问题，共享画面更清晰也更省资源。",
       "**更多显卡加入硬件加速阵营。** 老款 NVIDIA 显卡（如 GTX 660）与 Intel 核显现在也能使用硬件编码，不必再让 CPU 硬扛。",
       "**电脑终于能喘口气了。** 没人观看时屏幕共享会自动暂停繁重编码，屏幕外或已关闭的动画也会老老实实停下来。",
+      "**画面连接更快、不再突然重连。** GPU 共享现已支持直连 IPv6 链路，点击开始共享时也不会再把房间里的成员意外踢下线或触发重连。",
       "**人都聊上了，别再显示连接中了。** 修复了语音已经清晰传过来，但参与者卡片仍一直卡在“正在连接”的问题。"
     ],
     "zh-TW": [
       "**GPU 硬體直推終於穩住了。** 修復了協商異常導致畫面退回高負載 CPU 重編碼的問題，分享畫面更清晰也更省資源。",
       "**更多顯示卡加入硬體加速行列。** 舊款 NVIDIA 顯卡（如 GTX 660）與 Intel 內顯現在也能使用硬體編碼，不必再讓 CPU 硬撐。",
       "**電腦終於能喘口氣了。** 沒人觀看時螢幕分享會自動暫停繁重編碼，畫面外或已關閉的動畫也會乖乖停下來。",
+      "**畫面連線更快、不再突然重連。** GPU 分享現已支援直連 IPv6 路徑，按下開始分享時也不會再讓房間裡的成員意外斷線或重連。",
       "**人都聊起來了，別再卡在連線中。** 修復了語音明明已經清楚傳來，參與者卡片卻還一直顯示「連線中」的問題。"
     ],
     "ja": [
       "**GPUでの画面共有がしっかり安定しました。** 交渉エラーで重いCPU再エンコードに落ちてしまう不具合を直し、軽くてくっきりした共有になりました。",
       "**対応GPUがさらに広がりました。** GTX 660 などの旧世代NVIDIAカードやIntelグラフィックスでも、CPUに頼らずハードウェアエンコードが使えます。",
       "**PCもようやくひと休み。** 誰も見ていないときは重いエンコードを一時停止し、画面外や無効化されたアニメーションもしっかり止まるようになりました。",
+      "**共有の接続がより速く、途切れにくくなりました。** GPU共有が直接IPv6接続に対応し、共有開始時にルーム内のメンバーが再接続される問題も解消しました。",
       "**もう話しているのに「接続中」のまま問題を修正。** 音声が普通に届いているのに参加者が接続中のまま固まることがあった不具合を直しました。"
     ],
     "ko": [
       "**GPU 화면 공유가 이제 제대로 유지됩니다.** 협상 오류로 무거운 CPU 재인코딩으로 빠지던 문제를 고쳐 더 가볍고 선명하게 공유할 수 있어요.",
       "**더 많은 그래픽카드가 하드웨어 가속에 합류했어요.** GTX 660 같은 구형 NVIDIA 카드와 Intel 그래픽도 CPU 대신 하드웨어 인코딩을 사용합니다.",
       "**이제 PC도 숨 좀 돌릴 수 있어요.** 아무도 보지 않을 때는 무거운 인코딩을 잠시 멈추고, 화면 밖이거나 꺼 둔 애니메이션도 조용히 멈춥니다.",
+      "**공유가 더 빠르고 끊김 없이 연결됩니다.** 이제 GPU 스트림이 직접 IPv6 경로를 사용하며, 화면 공유를 시작할 때 방 안의 다른 참가자가 재연결되지 않아요.",
       "**이미 대화 중인데 '연결 중'으로 남던 버그 수정.** 상대방 목소리가 잘 들리는데도 참가자가 계속 연결 중 상태로 멈춰 있던 문제를 고쳤습니다."
     ],
     "hi": [
       "**GPU स्क्रीन शेयरिंग अब सच में GPU पर ही टिकती है।** भारी CPU री-एनकोडिंग पर फिसलने वाली गड़बड़ ठीक हो गई, जिससे शेयरिंग हल्की और साफ रहती है।",
       "**अब और ग्राफ़िक्स कार्ड्स भी हार्डवेयर पार्टी में हैं।** पुराने NVIDIA कार्ड्स (जैसे GTX 660) और Intel ग्राफ़िक्स को भी अब CPU की जगह हार्डवेयर एनकोडिंग मिलती है।",
       "**आपके PC को आखिरकार चैन की सांस मिली।** जब कोई देख न रहा हो तो स्क्रीन शेयरिंग भारी काम रोक देती है, और बंद या छिपे एनिमेशन भी अब शांत रहते हैं।",
+      "**शेयर अब तेज़ी से और बिना झटके के जुड़ते हैं।** GPU स्ट्रीम अब सीधे IPv6 रास्ते से जुड़ती हैं और शेयर शुरू करने पर कोई रीकनेक्ट नहीं होता।",
       "**बातचीत चल रही हो और फिर भी 'कनेक्ट हो रहा है' न दिखे।** आवाज़ साफ आने के बावजूद किसी सदस्य के कनेक्टिंग पर अटके रहने की गड़बड़ ठीक कर दी गई।"
     ],
     "fi": [
       "**Suora GPU-näytönjako pysyy nyt oikeasti päällä.** Korjattiin neuvotteluhäiriö, joka pudotti jaon raskaalle CPU-uudelleenkoodaukselle.",
       "**Lisää näytönohjaimia pääsi laitteistokiihdytykseen.** Vanhemmat NVIDIA-kortit (kuten GTX 660) ja Intel-grafiikat käyttävät nyt suoraa laitteistokoodausta.",
       "**Koneesi saa vihdoin vetää henkeä.** Näytönjako tauottaa raskaan työn, kun kukaan ei katso, ja piilotetut tai poistetut animaatiot pysyvät oikeasti paikallaan.",
+      "**Jaot yhdistyvät nopeammin ilman yllätyksiä.** GPU-video käyttää nyt suoraa IPv6-yhteyttä, eikä jaon aloittaminen enää katkaise tai yhdistä muita uudelleen.",
       "**Ei enää 'yhdistetään' kesken juttelun.** Korjattiin bugi, jossa osallistuja jäi jumiin yhdistämistilaan, vaikka hänen äänensä kuului jo täysin normaalisti."
     ],
     "ru": [
       "**Трансляция через GPU больше не срывается.** Исправлен сбой согласования, из-за которого видео скатывалось на тяжёлую перекодировку процессором.",
       "**К аппаратному ускорению подключилось больше видеокарт.** Старые NVIDIA (вроде GTX 660) и графика Intel теперь кодируют видео на GPU, а не нагружают процессор.",
       "**Компьютер наконец-то выдохнул.** Захват ставит тяжёлую работу на паузу, когда никто не смотрит, а скрытые и отключённые анимации теперь действительно не крутятся.",
+      "**Трансляции подключаются быстрее и без обрывов.** Видео через GPU теперь работает напрямую по IPv6, а запуск показа экрана больше не переподключает участников.",
       "**Хватит писать «подключение», когда вы уже общаетесь.** Исправлена ошибка, из-за которой участник зависал в статусе подключения, хотя его голос уже был слышен."
     ]
   }
