@@ -11,19 +11,31 @@ struct NativeLogger;
 static NATIVE_LOGGER: NativeLogger = NativeLogger;
 
 impl log::Log for NativeLogger {
-    fn enabled(&self, metadata: &log::Metadata<'_>) -> bool { metadata.level() <= log::Level::Warn }
+    fn enabled(&self, metadata: &log::Metadata<'_>) -> bool {
+        metadata.level() <= log::Level::Warn
+    }
     fn log(&self, record: &log::Record<'_>) {
         if self.enabled(record.metadata()) {
-            log_msg(record.level().as_str(), record.target(), &format!("{} ({}:{})", record.args(),
-                record.file().unwrap_or("unknown"), record.line().unwrap_or(0)));
+            log_msg(
+                record.level().as_str(),
+                record.target(),
+                &format!(
+                    "{} ({}:{})",
+                    record.args(),
+                    record.file().unwrap_or("unknown"),
+                    record.line().unwrap_or(0)
+                ),
+            );
         }
     }
-    fn flush(&self) { flush_log(); }
+    fn flush(&self) {
+        flush_log();
+    }
 }
 
-fn session_log_started_at(path: &Path) -> Option<u128> {
+fn timestamped_log_started_at(path: &Path, prefix: &str, suffix: &str) -> Option<u128> {
     let name = path.file_name()?.to_str()?;
-    let stem = name.strip_prefix("session-")?.strip_suffix(".log")?;
+    let stem = name.strip_prefix(prefix)?.strip_suffix(suffix)?;
     let (started_at, pid) = stem.split_once('-')?;
     if !started_at.bytes().all(|byte| byte.is_ascii_digit())
         || !pid.bytes().all(|byte| byte.is_ascii_digit())
@@ -34,7 +46,18 @@ fn session_log_started_at(path: &Path) -> Option<u128> {
     started_at.parse::<u128>().ok()
 }
 
-fn rotate_session_logs(log_dir: &Path, current_path: &Path) -> std::io::Result<()> {
+#[cfg(test)]
+fn session_log_started_at(path: &Path) -> Option<u128> {
+    timestamped_log_started_at(path, "session-", ".log")
+}
+
+pub(crate) fn rotate_timestamped_logs(
+    log_dir: &Path,
+    prefix: &str,
+    suffix: &str,
+    max_files: usize,
+    current_path: &Path,
+) -> std::io::Result<()> {
     let mut logs = fs::read_dir(log_dir)?
         .filter_map(|entry| {
             let entry = entry.ok()?;
@@ -42,13 +65,13 @@ fn rotate_session_logs(log_dir: &Path, current_path: &Path) -> std::io::Result<(
                 return None;
             }
             let path = entry.path();
-            let started_at = session_log_started_at(&path)?;
+            let started_at = timestamped_log_started_at(&path, prefix, suffix)?;
             Some((started_at, entry.file_name(), path))
         })
         .collect::<Vec<_>>();
 
     logs.sort_by(|left, right| left.0.cmp(&right.0).then_with(|| left.1.cmp(&right.1)));
-    let mut excess = logs.len().saturating_sub(MAX_SESSION_LOGS);
+    let mut excess = logs.len().saturating_sub(max_files);
     for (_, _, path) in logs {
         if excess == 0 {
             break;
@@ -59,13 +82,17 @@ fn rotate_session_logs(log_dir: &Path, current_path: &Path) -> std::io::Result<(
         match fs::remove_file(&path) {
             Ok(()) => excess -= 1,
             Err(error) => eprintln!(
-                "[LOGGER] Failed to remove old session log {}: {}",
+                "[LOGGER] Failed to remove old log {}: {}",
                 path.display(),
                 error
             ),
         }
     }
     Ok(())
+}
+
+fn rotate_session_logs(log_dir: &Path, current_path: &Path) -> std::io::Result<()> {
+    rotate_timestamped_logs(log_dir, "session-", ".log", MAX_SESSION_LOGS, current_path)
 }
 
 pub fn get_log_dir() -> PathBuf {
@@ -109,7 +136,10 @@ pub fn init_logger() {
     let log_dir = get_log_dir();
     let _ = fs::create_dir_all(&log_dir);
 
-    let started_at = SystemTime::now().duration_since(UNIX_EPOCH).unwrap_or_default().as_millis();
+    let started_at = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_millis();
     let session_path = log_dir.join(format!("session-{}-{}.log", started_at, std::process::id()));
 
     match OpenOptions::new()
@@ -135,7 +165,9 @@ pub fn init_logger() {
         }
     }
 
-    if log::set_logger(&NATIVE_LOGGER).is_ok() { log::set_max_level(log::LevelFilter::Warn); }
+    if log::set_logger(&NATIVE_LOGGER).is_ok() {
+        log::set_max_level(log::LevelFilter::Warn);
+    }
 
     // Preserve panic traces in release builds even without RUST_BACKTRACE.
     let default_hook = std::panic::take_hook();
@@ -169,7 +201,11 @@ pub fn init_logger() {
         default_hook(panic_info);
     }));
 
-    log_msg("INFO", "system", "P2Sharer diagnostics logger initialized successfully.");
+    log_msg(
+        "INFO",
+        "system",
+        "P2Sharer diagnostics logger initialized successfully.",
+    );
 }
 
 fn get_timestamp() -> String {
@@ -240,7 +276,9 @@ pub fn log_msg(level: &str, target: &str, message: &str) {
     let line = format!("[{}][{:5}][{}] {}\r\n", timestamp, level, target, message);
     print!("{}", line);
     log_raw(&line);
-    if matches!(level, "WARN" | "ERROR" | "FATAL") { flush_log(); }
+    if matches!(level, "WARN" | "ERROR" | "FATAL") {
+        flush_log();
+    }
 }
 
 #[tauri::command]
@@ -299,10 +337,16 @@ pub fn open_latest_log() -> Result<(), String> {
 pub fn clear_log_file() -> Result<(), String> {
     let path = current_log_path()?;
     {
-        let mut lock = LOG_FILE.lock().map_err(|_| "Não foi possível acessar o log.".to_string())?;
-        let file = lock.as_mut().ok_or_else(|| "Arquivo de log ainda não foi criado.".to_string())?;
-        file.set_len(0).map_err(|e| format!("Falha ao limpar arquivo de log: {}", e))?;
-        file.seek(SeekFrom::Start(0)).map_err(|e| format!("Falha ao reiniciar o log: {}", e))?;
+        let mut lock = LOG_FILE
+            .lock()
+            .map_err(|_| "Não foi possível acessar o log.".to_string())?;
+        let file = lock
+            .as_mut()
+            .ok_or_else(|| "Arquivo de log ainda não foi criado.".to_string())?;
+        file.set_len(0)
+            .map_err(|e| format!("Falha ao limpar arquivo de log: {}", e))?;
+        file.seek(SeekFrom::Start(0))
+            .map_err(|e| format!("Falha ao reiniciar o log: {}", e))?;
         write_log_header(file, &path, "Log Cleared")
             .map_err(|e| format!("Falha ao reescrever o log: {}", e))?;
     }
@@ -316,14 +360,24 @@ mod tests {
 
     #[test]
     fn native_errors_and_version_header_are_written_to_the_session_file() {
-        let unique = SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_nanos();
+        let unique = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap()
+            .as_nanos();
         let path = std::env::temp_dir().join(format!("p2sharer-logger-test-{unique}.log"));
         let mut file = File::create(&path).unwrap();
         write_log_header(&mut file, &path, "Test Session").unwrap();
         let previous = LOG_FILE.lock().unwrap().replace(file);
-        log::Log::log(&NATIVE_LOGGER, &log::Record::builder()
-            .args(format_args!("Native test failure code=42"))
-            .level(log::Level::Error).target("test.native").file(Some("fixture.rs")).line(Some(12)).build());
+        log::Log::log(
+            &NATIVE_LOGGER,
+            &log::Record::builder()
+                .args(format_args!("Native test failure code=42"))
+                .level(log::Level::Error)
+                .target("test.native")
+                .file(Some("fixture.rs"))
+                .line(Some(12))
+                .build(),
+        );
         *LOG_FILE.lock().unwrap() = previous;
         let text = fs::read_to_string(&path).unwrap();
         assert!(text.contains(&format!("App Version: {}", env!("CARGO_PKG_VERSION"))));
@@ -366,6 +420,47 @@ mod tests {
         }
         assert!(log_dir.join("notes.txt").exists());
         assert!(log_dir.join("session-invalid-123.log").exists());
+
+        fs::remove_dir_all(log_dir).unwrap();
+    }
+
+    #[test]
+    fn rotation_keeps_four_newest_performance_and_media_diagnostic_logs_independently() {
+        let unique = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap()
+            .as_nanos();
+        let log_dir = std::env::temp_dir().join(format!("p2sharer-perf-diag-rotation-{unique}"));
+        fs::create_dir(&log_dir).unwrap();
+
+        for started_at in (1..=6).rev() {
+            File::create(log_dir.join(format!("performance-{started_at}-42.json"))).unwrap();
+            File::create(log_dir.join(format!("media-diagnostics-{started_at}-42.jsonl"))).unwrap();
+        }
+        File::create(log_dir.join("session-1-42.log")).unwrap();
+
+        let current_perf = log_dir.join("performance-6-42.json");
+        rotate_timestamped_logs(&log_dir, "performance-", ".json", 4, &current_perf).unwrap();
+
+        let current_diag = log_dir.join("media-diagnostics-6-42.jsonl");
+        rotate_timestamped_logs(&log_dir, "media-diagnostics-", ".jsonl", 4, &current_diag)
+            .unwrap();
+
+        for started_at in 1..=6 {
+            assert_eq!(
+                log_dir
+                    .join(format!("performance-{started_at}-42.json"))
+                    .exists(),
+                started_at >= 3
+            );
+            assert_eq!(
+                log_dir
+                    .join(format!("media-diagnostics-{started_at}-42.jsonl"))
+                    .exists(),
+                started_at >= 3
+            );
+        }
+        assert!(log_dir.join("session-1-42.log").exists());
 
         fs::remove_dir_all(log_dir).unwrap();
     }

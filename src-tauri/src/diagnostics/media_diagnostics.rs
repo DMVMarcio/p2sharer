@@ -170,6 +170,7 @@ mod enabled {
     static WRITER: OnceLock<SyncSender<(&'static str, Value, u64, u64)>> = OnceLock::new();
     static DROPPED: AtomicU64 = AtomicU64::new(0);
     const LIMIT: u64 = 32 * 1024 * 1024;
+    const MAX_MEDIA_DIAGNOSTIC_LOGS: usize = 4;
 
     pub fn enqueue(kind: &'static str, value: Value) {
         if let Some(writer) = WRITER.get() {
@@ -200,10 +201,19 @@ mod enabled {
         let Ok(mut file) = std::fs::OpenOptions::new()
             .create_new(true)
             .write(true)
-            .open(path)
+            .open(&path)
         else {
             return;
         };
+        if let Err(error) = crate::logger::rotate_timestamped_logs(
+            &dir,
+            "media-diagnostics-",
+            ".jsonl",
+            MAX_MEDIA_DIAGNOSTIC_LOGS,
+            &path,
+        ) {
+            eprintln!("[LOGGER] Failed to rotate media diagnostic logs: {}", error);
+        }
         std::thread::spawn(move || {
             let mut bytes = 0u64;
             for (kind, data, epoch_ms, uptime_ms) in rx {

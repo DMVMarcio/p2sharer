@@ -8,7 +8,9 @@ use std::collections::{HashMap, HashSet};
 use std::fs;
 use std::sync::Mutex;
 use std::time::{Instant, SystemTime, UNIX_EPOCH};
-use sysinfo::{CpuRefreshKind, MemoryRefreshKind, ProcessRefreshKind, ProcessesToUpdate, RefreshKind, System};
+use sysinfo::{
+    CpuRefreshKind, MemoryRefreshKind, ProcessRefreshKind, ProcessesToUpdate, RefreshKind, System,
+};
 
 use crate::screen_sources::ActiveCaptureDiagnosticSnapshot;
 
@@ -316,7 +318,9 @@ fn probe_gpu_adapters() -> Vec<GpuAdapterInfo> {
                     .iter()
                     .position(|&c| c == 0)
                     .unwrap_or(desc.Description.len());
-                let name = String::from_utf16_lossy(&desc.Description[..nul_pos]).trim().to_string();
+                let name = String::from_utf16_lossy(&desc.Description[..nul_pos])
+                    .trim()
+                    .to_string();
                 let is_software = (desc.Flags & (DXGI_ADAPTER_FLAG_SOFTWARE.0 as u32)) != 0;
                 adapters.push(GpuAdapterInfo {
                     description: name,
@@ -370,7 +374,11 @@ fn collect_hardware_info(sys: &mut System) -> HardwareInfo {
 
     HardwareInfo {
         app_version: env!("CARGO_PKG_VERSION").to_string(),
-        build_mode: if cfg!(debug_assertions) { "debug" } else { "release" },
+        build_mode: if cfg!(debug_assertions) {
+            "debug"
+        } else {
+            "release"
+        },
         arch: std::env::consts::ARCH,
         os_name: System::name().unwrap_or_else(|| "Windows".to_string()),
         os_version: System::os_version().unwrap_or_else(|| "Unknown".to_string()),
@@ -397,7 +405,8 @@ fn snapshot_process_tree(sys: &mut System) -> HashMap<u32, ProcessSample> {
     use std::mem::size_of;
     use windows::Win32::Foundation::{CloseHandle, FILETIME};
     use windows::Win32::System::Diagnostics::ToolHelp::{
-        CreateToolhelp32Snapshot, Process32FirstW, Process32NextW, PROCESSENTRY32W, TH32CS_SNAPPROCESS,
+        CreateToolhelp32Snapshot, Process32FirstW, Process32NextW, PROCESSENTRY32W,
+        TH32CS_SNAPPROCESS,
     };
     use windows::Win32::System::ProcessStatus::{GetProcessMemoryInfo, PROCESS_MEMORY_COUNTERS_EX};
     use windows::Win32::System::Threading::{
@@ -447,7 +456,10 @@ fn snapshot_process_tree(sys: &mut System) -> HashMap<u32, ProcessSample> {
     }
 
     // Refresh only our tree PIDs in sysinfo to read command lines for role classification.
-    let sys_pids: Vec<sysinfo::Pid> = tree_pids.iter().map(|&p| sysinfo::Pid::from_u32(p)).collect();
+    let sys_pids: Vec<sysinfo::Pid> = tree_pids
+        .iter()
+        .map(|&p| sysinfo::Pid::from_u32(p))
+        .collect();
     sys.refresh_processes_specifics(
         ProcessesToUpdate::Some(&sys_pids),
         false,
@@ -482,7 +494,8 @@ fn snapshot_process_tree(sys: &mut System) -> HashMap<u32, ProcessSample> {
                 let mut exit = FILETIME::default();
                 let mut kernel = FILETIME::default();
                 let mut user = FILETIME::default();
-                if GetProcessTimes(handle, &mut creation, &mut exit, &mut kernel, &mut user).is_ok() {
+                if GetProcessTimes(handle, &mut creation, &mut exit, &mut kernel, &mut user).is_ok()
+                {
                     kernel_100ns = filetime_to_u64(kernel);
                     user_100ns = filetime_to_u64(user);
                 }
@@ -557,7 +570,9 @@ fn snapshot_self_threads() -> HashMap<u32, ThreadSample> {
                         let mut exit = FILETIME::default();
                         let mut kernel = FILETIME::default();
                         let mut user = FILETIME::default();
-                        if GetThreadTimes(handle, &mut creation, &mut exit, &mut kernel, &mut user).is_ok() {
+                        if GetThreadTimes(handle, &mut creation, &mut exit, &mut kernel, &mut user)
+                            .is_ok()
+                        {
                             let name = match GetThreadDescription(handle) {
                                 Ok(pwstr) => {
                                     let s = pwstr.to_string().unwrap_or_default();
@@ -611,16 +626,28 @@ fn compute_capture_deltas(
         .iter()
         .map(|cur| {
             let prev = base_map.get(&cur.session_index).copied();
-            let d_callbacks = cur.callbacks.saturating_sub(prev.map_or(0, |p| p.callbacks));
+            let d_callbacks = cur
+                .callbacks
+                .saturating_sub(prev.map_or(0, |p| p.callbacks));
             let d_gated = cur.gated.saturating_sub(prev.map_or(0, |p| p.gated));
             let d_images = cur.images.saturating_sub(prev.map_or(0, |p| p.images));
-            let d_nvenc_images = cur.nvenc_images.saturating_sub(prev.map_or(0, |p| p.nvenc_images));
-            let d_gpu_scaled = cur.gpu_scaled_images.saturating_sub(prev.map_or(0, |p| p.gpu_scaled_images));
-            let d_readback_us = cur.readback_us.saturating_sub(prev.map_or(0, |p| p.readback_us));
+            let d_nvenc_images = cur
+                .nvenc_images
+                .saturating_sub(prev.map_or(0, |p| p.nvenc_images));
+            let d_gpu_scaled = cur
+                .gpu_scaled_images
+                .saturating_sub(prev.map_or(0, |p| p.gpu_scaled_images));
+            let d_readback_us = cur
+                .readback_us
+                .saturating_sub(prev.map_or(0, |p| p.readback_us));
             let d_jpeg_us = cur.jpeg_us.saturating_sub(prev.map_or(0, |p| p.jpeg_us));
             let d_nvenc_us = cur.nvenc_us.saturating_sub(prev.map_or(0, |p| p.nvenc_us));
-            let d_resize_us = cur.resize_us.saturating_sub(prev.map_or(0, |p| p.resize_us));
-            let d_processing_us = cur.processing_us.saturating_sub(prev.map_or(0, |p| p.processing_us));
+            let d_resize_us = cur
+                .resize_us
+                .saturating_sub(prev.map_or(0, |p| p.resize_us));
+            let d_processing_us = cur
+                .processing_us
+                .saturating_sub(prev.map_or(0, |p| p.processing_us));
 
             let img_denom = d_images.max(1) as f64;
             let nvenc_denom = d_nvenc_images.max(1) as f64;
@@ -636,16 +663,46 @@ fn compute_capture_deltas(
                 delta_gpu_scaled_images: d_gpu_scaled,
                 callbacks_per_sec: round2(d_callbacks as f64 / secs),
                 images_per_sec: round2(d_images as f64 / secs),
-                avg_readback_ms: if d_images > 0 { round2(d_readback_us as f64 / img_denom / 1000.0) } else { 0.0 },
-                avg_jpeg_ms: if d_images > 0 { round2(d_jpeg_us as f64 / img_denom / 1000.0) } else { 0.0 },
-                avg_nvenc_ms: if d_nvenc_images > 0 { round2(d_nvenc_us as f64 / nvenc_denom / 1000.0) } else { 0.0 },
-                avg_resize_ms: if d_images > 0 { round2(d_resize_us as f64 / img_denom / 1000.0) } else { 0.0 },
-                avg_processing_ms: if d_images > 0 { round2(d_processing_us as f64 / img_denom / 1000.0) } else { 0.0 },
-                delta_queue_drops: cur.queue_drops.saturating_sub(prev.map_or(0, |p| p.queue_drops)),
-                delta_missed_deadlines: cur.missed_deadlines.saturating_sub(prev.map_or(0, |p| p.missed_deadlines)),
-                delta_nvenc_fallbacks: cur.nvenc_fallbacks.saturating_sub(prev.map_or(0, |p| p.nvenc_fallbacks)),
-                delta_readback_errors: cur.readback_errors.saturating_sub(prev.map_or(0, |p| p.readback_errors)),
-                delta_jpeg_errors: cur.jpeg_errors.saturating_sub(prev.map_or(0, |p| p.jpeg_errors)),
+                avg_readback_ms: if d_images > 0 {
+                    round2(d_readback_us as f64 / img_denom / 1000.0)
+                } else {
+                    0.0
+                },
+                avg_jpeg_ms: if d_images > 0 {
+                    round2(d_jpeg_us as f64 / img_denom / 1000.0)
+                } else {
+                    0.0
+                },
+                avg_nvenc_ms: if d_nvenc_images > 0 {
+                    round2(d_nvenc_us as f64 / nvenc_denom / 1000.0)
+                } else {
+                    0.0
+                },
+                avg_resize_ms: if d_images > 0 {
+                    round2(d_resize_us as f64 / img_denom / 1000.0)
+                } else {
+                    0.0
+                },
+                avg_processing_ms: if d_images > 0 {
+                    round2(d_processing_us as f64 / img_denom / 1000.0)
+                } else {
+                    0.0
+                },
+                delta_queue_drops: cur
+                    .queue_drops
+                    .saturating_sub(prev.map_or(0, |p| p.queue_drops)),
+                delta_missed_deadlines: cur
+                    .missed_deadlines
+                    .saturating_sub(prev.map_or(0, |p| p.missed_deadlines)),
+                delta_nvenc_fallbacks: cur
+                    .nvenc_fallbacks
+                    .saturating_sub(prev.map_or(0, |p| p.nvenc_fallbacks)),
+                delta_readback_errors: cur
+                    .readback_errors
+                    .saturating_sub(prev.map_or(0, |p| p.readback_errors)),
+                delta_jpeg_errors: cur
+                    .jpeg_errors
+                    .saturating_sub(prev.map_or(0, |p| p.jpeg_errors)),
                 max_queue_age_ms: round2(cur.max_queue_age_us as f64 / 1000.0),
             }
         })
@@ -653,7 +710,9 @@ fn compute_capture_deltas(
 }
 
 #[tauri::command]
-pub fn perf_diag_start(state: tauri::State<'_, PerformanceDiagState>) -> Result<PerfDiagStartResult, String> {
+pub fn perf_diag_start(
+    state: tauri::State<'_, PerformanceDiagState>,
+) -> Result<PerfDiagStartResult, String> {
     let mut sys = System::new_with_specifics(
         RefreshKind::new()
             .with_cpu(CpuRefreshKind::everything())
@@ -687,7 +746,10 @@ pub fn perf_diag_start(state: tauri::State<'_, PerformanceDiagState>) -> Result<
         system_cpu_samples: 0,
     };
 
-    let mut guard = state.active.lock().map_err(|_| "Performance diagnostic lock poisoned".to_string())?;
+    let mut guard = state
+        .active
+        .lock()
+        .map_err(|_| "Performance diagnostic lock poisoned".to_string())?;
     *guard = Some(session);
 
     Ok(PerfDiagStartResult {
@@ -698,9 +760,16 @@ pub fn perf_diag_start(state: tauri::State<'_, PerformanceDiagState>) -> Result<
 }
 
 #[tauri::command]
-pub fn perf_diag_sample(state: tauri::State<'_, PerformanceDiagState>) -> Result<PerfDiagTickSample, String> {
-    let mut guard = state.active.lock().map_err(|_| "Performance diagnostic lock poisoned".to_string())?;
-    let session = guard.as_mut().ok_or_else(|| "No active performance diagnostic session".to_string())?;
+pub fn perf_diag_sample(
+    state: tauri::State<'_, PerformanceDiagState>,
+) -> Result<PerfDiagTickSample, String> {
+    let mut guard = state
+        .active
+        .lock()
+        .map_err(|_| "Performance diagnostic lock poisoned".to_string())?;
+    let session = guard
+        .as_mut()
+        .ok_or_else(|| "No active performance diagnostic session".to_string())?;
 
     let now = Instant::now();
     let elapsed_ms = now.duration_since(session.started_at).as_millis() as u64;
@@ -794,9 +863,16 @@ pub fn perf_diag_sample(state: tauri::State<'_, PerformanceDiagState>) -> Result
 }
 
 #[tauri::command]
-pub fn perf_diag_finish(state: tauri::State<'_, PerformanceDiagState>) -> Result<NativePerformanceReport, String> {
-    let mut guard = state.active.lock().map_err(|_| "Performance diagnostic lock poisoned".to_string())?;
-    let mut session = guard.take().ok_or_else(|| "No active performance diagnostic session".to_string())?;
+pub fn perf_diag_finish(
+    state: tauri::State<'_, PerformanceDiagState>,
+) -> Result<NativePerformanceReport, String> {
+    let mut guard = state
+        .active
+        .lock()
+        .map_err(|_| "Performance diagnostic lock poisoned".to_string())?;
+    let mut session = guard
+        .take()
+        .ok_or_else(|| "No active performance diagnostic session".to_string())?;
 
     let now = Instant::now();
     let duration_ms = now.duration_since(session.started_at).as_millis().max(1) as u64;
@@ -843,7 +919,9 @@ pub fn perf_diag_finish(state: tauri::State<'_, PerformanceDiagState>) -> Result
             wv_ws = wv_ws.saturating_add(cur.working_set_bytes);
             wv_priv = wv_priv.saturating_add(cur.private_bytes);
 
-            let entry = role_accum.entry(cur.role.clone()).or_insert((0, 0, 0, 0, 0));
+            let entry = role_accum
+                .entry(cur.role.clone())
+                .or_insert((0, 0, 0, 0, 0));
             entry.0 += 1;
             entry.1 = entry.1.saturating_add(d_kernel);
             entry.2 = entry.2.saturating_add(d_user);
@@ -900,8 +978,12 @@ pub fn perf_diag_finish(state: tauri::State<'_, PerformanceDiagState>) -> Result
         .iter()
         .map(|(tid, cur)| {
             let base = session.baseline_threads.get(tid);
-            let d_kernel = base.map_or(cur.kernel_100ns, |b| cur.kernel_100ns.saturating_sub(b.kernel_100ns));
-            let d_user = base.map_or(cur.user_100ns, |b| cur.user_100ns.saturating_sub(b.user_100ns));
+            let d_kernel = base.map_or(cur.kernel_100ns, |b| {
+                cur.kernel_100ns.saturating_sub(b.kernel_100ns)
+            });
+            let d_user = base.map_or(cur.user_100ns, |b| {
+                cur.user_100ns.saturating_sub(b.user_100ns)
+            });
             let (cpu_pct, cpu_single, _, user_ms, kernel_ms) =
                 compute_cpu_metrics(d_kernel, d_user, duration_wall_ms, cores);
             ThreadCpuBreakdown {
@@ -984,7 +1066,10 @@ pub fn perf_diag_finish(state: tauri::State<'_, PerformanceDiagState>) -> Result
 
 #[tauri::command]
 pub fn perf_diag_cancel(state: tauri::State<'_, PerformanceDiagState>) -> Result<(), String> {
-    let mut guard = state.active.lock().map_err(|_| "Performance diagnostic lock poisoned".to_string())?;
+    let mut guard = state
+        .active
+        .lock()
+        .map_err(|_| "Performance diagnostic lock poisoned".to_string())?;
     *guard = None;
     Ok(())
 }
@@ -1018,6 +1103,8 @@ pub async fn export_performance_report(
     Ok(Some(target.to_string_lossy().into_owned()))
 }
 
+const MAX_PERFORMANCE_LOGS: usize = 4;
+
 #[tauri::command]
 pub fn save_performance_report_to_logs(report_json: String) -> Result<String, String> {
     if report_json.len() > MAX_REPORT_BYTES {
@@ -1025,9 +1112,22 @@ pub fn save_performance_report_to_logs(report_json: String) -> Result<String, St
     }
     let log_dir = crate::logger::get_log_dir();
     fs::create_dir_all(&log_dir).map_err(|e| format!("Could not prepare log directory: {e}"))?;
-    let target = log_dir.join(format!("performance-{}-{}.json", now_epoch_ms(), std::process::id()));
+    let target = log_dir.join(format!(
+        "performance-{}-{}.json",
+        now_epoch_ms(),
+        std::process::id()
+    ));
     fs::write(&target, report_json.as_bytes())
         .map_err(|e| format!("Could not write performance report: {e}"))?;
+    if let Err(error) = crate::logger::rotate_timestamped_logs(
+        &log_dir,
+        "performance-",
+        ".json",
+        MAX_PERFORMANCE_LOGS,
+        &target,
+    ) {
+        eprintln!("[LOGGER] Failed to rotate performance logs: {}", error);
+    }
     Ok(target.to_string_lossy().into_owned())
 }
 
