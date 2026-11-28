@@ -440,6 +440,7 @@ export class RoomService {
         } else if (reason === 'window_not_found') {
           showToast(t('message.52272f3cb20b'));
           this.stopScreenSharing();
+          this.audioBridge.setRemoteConsumersActive(false);
         } else {
           showToast(t('message.c74fa38e13bf', { v0: localizeError(reason) }));
         }
@@ -635,6 +636,7 @@ export class RoomService {
       profileStats.setInCall(false);
       const oldManager = this.roomManager;
       this.stopScreenSharing();
+      this.audioBridge.setRemoteConsumersActive(false);
       this.roomManager = null;
       try {
         await oldManager.leave();
@@ -658,6 +660,7 @@ export class RoomService {
       return;
     }
     this.roomManager = manager;
+    this.audioBridge.setRemoteConsumersActive(false);
     voiceManager.enterRoomMuted();
     manager.setLocalVoiceState({ inVoice: true, muted: true, deafened: false }, null);
     this.syncVoiceSnapshot();
@@ -885,6 +888,7 @@ export class RoomService {
           if (this.roomManager !== manager) return;
           profileStats.setInCall(manager.hasAdmission());
           this.peers = peers;
+          this.audioBridge.setRemoteConsumersActive(peers.length > 0);
           for (const peer of peers) {
             if (peer.publicKey) {
               voiceManager.refreshRemotePeerIdentity(peer.id, peer.publicKey, peer.username);
@@ -1994,6 +1998,7 @@ export class RoomService {
           isTauri() &&
           !Array.from(this.localCaptures.values()).some((entry) => entry.kind === 'screen');
         if (!previous && hasAudioTrack) {
+          this.audioBridge.setRemoteConsumersActive(this.peers.length > 0);
           acquiredAudio = await this.audioBridge.startCapture(
             stateStore.isAudioFilterFullAudio ? 'full' : stateStore.selectedFilterMode,
             stateStore.isAudioFilterFullAudio ? [] : stateStore.getActiveFilterPids(),
@@ -2266,6 +2271,7 @@ export class RoomService {
     this.voicePeers = {};
 
     this.stopScreenSharing();
+    this.audioBridge.setRemoteConsumersActive(false);
 
     if (this.roomManager) {
       const oldManager = this.roomManager;

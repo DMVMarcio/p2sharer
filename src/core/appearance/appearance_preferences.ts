@@ -55,3 +55,19 @@ export function applyAppearanceAttributes(animations: boolean, visualEffects: bo
     root.removeAttribute('data-reduced-effects');
   }
 }
+
+/** Tracks document visibility so infinite background animations pause while minimized or occluded. */
+export function startWindowVisibilityTracking(): () => void {
+  if (typeof document === 'undefined' || !document.documentElement) return () => {};
+  const root = document.documentElement;
+  const sync = () => {
+    if (document.hidden) root.setAttribute('data-window-hidden', 'true');
+    else root.removeAttribute('data-window-hidden');
+  };
+  sync();
+  document.addEventListener('visibilitychange', sync);
+  return () => {
+    document.removeEventListener('visibilitychange', sync);
+    root.removeAttribute('data-window-hidden');
+  };
+}

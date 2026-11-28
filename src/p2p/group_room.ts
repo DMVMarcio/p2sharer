@@ -3896,6 +3896,18 @@ export class GroupRoomManager {
       });
     }
     this.callbacks?.onRemoteVoiceStream?.(peerId, stream);
+    if (
+      !this.peerTracker.isVerified(peerId) &&
+      this.indirectPeerReports.has(peerId) &&
+      !this.previewOnly &&
+      this.localAdmitted &&
+      (!this.authority || this.isAdmittedPeer(peerId))
+    ) {
+      try {
+        this.presenceAction?.send(this.buildPresencePayload(), { target: peerId });
+      } catch {}
+      this.notifyPeersUpdate();
+    }
 
     audioTracks.forEach((track) => {
       track.addEventListener('ended', () => {
@@ -6614,11 +6626,16 @@ export class GroupRoomManager {
       const report = this.getVisibleIndirectReport(peerId, now);
       if (!report) continue;
       const resolvedKey = this.chatAuth?.getKnownKey(peerId) ?? report.publicKey ?? this.admittedPeers.get(peerId);
+      const pcState = (this.room?.getPeers?.()?.[peerId] as RTCPeerConnection | undefined)?.connectionState;
+      const hasLiveDirectVoice =
+        this.remoteVoiceStreams.has(peerId) &&
+        pcState === 'connected' &&
+        (!this.authority || this.isAdmittedPeer(peerId));
       peersById.set(peerId, {
         id: peerId,
         publicKey: resolvedKey,
         username: report.username,
-        connectionState: 'connecting',
+        connectionState: hasLiveDirectVoice ? 'connected' : 'connecting',
         joinedAt: report.joinedAt,
         isCreator: Boolean(this.authority && resolvedKey && resolvedKey === this.authority.currentKey),
         isAdmin: Boolean(resolvedKey && this.hasAdminGrant(resolvedKey)),

@@ -9,6 +9,8 @@ namespace {
 struct Encoder {
     HMODULE dll;
     NV_ENCODE_API_FUNCTION_LIST api;
+    uint32_t api_version;
+    bool legacy_v11;
     void* session;
     ID3D11Texture2D* input;
     ID3D11DeviceContext* context;
@@ -66,6 +68,27 @@ void configure_h264_quality(NV_ENC_CONFIG& config, bool high_quality) {
     // Match NVENC's native ABGR->NV12 conversion without overriding VUI colorimetry.
     h264.h264VUIParameters = {};
 }
+bool select_api_version(uint32_t max_version, uint32_t& api_version, bool& legacy_v11) {
+    if (max_version >= ((NVENCAPI_MAJOR_VERSION << 4) | NVENCAPI_MINOR_VERSION)) {
+        api_version = NVENCAPI_VERSION;
+        legacy_v11 = false;
+        return true;
+    }
+    if (max_version >= ((11u << 4) | 1u)) {
+        api_version = (11u | (1u << 24));
+        legacy_v11 = true;
+        return true;
+    }
+    if (max_version >= ((11u << 4) | 0u)) {
+        api_version = (11u | (0u << 24));
+        legacy_v11 = true;
+        return true;
+    }
+    return false;
+}
+uint32_t struct_version(uint32_t api_version, uint32_t ver, bool high_bit = false) {
+    return api_version | (ver << 16) | (0x7u << 28) | (high_bit ? (1u << 31) : 0u);
+}
 bool load(Encoder* encoder, char* error, size_t size) {
 #ifdef _WIN64
     const auto name = L"nvEncodeAPI64.dll";
@@ -86,12 +109,11 @@ bool load(Encoder* encoder, char* error, size_t size) {
         error_text(error, size, "NVENC driver API entrypoints missing (NvEncodeAPIGetMaxSupportedVersion/NvEncodeAPICreateInstance)"); return false;
     }
     NV_CHECK(maximum(&version), "Query driver API version");
-    if (version < ((NVENCAPI_MAJOR_VERSION << 4) | NVENCAPI_MINOR_VERSION)) {
-        if (error && size) snprintf(error, size, "NVENC driver API unsupported (maximum=0x%x required=0x%x)", version,
-            (NVENCAPI_MAJOR_VERSION << 4) | NVENCAPI_MINOR_VERSION);
+    if (!select_api_version(version, encoder->api_version, encoder->legacy_v11)) {
+        if (error && size) snprintf(error, size, "NVENC driver API unsupported (maximum=0x%x minimum=0xb0)", version);
         return false;
     }
-    encoder->api.version = NV_ENCODE_API_FUNCTION_LIST_VER;
+    encoder->api.version = struct_version(encoder->api_version, 2);
     NV_CHECK(create(&encoder->api), "Load NVENC function table");
     return true;
 }
@@ -114,8 +136,8 @@ bool initialize(Encoder* encoder, ID3D11Device* device, uint32_t w, uint32_t h,
     encoder->width = w; encoder->height = h;
     auto& api = encoder->api; auto& session = encoder->session;
     NV_ENC_OPEN_ENCODE_SESSION_EX_PARAMS open{};
-    open.version = NV_ENC_OPEN_ENCODE_SESSION_EX_PARAMS_VER;
-    open.device = device; open.deviceType = NV_ENC_DEVICE_TYPE_DIRECTX; open.apiVersion = NVENCAPI_VERSION;
+    open.version = struct_version(encoder->api_version, 1);
+    open.device = device; open.deviceType = NV_ENC_DEVICE_TYPE_DIRECTX; open.apiVersion = encoder->api_version;
     NV_CHECK(api.nvEncOpenEncodeSessionEx(&open, &session), "Open D3D11 session");
     uint32_t count = 0;
     NV_CHECK(api.nvEncGetInputFormatCount(session, NV_ENC_CODEC_H264_GUID, &count), "Query H264 formats");
@@ -126,16 +148,29 @@ bool initialize(Encoder* encoder, ID3D11Device* device, uint32_t w, uint32_t h,
     bool rgba = false;
     for (uint32_t i = 0; i < count; i++) if (formats[i] == NV_ENC_BUFFER_FORMAT_ABGR) rgba = true;
     if (!rgba) { error_text(error, size, "NVENC RGBA texture input unsupported"); return false; }
-    NV_ENC_PRESET_CONFIG preset{}; preset.version = NV_ENC_PRESET_CONFIG_VER; preset.presetCfg.version = NV_ENC_CONFIG_VER;
+    const uint32_t cfg_ver = struct_version(encoder->api_version, encoder->legacy_v11 ? 7 : 8, true);
+    const uint32_t init_ver = struct_version(encoder->api_version, encoder->legacy_v11 ? 5 : 6, true);
+    NV_ENC_PRESET_CONFIG preset{}; preset.version = struct_version(encoder->api_version, 4, true); preset.presetCfg.version = cfg_ver;
     GUID chosen_preset = NV_ENC_PRESET_P4_GUID;
-    NVENCSTATUS preset_status = api.nvEncGetEncodePresetConfigEx(session, NV_ENC_CODEC_H264_GUID, chosen_preset,
-        NV_ENC_TUNING_INFO_ULTRA_LOW_LATENCY, &preset);
+    bool use_tuning = true;
+    NVENCSTATUS preset_status = api.nvEncGetEncodePresetConfigEx
+        ? api.nvEncGetEncodePresetConfigEx(session, NV_ENC_CODEC_H264_GUID, chosen_preset,
+            NV_ENC_TUNING_INFO_ULTRA_LOW_LATENCY, &preset)
+        : NV_ENC_ERR_UNSUPPORTED_PARAM;
     if (preset_status != NV_ENC_SUCCESS) {
         chosen_preset = NV_ENC_PRESET_P1_GUID;
-        NV_CHECK(api.nvEncGetEncodePresetConfigEx(session, NV_ENC_CODEC_H264_GUID, chosen_preset,
-            NV_ENC_TUNING_INFO_ULTRA_LOW_LATENCY, &preset), "Query low-latency preset");
+        preset_status = api.nvEncGetEncodePresetConfigEx
+            ? api.nvEncGetEncodePresetConfigEx(session, NV_ENC_CODEC_H264_GUID, chosen_preset,
+                NV_ENC_TUNING_INFO_ULTRA_LOW_LATENCY, &preset)
+            : NV_ENC_ERR_UNSUPPORTED_PARAM;
+        if (preset_status != NV_ENC_SUCCESS) {
+            use_tuning = false;
+            NV_CHECK(api.nvEncGetEncodePresetConfig(session, NV_ENC_CODEC_H264_GUID, chosen_preset, &preset),
+                "Query low-latency preset");
+        }
     }
     auto config = preset.presetCfg;
+    config.version = cfg_ver;
     // WebRTC requests recovery IDRs explicitly; periodic full-picture refreshes
     // unnecessarily destroy the fine detail accumulated by delta pictures.
     config.gopLength = NVENC_INFINITE_GOPLENGTH; config.frameIntervalP = 1;
@@ -145,21 +180,30 @@ bool initialize(Encoder* encoder, ID3D11Device* device, uint32_t w, uint32_t h,
     config.encodeCodecConfig.h264Config.repeatSPSPPS = 1;
     config.encodeCodecConfig.h264Config.level = NV_ENC_LEVEL_H264_51;
     configure_h264_quality(config, true);
-    NV_ENC_INITIALIZE_PARAMS init{}; init.version = NV_ENC_INITIALIZE_PARAMS_VER;
+    NV_ENC_INITIALIZE_PARAMS init{}; init.version = init_ver;
     init.encodeGUID = NV_ENC_CODEC_H264_GUID; init.presetGUID = chosen_preset;
     init.encodeWidth = w; init.encodeHeight = h; init.darWidth = w; init.darHeight = h;
     init.frameRateNum = fps; init.frameRateDen = 1; init.enablePTD = 1;
-    init.encodeConfig = &config; init.tuningInfo = NV_ENC_TUNING_INFO_ULTRA_LOW_LATENCY;
+    init.encodeConfig = &config;
+    init.tuningInfo = use_tuning ? NV_ENC_TUNING_INFO_ULTRA_LOW_LATENCY : NV_ENC_TUNING_INFO_UNDEFINED;
     NVENCSTATUS init_status = api.nvEncInitializeEncoder(session, &init);
     if (init_status != NV_ENC_SUCCESS) {
         // Retry with conservative High/Baseline parameters on P1 if an older driver rejects P4/two-pass.
         if (chosen_preset != NV_ENC_PRESET_P1_GUID) {
             chosen_preset = NV_ENC_PRESET_P1_GUID;
             init.presetGUID = chosen_preset;
-            api.nvEncGetEncodePresetConfigEx(session, NV_ENC_CODEC_H264_GUID, chosen_preset,
-                NV_ENC_TUNING_INFO_ULTRA_LOW_LATENCY, &preset);
+            preset_status = (use_tuning && api.nvEncGetEncodePresetConfigEx)
+                ? api.nvEncGetEncodePresetConfigEx(session, NV_ENC_CODEC_H264_GUID, chosen_preset,
+                    NV_ENC_TUNING_INFO_ULTRA_LOW_LATENCY, &preset)
+                : NV_ENC_ERR_UNSUPPORTED_PARAM;
+            if (preset_status != NV_ENC_SUCCESS) {
+                use_tuning = false;
+                init.tuningInfo = NV_ENC_TUNING_INFO_UNDEFINED;
+                api.nvEncGetEncodePresetConfig(session, NV_ENC_CODEC_H264_GUID, chosen_preset, &preset);
+            }
         }
         config = preset.presetCfg;
+        config.version = cfg_ver;
         config.gopLength = NVENC_INFINITE_GOPLENGTH; config.frameIntervalP = 1;
         rate_control(config, bitrate, fps);
         config.rcParams.enableLookahead = 0;
@@ -182,12 +226,12 @@ bool initialize(Encoder* encoder, ID3D11Device* device, uint32_t w, uint32_t h,
         return false;
     }
     device->GetImmediateContext(&encoder->context);
-    NV_ENC_REGISTER_RESOURCE resource{}; resource.version = NV_ENC_REGISTER_RESOURCE_VER;
+    NV_ENC_REGISTER_RESOURCE resource{}; resource.version = struct_version(encoder->api_version, encoder->legacy_v11 ? 3 : 4);
     resource.resourceType = NV_ENC_INPUT_RESOURCE_TYPE_DIRECTX; resource.resourceToRegister = encoder->input;
     resource.width = w; resource.height = h; resource.bufferFormat = NV_ENC_BUFFER_FORMAT_ABGR;
     resource.bufferUsage = NV_ENC_INPUT_IMAGE;
     NV_CHECK(api.nvEncRegisterResource(session, &resource), "Register GPU texture"); encoder->registered = resource.registeredResource;
-    NV_ENC_CREATE_BITSTREAM_BUFFER output{}; output.version = NV_ENC_CREATE_BITSTREAM_BUFFER_VER;
+    NV_ENC_CREATE_BITSTREAM_BUFFER output{}; output.version = struct_version(encoder->api_version, 1);
     NV_CHECK(api.nvEncCreateBitstreamBuffer(session, &output), "Allocate H264 output"); encoder->bitstream = output.bitstreamBuffer;
     return true;
 }
@@ -200,15 +244,15 @@ bool encode(Encoder* encoder, ID3D11Texture2D* source, uint64_t timestamp, bool 
     }
     encoder->context->CopyResource(encoder->input, source);
     auto& api = encoder->api; auto session = encoder->session;
-    NV_ENC_MAP_INPUT_RESOURCE map{}; map.version = NV_ENC_MAP_INPUT_RESOURCE_VER; map.registeredResource = encoder->registered;
+    NV_ENC_MAP_INPUT_RESOURCE map{}; map.version = struct_version(encoder->api_version, 4); map.registeredResource = encoder->registered;
     NV_CHECK(api.nvEncMapInputResource(session, &map), "Map NVENC texture"); encoder->mapped = map.mappedResource;
-    NV_ENC_PIC_PARAMS picture{}; picture.version = NV_ENC_PIC_PARAMS_VER;
+    NV_ENC_PIC_PARAMS picture{}; picture.version = struct_version(encoder->api_version, encoder->legacy_v11 ? 4 : 6, true);
     picture.inputBuffer = encoder->mapped; picture.bufferFmt = NV_ENC_BUFFER_FORMAT_ABGR;
     picture.inputWidth = encoder->width; picture.inputHeight = encoder->height; picture.outputBitstream = encoder->bitstream;
     picture.pictureStruct = NV_ENC_PIC_STRUCT_FRAME; picture.inputTimeStamp = timestamp;
     if (force_key) picture.encodePicFlags = NV_ENC_PIC_FLAG_FORCEIDR | NV_ENC_PIC_FLAG_OUTPUT_SPSPPS;
     NV_CHECK(api.nvEncEncodePicture(session, &picture), "Encode GPU image");
-    NV_ENC_LOCK_BITSTREAM lock{}; lock.version = NV_ENC_LOCK_BITSTREAM_VER; lock.outputBitstream = encoder->bitstream;
+    NV_ENC_LOCK_BITSTREAM lock{}; lock.version = struct_version(encoder->api_version, 1, !encoder->legacy_v11); lock.outputBitstream = encoder->bitstream;
     NV_CHECK(api.nvEncLockBitstream(session, &lock), "Read H264 output");
     *key = lock.pictureType == NV_ENC_PIC_TYPE_IDR ? 1 : 0;
     bool valid = lock.bitstreamSizeInBytes > 0 && lock.bitstreamSizeInBytes <= 16 * 1024 * 1024;
@@ -251,7 +295,7 @@ extern "C" int p2_nvenc_bitrate(void* handle, uint32_t bitrate, char* error, siz
     auto encoder = static_cast<Encoder*>(handle);
     auto config = encoder->config;
     rate_control(config, bitrate, encoder->init.frameRateNum);
-    NV_ENC_RECONFIGURE_PARAMS params{}; params.version = NV_ENC_RECONFIGURE_PARAMS_VER;
+    NV_ENC_RECONFIGURE_PARAMS params{}; params.version = struct_version(encoder->api_version, 1, true);
     params.reInitEncodeParams = encoder->init; params.reInitEncodeParams.encodeConfig = &config;
     // Bitrate-only adaptation keeps prediction and rate-control history. Geometry
     // changes recreate the session; genuine decoder recovery still forces an IDR.

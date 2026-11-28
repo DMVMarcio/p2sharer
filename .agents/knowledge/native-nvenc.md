@@ -156,8 +156,7 @@ does not pass through that decoder or a browser encoder.
 
 ### NVIDIA backend
 
-`native/nvenc/encoder.cpp` uses the pinned, MIT-licensed NVIDIA SDK 12.1 header. It
-loads the driver DLL from Windows System32, checks API compatibility, opens a session
+`native/nvenc/encoder.cpp` uses the pinned, MIT-licensed NVIDIA SDK 12.1 header and negotiates API 12.1, 11.1, or 11.0 at runtime with matching struct version tags. It loads the driver DLL from Windows System32, checks API compatibility, opens a session
 on the actual WGC D3D11 device and queries H264 RGBA input support. A successful DLL
 probe or vendor name is not evidence that a particular capture device can encode.
 No CUDA runtime, driver DLL, NVIDIA import library or C++ standard-library runtime

@@ -34,6 +34,7 @@ import { ReleaseNotesDialog } from './components/modals/ReleaseNotesDialog';
 import { startAutomaticUpdateChecks } from './services/app_updates';
 import { startRoomDeepLinks } from './services/room_deep_links';
 import { startVoiceShortcuts } from './services/voice_shortcuts';
+import { startWindowVisibilityTracking } from './core/appearance/appearance_preferences';
 import { releaseNotes } from './services/release_notes';
 import { isTauri } from '@tauri-apps/api/core';
 import { BrowserCaptureModal } from './components/modals/capture/BrowserCaptureModal';
@@ -42,16 +43,12 @@ import { startWebRoomNavigation, type WebRoomNavigation } from './services/web_r
 export const App: React.FC<{ webNavigation?: WebRoomNavigation }> = ({ webNavigation }) => {
   useAppTheme(); // Sets data-theme & data-accent
 
-  const pipPeerId = typeof window !== 'undefined'
-    ? new URLSearchParams(window.location.search).get('pip')
-    : null;
+  const pipPeerId = typeof window !== 'undefined' ? new URLSearchParams(window.location.search).get('pip') : null;
 
   if (pipPeerId) {
     if (pipPeerId.startsWith('app-')) return <RoomAppWindow instanceId={pipPeerId.slice(4)} />;
-    if (pipPeerId.startsWith('youtube-'))
-      return <YouTubePipView instanceId={pipPeerId.slice('youtube-'.length)} />;
-    if (pipPeerId.startsWith('twitch-'))
-      return <TwitchPipView instanceId={pipPeerId.slice('twitch-'.length)} />;
+    if (pipPeerId.startsWith('youtube-')) return <YouTubePipView instanceId={pipPeerId.slice('youtube-'.length)} />;
+    if (pipPeerId.startsWith('twitch-')) return <TwitchPipView instanceId={pipPeerId.slice('twitch-'.length)} />;
     return <PipView peerId={pipPeerId} />;
   }
 
@@ -71,6 +68,7 @@ const MainApp: React.FC<{ webNavigation?: WebRoomNavigation }> = ({ webNavigatio
   }, [notesState.pending]);
   useEffect(startRoomDeepLinks, []);
   useEffect(startVoiceShortcuts, []);
+  useEffect(startWindowVisibilityTracking, []);
   useEffect(() => startWebRoomNavigation(roomExit.confirmExit, webNavigation), [roomExit.confirmExit, webNavigation]);
   useEffect(() => setHomeScrolled(false), [isInRoom]);
 
@@ -97,10 +95,16 @@ const MainApp: React.FC<{ webNavigation?: WebRoomNavigation }> = ({ webNavigatio
     <>
       <WindowTitlebar onVisibilityChange={setTitlebarVisible} confirmClose={roomExit.confirmExit} />
       <div className={`app-workspace${isInRoom ? '' : ' is-home'}`}>
-        <AppHeader onLeaveRoom={async () => { if (await roomExit.confirmExit()) leaveRoom(); }} showUpdate={!titlebarVisible} homeScrolled={homeScrolled} />
+        <AppHeader
+          onLeaveRoom={async () => {
+            if (await roomExit.confirmExit()) leaveRoom();
+          }}
+          showUpdate={!titlebarVisible}
+          homeScrolled={homeScrolled}
+        />
         <main className="app-main" id="app-main">
           <ContentTransition value={isInRoom ? 'room' : 'home'} className="content-transition-fill">
-            {view => view === 'room' ? <RoomView /> : <HomeView onScrollChange={setHomeScrolled} />}
+            {(view) => (view === 'room' ? <RoomView /> : <HomeView onScrollChange={setHomeScrolled} />)}
           </ContentTransition>
         </main>
       </div>

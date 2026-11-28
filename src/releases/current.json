@@ -1,109 +1,83 @@
 {
-  "version": "1.8.5",
+  "version": "1.8.6",
   "translations": {
     "en": [
-      "**Whiteboard got a real studio glow-up.** Textured pencil, bristle brush, watercolor, smooth smudge/blur, and fluid WebGL2 panning—no more 1 FPS slideshows.",
-      "**Performance diagnostics you can actually export.** Check real CPU, memory, frame rate, and media load per process, and save a full JSON report whenever you need it.",
-      "**No more invisible rooms when the host steps out.** Fixed a bug where members and other admins kept playing hide-and-seek if you joined while the host was offline.",
-      "**Chat notices stopped time-traveling.** Join, leave, and room events now stay in proper chronological order when you rejoin or sync history.",
-      "**Room passwords actually guard the door now.** Fixed bugs that let empty passwords slip through, spammed wrong-password alerts, or forgot saved room passwords.",
-      "**Saved rooms now show a pulse while checking who's online.** Each room card displays a spinner in the avatar corner until its check finishes."
+      "**Direct GPU screen sharing actually sticks now.** Fixed a handshake hiccup that pushed streams onto heavy CPU re-encoding, keeping shares crisp and light.",
+      "**More graphics cards joined the hardware party.** Older NVIDIA cards (like the GTX 660) and Intel graphics now get direct hardware encoding instead of sweating on CPU.",
+      "**Your PC can finally catch its breath.** Screen sharing pauses heavy work when nobody is watching, and offscreen or disabled animations actually sit still now.",
+      "**No more 'connecting' while you're already talking.** Fixed a bug where a participant stayed stuck on connecting even while their voice was coming through loud and clear."
     ],
     "pt-BR": [
-      "**Quadro Branco em modo estúdio.** Lápis com textura, pincel de cerdas, aquarela, borrar/desfocar suaves e zoom fluido em WebGL2 — chega de desenhar em câmera lenta.",
-      "**Diagnóstico de desempenho exportável.** Acompanhe CPU, memória, fluidez e carga de mídia por processo e salve um relatório JSON completo quando precisar.",
-      "**Chega de sala fantasma sem o anfitrião.** Corrigimos o bug em que participantes e outros admins brincavam de esconde-esconde ao entrar com o dono da sala offline.",
-      "**Avisos do chat pararam de viajar no tempo.** Mensagens de entrada, saída e sala agora seguem a ordem certa ao reconectar ou sincronizar o histórico.",
-      "**Senhas de sala agora realmente trancam a porta.** Corrigimos falhas que deixavam senha vazia passar, spammavam alertas de senha incorreta ou esqueciam a senha salva.",
-      "**Salas salvas agora mostram um indicador enquanto buscam quem está online.** Cada cartão exibe uma bolinha girando na área dos avatares até concluir a consulta."
+      "**Compartilhamento por GPU agora segura firme.** Corrigimos uma falha na negociação que jogava a transmissão pro processador, deixando tudo mais leve e nítido.",
+      "**Mais placas entraram na festa do hardware.** Placas NVIDIA mais antigas (como a GTX 660) e gráficos Intel agora usam aceleração por GPU sem fritar a CPU.",
+      "**Seu PC finalmente pode respirar.** A captura desacelera quando ninguém está assistindo, e animações fora da tela ou desativadas agora ficam quietinhas de verdade.",
+      "**Chega de 'conectando' enquanto vocês já conversam.** Corrigimos o bug em que um participante ficava preso em conectando mesmo com a voz dele chegando normalmente."
     ],
     "es": [
-      "**La Pizarra estrenó modo estudio.** Lápiz con textura, pincel de cerdas, acuarela, difuminado suave y cámara fluida en WebGL2 — adiós a dibujar en cámara lenta.",
-      "**Diagnóstico de rendimiento exportable.** Consulta CPU, memoria, fluidez y carga multimedia por proceso, y guarda un informe JSON completo cuando lo necesites.",
-      "**Se acabó jugar al escondite sin el anfitrión.** Corregimos el fallo por el que participantes y otros admins quedaban ocultos al entrar con el dueño desconectado.",
-      "**Los avisos del chat dejaron de viajar en el tiempo.** Las notificaciones de entrada, salida y sala ahora mantienen el orden correcto al reconectar o sincronizar.",
-      "**Las contraseñas ahora sí protegen la puerta.** Corregimos errores que dejaban pasar contraseñas vacías, repetían avisos de error o olvidaban contraseñas guardadas.",
-      "**Las salas guardadas ahora muestran carga al buscar participantes.** Cada tarjeta enseña un indicador giratorio en el área de avatares hasta terminar la consulta."
+      "**El video por GPU ahora sí se queda en la GPU.** Corregimos un fallo que mandaba la transmisión a recodificar en CPU, dejándola mucho más ligera y nítida.",
+      "**Más tarjetas se sumaron a la fiesta.** GPU NVIDIA antiguas (como la GTX 660) y gráficos Intel ahora usan codificación por hardware en lugar de exprimir tu CPU.",
+      "**Tu PC al fin puede tomar un respiro.** Compartir pantalla pausa el trabajo pesado cuando nadie mira, y las animaciones ocultas o desactivadas ahora sí se detienen.",
+      "**Basta de ver 'conectando' mientras ya hablan.** Corregimos un fallo donde alguien seguía apareciendo en conexión aunque su voz ya se escuchara perfectamente."
     ],
     "fr": [
-      "**Le Tableau passe en mode studio.** Crayon texturé, pinceau à poils, aquarelle, doigt/flou fluides et zoom WebGL2 ultra doux — fini les diaporamas à 1 FPS.",
-      "**Diagnostic de performance exportable.** Consultez le CPU, la mémoire, la fluidité et la charge média par processus, et enregistrez un rapport JSON quand vous voulez.",
-      "**Fini la partie de cache-cache sans l'hôte.** Correction du bug où les membres et autres admins restaient invisibles en rejoignant un salon quand l'hôte est hors ligne.",
-      "**Les avis du chat ont arrêté de voyager dans le temps.** Les messages d'arrivée, de départ et de salon restent bien dans l'ordre après une reconnexion.",
-      "**Les mots de passe gardent enfin la porte.** Correction des bugs qui acceptaient un mot de passe vide, répétaient les alertes d'erreur ou oubliaient le mot de passe.",
-      "**Les salons enregistrés montrent maintenant la recherche en cours.** Chaque carte affiche un indicateur rotatif côté avatars jusqu'à la fin de sa vérification."
+      "**Le partage d'écran par GPU tient enfin bon.** Correction d'un souci de négociation qui basculait le flux sur le processeur, pour un partage plus léger et plus net.",
+      "**Plus de cartes rejoignent la fête matérielle.** Les anciennes cartes NVIDIA (comme la GTX 660) et les GPU Intel profitent maintenant de l'encodage matériel.",
+      "**Votre PC peut enfin souffler.** Le partage met le gros travail en pause quand personne ne regarde, et les animations cachées ou désactivées restent vraiment calmes.",
+      "**Fini le 'connexion' alors que vous parlez déjà.** Correction d'un bug où un participant restait bloqué sur connexion même quand sa voix passait déjà très bien."
     ],
     "de": [
-      "**Das Whiteboard ist jetzt ein echtes Studio.** Strukturierter Bleistift, Borstenpinsel, Aquarell, weiches Wischen und flüssiges WebGL2-Zoomen statt Zeitlupen-Diashow.",
-      "**Leistungsdiagnose zum Mitnehmen.** Behalte CPU, Speicher, Bildrate und Medienlast pro Prozess im Blick und speichere bei Bedarf einen vollständigen JSON-Bericht.",
-      "**Kein Versteckspiel mehr ohne Host.** Behoben, dass Teilnehmende oder andere Admins unsichtbar blieben, wenn du beigetreten bist, während der Host offline war.",
-      "**Chat-Hinweise reisen nicht mehr durch die Zeit.** Beitritts-, Austritts- und Raummeldungen erscheinen nach dem erneuten Verbinden jetzt in der richtigen Reihenfolge.",
-      "**Raumpasswörter halten die Tür jetzt wirklich zu.** Behoben, dass leere Passwörter durchrutschten, Fehlermeldungen gespammt oder gespeicherte Passwörter vergessen wurden.",
-      "**Gespeicherte Räume zeigen jetzt an, wenn sie geladen werden.** Jede Karte dreht einen kleinen Ladekreis im Avatar-Bereich, bis ihre Abfrage abgeschlossen ist."
+      "**Direktes GPU-Screensharing bleibt jetzt wirklich dabei.** Ein Aushandlungsfehler fiel bisher auf schwere CPU-Neukodierung zurück – jetzt bleibt alles flüssig und leicht.",
+      "**Mehr Grafikkarten feiern jetzt mit.** Ältere NVIDIA-Karten (wie die GTX 660) und Intel-Grafik nutzen nun direktes Hardware-Encoding statt die CPU ins Schwitzen zu bringen.",
+      "**Dein PC darf endlich durchatmen.** Wenn niemand zuschaut, pausiert die Bildschirmaufnahme die schwere Arbeit, und verborgene oder deaktivierte Animationen bleiben still.",
+      "**Schluss mit 'Verbindet…' mitten im Gespräch.** Behoben, dass Teilnehmende auf Verbinden hängen blieben, obwohl ihre Stimme längst klar und deutlich ankam."
     ],
     "it": [
-      "**La Lavagna si è fatta lo studio nuovo.** Matita materica, pennello a setole, acquerello, sfumino fluido e zoom WebGL2 scattante — basta diapositive a 1 FPS.",
-      "**Diagnostica prestazioni pronta da esportare.** Controlla CPU, memoria, fluidità e carico multimediale per processo e salva un report JSON completo quando vuoi.",
-      "**Basta nascondino quando l'host esce un attimo.** Risolto il bug per cui membri e altri admin restavano invisibili entrando con il proprietario della stanza offline.",
-      "**Gli avvisi in chat hanno smesso di viaggiare nel tempo.** Le notifiche di ingresso, uscita e stanza ora restano in ordine cronologico dopo ogni riconnessione.",
-      "**Le password ora chiudono davvero la porta.** Risolti i bug che facevano passare password vuote, ripetevano avvisi di errore o dimenticavano le password salvate.",
-      "**Le stanze salvate ora mostrano il caricamento dei partecipanti.** Ogni scheda mostra una rotellina nella zona degli avatar finché non termina il controllo."
+      "**La condivisione via GPU ora resta davvero sulla GPU.** Risolto un intoppo che spostava lo stream sulla CPU, rendendo tutto più nitido e leggero.",
+      "**Più schede video si sono unite alla festa.** Anche le NVIDIA più datate (come la GTX 660) e le grafiche Intel ora usano l'accelerazione hardware al posto della CPU.",
+      "**Il tuo PC può finalmente tirare il fiato.** La condivisione mette in pausa il lavoro pesante quando nessuno guarda, e le animazioni nascoste o disattivate stanno ferme.",
+      "**Basta 'connessione' mentre state già parlando.** Risolto il bug per cui un partecipante restava bloccato in connessione anche se la sua voce si sentiva benissimo."
     ],
     "zh-CN": [
-      "**白板直接升级成专业画室。** 纸纹铅笔、鬃毛画笔、水彩、丝滑涂抹模糊，还有跟手的 WebGL2 平移缩放，告别 1 帧幻灯片。",
-      "**性能诊断报告随时导出。** 按进程查看真实 CPU、内存、帧率与媒体负载，需要时一键保存完整的 JSON 诊断报告。",
-      "**房主离线也不再玩捉迷藏。** 修复了原房主不在线时加入房间，其他成员和管理员会莫名隐身的问题。",
-      "**聊天系统通知不再穿越时空。** 重新连接或同步历史记录时，进出房间与建房提示都会乖乖按时间顺序排好。",
-      "**房间密码终于能把好大门了。** 修复了空密码也能混进去、密码错误提示刷屏，以及忘记已保存房间密码的问题。",
-      "**已保存的房间在查询在线成员时会显示加载状态。** 每个房间卡片会在头像区域显示旋转指示器，直到该房间查询完成。"
+      "**GPU 硬件直推终于稳住了。** 修复了协商异常导致画面退回高负载 CPU 重编码的问题，共享画面更清晰也更省资源。",
+      "**更多显卡加入硬件加速阵营。** 老款 NVIDIA 显卡（如 GTX 660）与 Intel 核显现在也能使用硬件编码，不必再让 CPU 硬扛。",
+      "**电脑终于能喘口气了。** 没人观看时屏幕共享会自动暂停繁重编码，屏幕外或已关闭的动画也会老老实实停下来。",
+      "**人都聊上了，别再显示连接中了。** 修复了语音已经清晰传过来，但参与者卡片仍一直卡在“正在连接”的问题。"
     ],
     "zh-TW": [
-      "**白板直接升級成專業畫室。** 紙紋鉛筆、鬃毛筆刷、水彩、滑順塗抹模糊，搭配跟手的 WebGL2 平移縮放，跟 1 FPS 卡頓說再見。",
-      "**效能診斷報告隨時匯出。** 依處理程序查看真實 CPU、記憶體、幀率與媒體負載，需要時隨時儲存完整的 JSON 報告。",
-      "**房主離線也不再玩捉迷藏。** 修復了原房主不在線時加入房間，其他成員與管理員會突然隱身的問題。",
-      "**聊天室系統通知不再時空錯亂。** 重新連線或同步歷史紀錄時，進出房間與建立提示都會乖乖照時間順序排好。",
-      "**房間密碼終於能好好把關了。** 修復了空密碼也能闖入、密碼錯誤提示狂跳刷屏，以及忘記已儲存房間密碼的問題。",
-      "**已儲存的房間在查詢線上成員時會顯示載入狀態。** 每張房間卡片會在頭像區顯示旋轉指示器，直到該房間查詢完成。"
+      "**GPU 硬體直推終於穩住了。** 修復了協商異常導致畫面退回高負載 CPU 重編碼的問題，分享畫面更清晰也更省資源。",
+      "**更多顯示卡加入硬體加速行列。** 舊款 NVIDIA 顯卡（如 GTX 660）與 Intel 內顯現在也能使用硬體編碼，不必再讓 CPU 硬撐。",
+      "**電腦終於能喘口氣了。** 沒人觀看時螢幕分享會自動暫停繁重編碼，畫面外或已關閉的動畫也會乖乖停下來。",
+      "**人都聊起來了，別再卡在連線中。** 修復了語音明明已經清楚傳來，參與者卡片卻還一直顯示「連線中」的問題。"
     ],
     "ja": [
-      "**ホワイトボードが本格スタジオ仕様に。** 紙質感の鉛筆、毛筆、水彩、滑らかなぼかし、軽快なWebGL2操作で1FPSのカクつきから卒業しました。",
-      "**いつでも書き出せるパフォーマンス診断。** プロセスごとのCPU・メモリ・フレームレート・メディア負荷を確認し、詳細なJSONレポートを保存できます。",
-      "**ホスト不在でもかくれんぼ終了。** 元のホストがオフラインのときに入室すると、他の参加者や管理者が見えなくなることがあった不具合を直しました。",
-      "**チャットの通知がタイムトラベルをやめました。** 再入室や履歴の同期をしても、入退室やルーム作成の通知が正しい時系列で並びます。",
-      "**ルームのパスワードがしっかり門番するように。** 空のまま入室できてしまう問題や、エラー通知の連打、保存済みパスワードの消失を修正しました。",
-      "**保存済みルームの参加者確認中にスピナーを表示。** 各カードのアイコン付近に読み込み中インジケーターが出て、確認が終わると消えます。"
+      "**GPUでの画面共有がしっかり安定しました。** 交渉エラーで重いCPU再エンコードに落ちてしまう不具合を直し、軽くてくっきりした共有になりました。",
+      "**対応GPUがさらに広がりました。** GTX 660 などの旧世代NVIDIAカードやIntelグラフィックスでも、CPUに頼らずハードウェアエンコードが使えます。",
+      "**PCもようやくひと休み。** 誰も見ていないときは重いエンコードを一時停止し、画面外や無効化されたアニメーションもしっかり止まるようになりました。",
+      "**もう話しているのに「接続中」のまま問題を修正。** 音声が普通に届いているのに参加者が接続中のまま固まることがあった不具合を直しました。"
     ],
     "ko": [
-      "**화이트보드가 진짜 작업실처럼 변신했어요.** 종이 질감 연필, 브러시 모, 수채화, 부드러운 문지르기, 매끈한 WebGL2 줌으로 1 FPS 슬라이드쇼는 이제 안녕.",
-      "**필요할 때 바로 내보내는 성능 진단.** 프로세스별 실제 CPU, 메모리, 프레임률과 미디어 부하를 확인하고 전체 JSON 보고서로 저장할 수 있어요.",
-      "**호스트가 자리 비워도 숨바꼭질은 끝.** 호스트가 오프라인일 때 입장하면 다른 참가자나 관리자가 보이지 않던 버그를 고쳤습니다.",
-      "**채팅 알림이 시간 여행을 멈췄습니다.** 다시 입장하거나 기록을 동기화해도 입장·퇴장·방 생성 알림이 시간 순서대로 차곡차곡 표시돼요.",
-      "**방 비밀번호가 이제 제대로 문을 지킵니다.** 빈 비밀번호로 입장되거나 오류 알림이 도배되고, 저장된 비밀번호를 잊어버리던 문제를 해결했어요.",
-      "**저장된 방의 참여자를 불러올 때 로딩 표시가 나타납니다.** 각 방 카드의 아바타 영역에 회전 표시가 뜨고 조회가 끝나면 사라집니다."
+      "**GPU 화면 공유가 이제 제대로 유지됩니다.** 협상 오류로 무거운 CPU 재인코딩으로 빠지던 문제를 고쳐 더 가볍고 선명하게 공유할 수 있어요.",
+      "**더 많은 그래픽카드가 하드웨어 가속에 합류했어요.** GTX 660 같은 구형 NVIDIA 카드와 Intel 그래픽도 CPU 대신 하드웨어 인코딩을 사용합니다.",
+      "**이제 PC도 숨 좀 돌릴 수 있어요.** 아무도 보지 않을 때는 무거운 인코딩을 잠시 멈추고, 화면 밖이거나 꺼 둔 애니메이션도 조용히 멈춥니다.",
+      "**이미 대화 중인데 '연결 중'으로 남던 버그 수정.** 상대방 목소리가 잘 들리는데도 참가자가 계속 연결 중 상태로 멈춰 있던 문제를 고쳤습니다."
     ],
     "hi": [
-      "**व्हाइटबोर्ड अब पूरा स्टूडियो बन गया।** टेक्सचर पेंसिल, ब्रिसल ब्रश, वॉटरकलर, स्मूद स्मज/ब्लर और मक्खन जैसा WebGL2 ज़ूम — अब स्लो-मोशन स्लाइडशो नहीं।",
-      "**एक्सपोर्ट करने लायक परफॉर्मेंस डायग्नोस्टिक्स।** हर प्रोसेस का असली CPU, मेमोरी, फ्रेम रेट और मीडिया लोड देखें और जब चाहें पूरा JSON रिपोर्ट सेव करें।",
-      "**होस्ट ऑफ़लाइन हो तब भी अब लुका-छिपी बंद।** होस्ट के ऑफ़लाइन रहते रूम में जुड़ने पर बाकी सदस्यों या एडमिन के गायब दिखने की गड़बड़ ठीक कर दी गई।",
-      "**चैट सूचनाओं ने टाइम-ट्रैवल करना बंद किया।** दोबारा जुड़ने या इतिहास सिंक करने पर प्रवेश, निकास और रूम संदेश अब सही क्रम में ही दिखते हैं।",
-      "**रूम पासवर्ड अब सच में पहरा देते हैं।** खाली पासवर्ड से प्रवेश, गलत पासवर्ड अलर्ट की बौछार और सेव किए गए पासवर्ड भूल जाने की गड़बड़ ठीक हो गई।",
-      "**सेव किए गए रूम अब सदस्य जाँचते समय स्पिनर दिखाते हैं।** हर कार्ड के अवतार वाले हिस्से में जाँच पूरी होने तक घूमता आइकन दिखता है।"
+      "**GPU स्क्रीन शेयरिंग अब सच में GPU पर ही टिकती है।** भारी CPU री-एनकोडिंग पर फिसलने वाली गड़बड़ ठीक हो गई, जिससे शेयरिंग हल्की और साफ रहती है।",
+      "**अब और ग्राफ़िक्स कार्ड्स भी हार्डवेयर पार्टी में हैं।** पुराने NVIDIA कार्ड्स (जैसे GTX 660) और Intel ग्राफ़िक्स को भी अब CPU की जगह हार्डवेयर एनकोडिंग मिलती है।",
+      "**आपके PC को आखिरकार चैन की सांस मिली।** जब कोई देख न रहा हो तो स्क्रीन शेयरिंग भारी काम रोक देती है, और बंद या छिपे एनिमेशन भी अब शांत रहते हैं।",
+      "**बातचीत चल रही हो और फिर भी 'कनेक्ट हो रहा है' न दिखे।** आवाज़ साफ आने के बावजूद किसी सदस्य के कनेक्टिंग पर अटके रहने की गड़बड़ ठीक कर दी गई।"
     ],
     "fi": [
-      "**Piirtotaulu sai kunnon studiokäsittelyn.** Paperitekstuurikynä, harjassivellin, akvarelli, sulava sormitus ja liukas WebGL2-zoomaus – hyvästi 1 FPS:n diaesitys.",
-      "**Suorituskykydiagnostiikka, jonka voi viedä talteen.** Seuraa oikeaa CPU-, muisti-, ruudunpäivitys- ja mediakuormaa prosesseittain ja tallenna JSON-raportti.",
-      "**Piiloleikki ilman isäntää päättyi.** Korjattiin bugi, jossa muut jäsenet ja ylläpitäjät jäivät näkymättömiin, kun huoneeseen liityttiin isännän ollessa offline-tilassa.",
-      "**Chatin ilmoitukset lopettivat aikamatkailun.** Liittymis-, poistumis- ja huoneviestit pysyvät nyt oikeassa järjestyksessä paluun ja synkronoinnin jälkeen.",
-      "**Huoneen salasanat vartioivat ovea nyt oikeasti.** Korjattiin bugit, jotka päästivät tyhjän salasanan läpi, toistivat virheilmoituksia tai unohtivat tallennetun salasanan.",
-      "**Tallennetut huoneet näyttävät nyt latausympyrän tarkistuksen ajan.** Jokaisen kortin avatar-alueella pyörii ilmaisin, kunnes sen huoneen haku valmistuu."
+      "**Suora GPU-näytönjako pysyy nyt oikeasti päällä.** Korjattiin neuvotteluhäiriö, joka pudotti jaon raskaalle CPU-uudelleenkoodaukselle.",
+      "**Lisää näytönohjaimia pääsi laitteistokiihdytykseen.** Vanhemmat NVIDIA-kortit (kuten GTX 660) ja Intel-grafiikat käyttävät nyt suoraa laitteistokoodausta.",
+      "**Koneesi saa vihdoin vetää henkeä.** Näytönjako tauottaa raskaan työn, kun kukaan ei katso, ja piilotetut tai poistetut animaatiot pysyvät oikeasti paikallaan.",
+      "**Ei enää 'yhdistetään' kesken juttelun.** Korjattiin bugi, jossa osallistuja jäi jumiin yhdistämistilaan, vaikka hänen äänensä kuului jo täysin normaalisti."
     ],
     "ru": [
-      "**Доска переехала в настоящую студию.** Фактурный карандаш, щетинная кисть, акварель, плавное размазывание и шустрый WebGL2-зум — прощайте, слайд-шоу в 1 FPS.",
-      "**Диагностика производительности с экспортом.** Смотрите реальную нагрузку CPU, память, плавность и медиа по процессам и сохраняйте полный JSON-отчёт в любой момент.",
-      "**Больше никаких пряток без владельца.** Исправлена ошибка, из-за которой участники и другие админы оставались невидимыми при входе в комнату с офлайн-хостом.",
-      "**Уведомления в чате перестали путать время.** Сообщения о входе, выходе и создании комнаты теперь идут строго по порядку после переподключения и синхронизации.",
-      "**Пароли комнат наконец-то охраняют вход.** Исправлены ошибки, из-за которых проходил пустой пароль, сыпались уведомления об ошибке и забывались сохранённые пароли.",
-      "**В сохранённых комнатах появился индикатор поиска участников.** В области аватаров каждой карточки крутится спиннер, пока проверка не завершится."
+      "**Трансляция через GPU больше не срывается.** Исправлен сбой согласования, из-за которого видео скатывалось на тяжёлую перекодировку процессором.",
+      "**К аппаратному ускорению подключилось больше видеокарт.** Старые NVIDIA (вроде GTX 660) и графика Intel теперь кодируют видео на GPU, а не нагружают процессор.",
+      "**Компьютер наконец-то выдохнул.** Захват ставит тяжёлую работу на паузу, когда никто не смотрит, а скрытые и отключённые анимации теперь действительно не крутятся.",
+      "**Хватит писать «подключение», когда вы уже общаетесь.** Исправлена ошибка, из-за которой участник зависал в статусе подключения, хотя его голос уже был слышен."
     ]
   }
 }

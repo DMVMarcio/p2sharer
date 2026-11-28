@@ -27,8 +27,56 @@
 :root[data-reduced-motion='true'] .context-menu.dropdown-closing,
 :root[data-reduced-motion='true'] .app-select-list,
 :root[data-reduced-motion='true'] .app-select-list.dropdown-closing,
-:root[data-reduced-motion='true'] .audio-refresh-spinning {
+:root[data-reduced-motion='true'] .audio-refresh-spinning,
+:root[data-reduced-motion='true'] .nickname-effect-rainbow,
+:root[data-reduced-motion='true'] .nickname-effect-glow,
+:root[data-reduced-motion='true'] .nickname-effect-shine,
+:root[data-reduced-motion='true'] .nickname[data-font='honk'] .nickname-effect-shine::after,
+:root[data-reduced-motion='true'] .nickname-animation-float,
+:root[data-reduced-motion='true'] .nickname-animation-pulse,
+:root[data-reduced-motion='true'] .nickname-animation-wave .nickname-letter,
+:root[data-reduced-motion='true'] .radar-pulse-ring,
+:root[data-reduced-motion='true'] .remote-control-toggle.pending,
+:root[data-reduced-motion='true'] .skeleton-shimmer-sweep,
+:root[data-reduced-motion='true'] .hero-stars,
+:root[data-reduced-motion='true'] .youtube-loading,
+:root[data-reduced-motion='true'] .browser-loading span,
+:root[data-reduced-motion='true'] .whiteboard-marching-ants {
   animation: none !important;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .nickname-effect-rainbow,
+  .nickname-effect-glow,
+  .nickname-effect-shine,
+  .nickname[data-font='honk'] .nickname-effect-shine::after,
+  .nickname-animation-float,
+  .nickname-animation-pulse,
+  .nickname-animation-wave .nickname-letter,
+  .radar-pulse-ring,
+  .remote-control-toggle.pending,
+  .skeleton-shimmer-sweep,
+  .hero-stars,
+  .youtube-loading,
+  .browser-loading span,
+  .whiteboard-marching-ants {
+    animation: none !important;
+  }
+}
+
+:root[data-window-hidden='true'] .nickname-effect-rainbow,
+:root[data-window-hidden='true'] .nickname-effect-glow,
+:root[data-window-hidden='true'] .nickname-effect-shine,
+:root[data-window-hidden='true'] .nickname[data-font='honk'] .nickname-effect-shine::after,
+:root[data-window-hidden='true'] .nickname-animation-float,
+:root[data-window-hidden='true'] .nickname-animation-pulse,
+:root[data-window-hidden='true'] .nickname-animation-wave .nickname-letter,
+:root[data-window-hidden='true'] .radar-pulse-ring,
+:root[data-window-hidden='true'] .remote-control-toggle.pending,
+:root[data-window-hidden='true'] .skeleton-shimmer-sweep,
+:root[data-window-hidden='true'] .hero-stars,
+:root[data-window-hidden='true'] .home-hero::after {
+  animation-play-state: paused !important;
 }
 
 :root[data-reduced-motion='true'] .app-workspace.is-home .app-header,

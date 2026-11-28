@@ -580,6 +580,8 @@
   display: flex;
   flex-direction: column;
   gap: 4px;
+  content-visibility: auto;
+  contain-intrinsic-size: auto 48px;
 }
 
 .chat-msg-header {
@@ -599,6 +601,33 @@
   font-size: 13px;
   font-weight: 600;
   color: var(--accent-color);
+}
+
+.chat-msg-sender .nickname-effect-rainbow,
+.chat-msg-sender .nickname-effect-glow,
+.chat-msg-sender .nickname-effect-shine,
+.chat-msg-sender .nickname[data-font='honk'] .nickname-effect-shine::after,
+.chat-msg-sender .nickname-animation-float,
+.chat-msg-sender .nickname-animation-pulse,
+.chat-msg-sender .nickname-animation-wave .nickname-letter {
+  animation-play-state: paused;
+}
+
+.chat-msg-header:hover .chat-msg-sender .nickname-effect-rainbow,
+.chat-msg-header:hover .chat-msg-sender .nickname-effect-glow,
+.chat-msg-header:hover .chat-msg-sender .nickname-effect-shine,
+.chat-msg-header:hover .chat-msg-sender .nickname[data-font='honk'] .nickname-effect-shine::after,
+.chat-msg-header:hover .chat-msg-sender .nickname-animation-float,
+.chat-msg-header:hover .chat-msg-sender .nickname-animation-pulse,
+.chat-msg-header:hover .chat-msg-sender .nickname-animation-wave .nickname-letter,
+.chat-msg-header:focus-within .chat-msg-sender .nickname-effect-rainbow,
+.chat-msg-header:focus-within .chat-msg-sender .nickname-effect-glow,
+.chat-msg-header:focus-within .chat-msg-sender .nickname-effect-shine,
+.chat-msg-header:focus-within .chat-msg-sender .nickname[data-font='honk'] .nickname-effect-shine::after,
+.chat-msg-header:focus-within .chat-msg-sender .nickname-animation-float,
+.chat-msg-header:focus-within .chat-msg-sender .nickname-animation-pulse,
+.chat-msg-header:focus-within .chat-msg-sender .nickname-animation-wave .nickname-letter {
+  animation-play-state: running;
 }
 
 .chat-msg-time {

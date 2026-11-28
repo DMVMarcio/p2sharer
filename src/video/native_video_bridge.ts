@@ -1,4 +1,8 @@
-import { diagnosticOpaqueId, isMediaDiagnosticsActive, registerDiagnosticBridge } from '../core/media/media_diagnostics.ts';
+import {
+  diagnosticOpaqueId,
+  isMediaDiagnosticsActive,
+  registerDiagnosticBridge,
+} from '../core/media/media_diagnostics.ts';
 import { localizeError, t } from '../i18n/index.ts';
 import { getEncoderPreference, type NativeEncoderSupport } from '../core/media/encoder_preferences.ts';
 import { invoke } from '@tauri-apps/api/core';
@@ -12,7 +16,9 @@ import { NativeJpegDecoder, type DecodedJpegFrame } from './native_jpeg_decoder.
 
 export class NativeVideoBridge implements VideoCaptureBridge {
   public readonly sessionId: string;
-  constructor(sessionId = 'default') { this.sessionId = sessionId; }
+  constructor(sessionId = 'default') {
+    this.sessionId = sessionId;
+  }
   private activeStream: MediaStream | null = null;
   private canvas: HTMLCanvasElement | null = null;
   private ctx: CanvasRenderingContext2D | null = null;
@@ -45,20 +51,41 @@ export class NativeVideoBridge implements VideoCaptureBridge {
   private captureFailure: string | undefined;
   private consumers = new Set<string>();
   private managedConsumers = false;
+  private lastReportedConsumersActive: boolean | null = null;
   private hasFirstFrame = false;
   private previewEncoderFailed = false;
-  public get onFallbackNeeded() { return this.fallbackHandler; }
+  public get onFallbackNeeded() {
+    return this.fallbackHandler;
+  }
   public set onFallbackNeeded(handler: ((reason: string, stream?: MediaStream) => void) | null) {
     this.fallbackHandler = handler;
     const reason = this.captureFailure;
     const generation = this.captureGeneration;
-    if (handler && reason) queueMicrotask(() => {
-      if (generation === this.captureGeneration && this.fallbackHandler === handler) handler(reason);
-    });
+    if (handler && reason)
+      queueMicrotask(() => {
+        if (generation === this.captureGeneration && this.fallbackHandler === handler) handler(reason);
+      });
+  }
+
+  private syncNativeConsumerActivity(): void {
+    if (!this.isCapturingNative() || !this.hasFirstFrame || !this.encoderFeedbackToken || !this.managedConsumers) {
+      return;
+    }
+    const active = this.consumers.size > 0;
+    if (active === this.lastReportedConsumersActive) return;
+    this.lastReportedConsumersActive = active;
+    void invoke('control_capture_encoder', {
+      sessionId: this.sessionId,
+      feedbackToken: this.encoderFeedbackToken,
+      disable: false,
+      consumersActive: active,
+    }).catch(() => {});
   }
 
   private isRequiredBrowserWebRtcConsumerId(consumerId: string): boolean {
-    return consumerId === 'webrtc-peer' || (consumerId.startsWith('webrtc-') && !consumerId.startsWith('webrtc-probing-'));
+    return (
+      consumerId === 'webrtc-peer' || (consumerId.startsWith('webrtc-') && !consumerId.startsWith('webrtc-probing-'))
+    );
   }
 
   private hasRequiredBrowserWebRtcConsumer(): boolean {
@@ -73,30 +100,42 @@ export class NativeVideoBridge implements VideoCaptureBridge {
     if (active) {
       const wasEmpty = this.consumers.size === 0;
       this.consumers.add(consumerId);
-      if (this.isRequiredBrowserWebRtcConsumerId(consumerId) && this.previewEncoderFailed && this.isCapturingNative() && this.encoderFeedbackToken) {
+      if (
+        this.isRequiredBrowserWebRtcConsumerId(consumerId) &&
+        this.previewEncoderFailed &&
+        this.isCapturingNative() &&
+        this.encoderFeedbackToken
+      ) {
         void invoke('control_capture_encoder', {
           sessionId: this.sessionId,
           feedbackToken: this.encoderFeedbackToken,
           disable: true,
         }).catch(() => {});
       } else if (wasEmpty && this.isCapturingNative() && this.encoderFeedbackToken && !this.previewEncoderFailed) {
+        this.lastReportedConsumersActive = true;
         void invoke('control_capture_encoder', {
           sessionId: this.sessionId,
           feedbackToken: this.encoderFeedbackToken,
           disable: false,
+          consumersActive: true,
         }).catch(() => {});
+        return;
       }
+      this.syncNativeConsumerActivity();
     } else {
       this.consumers.delete(consumerId);
       if (this.consumers.size === 0) {
         this.latestEncodedFrame?.close();
         this.latestEncodedFrame = null;
         if (this.latestJpegFrame) {
-          try { this.latestJpegFrame.close(); } catch {}
+          try {
+            this.latestJpegFrame.close();
+          } catch {}
           this.latestJpegFrame = null;
         }
         this.pendingBuffer = null;
       }
+      this.syncNativeConsumerActivity();
     }
   }
 
@@ -118,7 +157,9 @@ export class NativeVideoBridge implements VideoCaptureBridge {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     if (track && typeof (track as any).requestFrame === 'function') {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      try { (track as any).requestFrame(); } catch {}
+      try {
+        (track as any).requestFrame();
+      } catch {}
     }
   }
 
@@ -137,7 +178,7 @@ export class NativeVideoBridge implements VideoCaptureBridge {
     frameRate: number = 60,
     resolution?: { width: number; height: number },
     cursor: boolean = true,
-    preferSurface?: 'monitor' | 'window'
+    preferSurface?: 'monitor' | 'window',
   ): Promise<MediaStream> {
     await this.stopCapture();
     this.captureFailure = undefined;
@@ -184,10 +225,10 @@ export class NativeVideoBridge implements VideoCaptureBridge {
     } catch (err) {
       this.isCapturing = false;
       this.isDirectGpu = false;
-    this.hasFirstFrame = false;
-    this.previewEncoderFailed = false;
-    this.managedConsumers = false;
-    this.consumers.clear();
+      this.hasFirstFrame = false;
+      this.previewEncoderFailed = false;
+      this.managedConsumers = false;
+      this.consumers.clear();
       throw err;
     }
   }
@@ -197,7 +238,7 @@ export class NativeVideoBridge implements VideoCaptureBridge {
     fps: number = 60,
     resolution: { width: number; height: number } = { width: 1920, height: 1080 },
     captureMouse: boolean = true,
-    quality: number = 90
+    quality: number = 90,
   ): Promise<MediaStream> {
     if (typeof optionsOrSourceId === 'object' && optionsOrSourceId !== null) {
       const opts = optionsOrSourceId as VideoSourceOptions;
@@ -206,7 +247,7 @@ export class NativeVideoBridge implements VideoCaptureBridge {
           opts.frameRate || fps,
           opts.resolution || resolution,
           opts.cursor !== false,
-          opts.preferSurface || 'monitor'
+          opts.preferSurface || 'monitor',
         );
       }
       const sId = !opts.sourceId ? 'screen:0' : opts.sourceId;
@@ -215,7 +256,7 @@ export class NativeVideoBridge implements VideoCaptureBridge {
         opts.frameRate || fps,
         opts.resolution || resolution,
         opts.cursor !== false,
-        opts.quality || quality
+        opts.quality || quality,
       );
     }
 
@@ -231,7 +272,7 @@ export class NativeVideoBridge implements VideoCaptureBridge {
     fps: number,
     resolution: { width: number; height: number },
     captureMouse: boolean,
-    quality: number
+    quality: number,
   ): Promise<MediaStream> {
     await this.stopCapture();
     this.captureFailure = undefined;
@@ -249,15 +290,23 @@ export class NativeVideoBridge implements VideoCaptureBridge {
     this.diagnosticLastPacket = 0;
     this.diagnosticPressure = 0;
     this.disposeDiagnostics = registerDiagnosticBridge(() => ({
-      session: diagnosticOpaqueId(this.sessionId), packets: this.diagnosticPackets,
+      session: diagnosticOpaqueId(this.sessionId),
+      packets: this.diagnosticPackets,
       last_packet_age_ms: this.diagnosticLastPacket ? performance.now() - this.diagnosticLastPacket : null,
-      pending: Boolean(this.pendingBuffer), effective_fps: this.effectiveFps,
-      pressure_percent: this.diagnosticPressure, ...this.encodedDecoder?.diagnosticSnapshot(),
+      pending: Boolean(this.pendingBuffer),
+      effective_fps: this.effectiveFps,
+      pressure_percent: this.diagnosticPressure,
+      ...this.encodedDecoder?.diagnosticSnapshot(),
     }));
     const loadMeter = new BridgeLoadMeter(fps, performance.now());
-    this.loadMeter = loadMeter; this.processingCost = 0;
-    const jpegDecoder = new NativeJpegDecoder(error => logDiagnostic('WARN', 'capture.decoder',
-      'Direct JPEG video decoding unavailable; retaining bitmap decoding', { sessionId: this.sessionId, error }));
+    this.loadMeter = loadMeter;
+    this.processingCost = 0;
+    const jpegDecoder = new NativeJpegDecoder((error) =>
+      logDiagnostic('WARN', 'capture.decoder', 'Direct JPEG video decoding unavailable; retaining bitmap decoding', {
+        sessionId: this.sessionId,
+        error,
+      }),
+    );
     this.jpegDecoder = jpegDecoder;
     let jpegDecoderLogged = false;
     let feedbackPending = false;
@@ -315,25 +364,45 @@ export class NativeVideoBridge implements VideoCaptureBridge {
     this.hasFirstFrame = false;
     this.previewEncoderFailed = false;
     this.managedConsumers = false;
+    this.lastReportedConsumersActive = null;
     this.consumers.clear();
 
     // 2. Start native Rust capture thread
     let encoderPreference = getEncoderPreference();
     try {
       const requestedEncoder = encoderPreference;
-      logDiagnostic('INFO', 'capture.bridge', 'Native capture requested', { sessionId: this.sessionId, sourceId,
-        resolution, fps, captureMouse, quality, encoderPreference, output: this.trackGenerator ? 'MediaStreamTrackGenerator' : 'canvas' });
+      logDiagnostic('INFO', 'capture.bridge', 'Native capture requested', {
+        sessionId: this.sessionId,
+        sourceId,
+        resolution,
+        fps,
+        captureMouse,
+        quality,
+        encoderPreference,
+        output: this.trackGenerator ? 'MediaStreamTrackGenerator' : 'canvas',
+      });
       if (encoderPreference === 'nvenc') {
         const support = await invoke<NativeEncoderSupport>('get_native_encoder_support').catch((error) => {
-          logDiagnostic('WARN', 'capture.encoder', 'Native encoder capability probe failed', { sessionId: this.sessionId, error });
+          logDiagnostic('WARN', 'capture.encoder', 'Native encoder capability probe failed', {
+            sessionId: this.sessionId,
+            error,
+          });
           return null;
         });
         encoderPreference = getEncoderPreference(support?.driver_api_available ?? false);
-        logDiagnostic(support?.driver_api_available ? 'INFO' : 'WARN', 'capture.encoder', 'NVENC preference validated', {
-          sessionId: this.sessionId, requestedEncoder, effectivePreference: encoderPreference,
-          available: support?.driver_api_available ?? false, reason: support?.reason ?? 'capability probe unavailable',
-          elapsedMs: Math.round(performance.now() - captureStarted),
-        });
+        logDiagnostic(
+          support?.driver_api_available ? 'INFO' : 'WARN',
+          'capture.encoder',
+          'NVENC preference validated',
+          {
+            sessionId: this.sessionId,
+            requestedEncoder,
+            effectivePreference: encoderPreference,
+            available: support?.driver_api_available ?? false,
+            reason: support?.reason ?? 'capability probe unavailable',
+            elapsedMs: Math.round(performance.now() - captureStarted),
+          },
+        );
       }
       await invoke('start_capture_session', {
         sessionId: this.sessionId,
@@ -347,18 +416,26 @@ export class NativeVideoBridge implements VideoCaptureBridge {
         encoderPreference,
       });
       logDiagnostic('INFO', 'capture.bridge', 'Native capture command completed; awaiting video', {
-        sessionId: this.sessionId, elapsedMs: Math.round(performance.now() - captureStarted), encoderPreference });
+        sessionId: this.sessionId,
+        elapsedMs: Math.round(performance.now() - captureStarted),
+        encoderPreference,
+      });
     } catch (err) {
       this.isCapturing = false;
       this.isDirectGpu = false;
-    this.hasFirstFrame = false;
-    this.previewEncoderFailed = false;
-    this.managedConsumers = false;
-    this.consumers.clear();
+      this.hasFirstFrame = false;
+      this.previewEncoderFailed = false;
+      this.managedConsumers = false;
+      this.consumers.clear();
       const reason = err instanceof Error ? err.message : String(err);
-      console.error('[NativeVideoBridge] Native capture failed to start:', { sessionId: this.sessionId, sourceId,
-        elapsedMs: Math.round(performance.now() - captureStarted), error: err, reason });
-      throw new Error(t("message.879ac52b7cbf", { v0: localizeError(reason) }));
+      console.error('[NativeVideoBridge] Native capture failed to start:', {
+        sessionId: this.sessionId,
+        sourceId,
+        elapsedMs: Math.round(performance.now() - captureStarted),
+        error: err,
+        reason,
+      });
+      throw new Error(t('message.879ac52b7cbf', { v0: localizeError(reason) }));
     }
 
     // 3. Connect to local binary WebSocket stream
@@ -368,7 +445,7 @@ export class NativeVideoBridge implements VideoCaptureBridge {
       accessToken = await invoke<string>('get_video_ws_token');
     } catch {
       await this.stopCapture();
-      throw new Error(t("message.c5919d3eedd0"));
+      throw new Error(t('message.c5919d3eedd0'));
     }
     this.pendingBuffer = null;
     this.isDecoding = false;
@@ -385,7 +462,8 @@ export class NativeVideoBridge implements VideoCaptureBridge {
 
         // Decode independent JPEGs directly to VideoFrame when WebCodecs supports it.
         if (buffer.byteLength > 4) {
-          this.latestEncodedFrame?.close(); this.latestEncodedFrame = null;
+          this.latestEncodedFrame?.close();
+          this.latestEncodedFrame = null;
           const newBitmap = await jpegDecoder.decode(buffer);
 
           if (!this.isCapturing || generation !== this.captureGeneration) {
@@ -401,8 +479,10 @@ export class NativeVideoBridge implements VideoCaptureBridge {
           if (!jpegDecoderLogged) {
             jpegDecoderLogged = true;
             logDiagnostic('INFO', 'capture.decoder', 'Observed JPEG preview decoder', {
-              sessionId: this.sessionId, decoder: 'displayWidth' in newBitmap ? 'ImageDecoder/VideoFrame' : 'createImageBitmap',
-              format: 'format' in newBitmap ? newBitmap.format : 'RGB bitmap' });
+              sessionId: this.sessionId,
+              decoder: 'displayWidth' in newBitmap ? 'ImageDecoder/VideoFrame' : 'createImageBitmap',
+              format: 'format' in newBitmap ? newBitmap.format : 'RGB bitmap',
+            });
           }
         }
 
@@ -422,9 +502,10 @@ export class NativeVideoBridge implements VideoCaptureBridge {
             const writer = this.trackWriter;
             if (writer.desiredSize !== null && writer.desiredSize <= 0) return;
             const frameInit = this.frameClock.next(performance.now(), this.effectiveFps);
-            const videoFrame = bitmap === this.latestJpegFrame && 'displayWidth' in bitmap
-              ? await jpegDecoder.createTrackFrame(bitmap, frameInit)
-              : new VideoFrameClass(bitmap, frameInit);
+            const videoFrame =
+              bitmap === this.latestJpegFrame && 'displayWidth' in bitmap
+                ? await jpegDecoder.createTrackFrame(bitmap, frameInit)
+                : new VideoFrameClass(bitmap, frameInit);
             try {
               await writer.ready;
               if (this.isCapturing && generation === this.captureGeneration) {
@@ -468,7 +549,7 @@ export class NativeVideoBridge implements VideoCaptureBridge {
         // Ignore frame decode failure
       } finally {
         if (generation === this.captureGeneration) {
-          if (buffer.byteLength > 4 || buffer.byteLength === 4 && new Uint8Array(buffer)[0] === 1) {
+          if (buffer.byteLength > 4 || (buffer.byteLength === 4 && new Uint8Array(buffer)[0] === 1)) {
             const cost = performance.now() - processingStarted;
             loadMeter.complete(cost);
             this.processingCost = this.processingCost ? this.processingCost * 0.9 + cost * 0.1 : cost;
@@ -489,24 +570,35 @@ export class NativeVideoBridge implements VideoCaptureBridge {
           settled = true;
           clearTimeout(timeout);
           logDiagnostic('INFO', 'capture.websocket', 'Native video bridge authenticated', {
-            sessionId: this.sessionId, elapsedMs: Math.round(performance.now() - captureStarted) });
+            sessionId: this.sessionId,
+            elapsedMs: Math.round(performance.now() - captureStarted),
+          });
           resolve();
         };
         const fail = (reason = 'authentication_failed', details?: unknown) => {
           logDiagnostic('ERROR', 'capture.websocket', 'Native video bridge failed', {
-            sessionId: this.sessionId, sourceId, reason, details, authenticated: settled,
-            elapsedMs: Math.round(performance.now() - captureStarted) });
+            sessionId: this.sessionId,
+            sourceId,
+            reason,
+            details,
+            authenticated: settled,
+            elapsedMs: Math.round(performance.now() - captureStarted),
+          });
           if (settled) return;
           settled = true;
           clearTimeout(timeout);
-          reject(new Error(t("message.35654175ba2a")));
+          reject(new Error(t('message.35654175ba2a')));
         };
         const wsUrl = `ws://127.0.0.1:${port}`;
         this.ws = new WebSocket(wsUrl);
         this.ws.binaryType = 'arraybuffer';
 
         this.ws.onopen = () => {
-          try { this.ws?.send(`${accessToken}:${this.sessionId}`); } catch (error) { fail('authentication_send_failed', error); }
+          try {
+            this.ws?.send(`${accessToken}:${this.sessionId}`);
+          } catch (error) {
+            fail('authentication_send_failed', error);
+          }
         };
 
         this.ws.onmessage = (evt: MessageEvent) => {
@@ -526,12 +618,16 @@ export class NativeVideoBridge implements VideoCaptureBridge {
             } catch {
               reason = evt.data;
             }
-            console.warn('[NativeVideoBridge] Received capture signal from native backend:', { sessionId: this.sessionId, sourceId, reason,
-              elapsedMs: Math.round(performance.now() - captureStarted) });
+            console.warn('[NativeVideoBridge] Received capture signal from native backend:', {
+              sessionId: this.sessionId,
+              sourceId,
+              reason,
+              elapsedMs: Math.round(performance.now() - captureStarted),
+            });
             if (reason === 'window_minimized') return;
             terminalReason = reason;
             this.captureFailure = reason;
-            this.activeStream?.getTracks().forEach(track => track.stop());
+            this.activeStream?.getTracks().forEach((track) => track.stop());
             if (this.onFallbackNeeded) {
               this.onFallbackNeeded(reason);
             } else void this.stopCapture();
@@ -546,8 +642,12 @@ export class NativeVideoBridge implements VideoCaptureBridge {
               const encoder = isNativeEncodedPacket(evt.data) ? 'native/H264' : 'libjpeg-turbo/JPEG';
               if (wireEncoder !== encoder) {
                 logDiagnostic('INFO', 'capture.encoder', 'Observed native video payload', {
-                  sessionId: this.sessionId, encoder, previousEncoder: wireEncoder,
-                  elapsedMs: Math.round(performance.now() - captureStarted), packetBytes: evt.data.byteLength });
+                  sessionId: this.sessionId,
+                  encoder,
+                  previousEncoder: wireEncoder,
+                  elapsedMs: Math.round(performance.now() - captureStarted),
+                  packetBytes: evt.data.byteLength,
+                });
                 wireEncoder = encoder;
               }
             }
@@ -556,25 +656,38 @@ export class NativeVideoBridge implements VideoCaptureBridge {
               this.diagnosticLastPacket = performance.now();
             }
             const nativeEncoded = isNativeEncodedPacket(evt.data);
-            const pressurePercent = loadMeter.receive(evt.data.byteLength > 4,
-              Boolean(this.pendingBuffer && this.pendingBuffer.byteLength > 4), performance.now());
+            const pressurePercent = loadMeter.receive(
+              evt.data.byteLength > 4,
+              Boolean(this.pendingBuffer && this.pendingBuffer.byteLength > 4),
+              performance.now(),
+            );
             if (isMediaDiagnosticsActive() && pressurePercent !== undefined) this.diagnosticPressure = pressurePercent;
             // Only forward bridge preview pressure when the browser WebRTC path consumes
             // decoded preview frames; local SW preview load must never downscale NativeVideoTransport.
-            const reportPressure = (!nativeEncoded || this.hasRequiredBrowserWebRtcConsumer())
-              ? pressurePercent
-              : (pressurePercent !== undefined ? 0 : undefined);
+            const reportPressure =
+              !nativeEncoded || this.hasRequiredBrowserWebRtcConsumer()
+                ? pressurePercent
+                : pressurePercent !== undefined
+                  ? 0
+                  : undefined;
             if (reportPressure !== undefined && !feedbackPending && generation === this.captureGeneration) {
               feedbackPending = true;
-              void invoke<number>('report_capture_load', { sessionId: this.sessionId, feedbackToken, pressurePercent: reportPressure })
-                .then(effectiveFps => {
+              void invoke<number>('report_capture_load', {
+                sessionId: this.sessionId,
+                feedbackToken,
+                pressurePercent: reportPressure,
+              })
+                .then((effectiveFps) => {
                   if (generation === this.captureGeneration) {
                     loadMeter.setEffectiveFps(effectiveFps);
-                    if (Number.isFinite(effectiveFps) && effectiveFps >= 15 && effectiveFps <= 120) this.effectiveFps = effectiveFps;
+                    if (Number.isFinite(effectiveFps) && effectiveFps >= 15 && effectiveFps <= 120)
+                      this.effectiveFps = effectiveFps;
                   }
                 })
                 .catch(() => {}) // Stopped/replaced sessions reject stale feedback.
-                .finally(() => { feedbackPending = false; });
+                .finally(() => {
+                  feedbackPending = false;
+                });
             }
             if (nativeEncoded) {
               if (!receivedNativeEncoding) {
@@ -585,32 +698,49 @@ export class NativeVideoBridge implements VideoCaptureBridge {
               if (nativeEncodingFailed) return;
               // Hardware decoders may need several input frames before producing the first output.
               // Submit asynchronously to the decoder's bounded queue; serialize only track writes.
-              void encodedDecoder.decode(evt.data).then(frame => {
-                if (!frame) return;
-                if (generation !== this.captureGeneration || !this.isCapturing || nativeEncodingFailed) { frame.close(); return; }
-                const track = this.activeStream?.getVideoTracks()[0];
-                if (track) registerNativeSenderSource(track, { sessionId: this.sessionId, feedbackToken });
-                if (!this.hasFirstFrame) {
-                  this.hasFirstFrame = true;
-                  onFirstFrame?.();
-                }
-                this.latestEncodedFrame?.close(); this.latestEncodedFrame = frame;
-                this.pendingBuffer = new Uint8Array([1, 0, 0, 0]).buffer;
-                void pumpNextFrame();
-              }).catch(error => {
-                if (generation !== this.captureGeneration || !this.isCapturing || nativeEncodingFailed) return;
-                nativeEncodingFailed = true;
-                this.previewEncoderFailed = true;
-                encodedDecoder.close();
-                console.warn('[NativeVideoBridge] Local H264 preview decoder failed; keeping native H264 encoder for direct P2P unless browser consumer activates:', {
-                  sessionId: this.sessionId, sourceId, error, elapsedMs: Math.round(performance.now() - captureStarted),
+              void encodedDecoder
+                .decode(evt.data)
+                .then((frame) => {
+                  if (!frame) return;
+                  if (generation !== this.captureGeneration || !this.isCapturing || nativeEncodingFailed) {
+                    frame.close();
+                    return;
+                  }
+                  const track = this.activeStream?.getVideoTracks()[0];
+                  if (track) registerNativeSenderSource(track, { sessionId: this.sessionId, feedbackToken });
+                  if (!this.hasFirstFrame) {
+                    this.hasFirstFrame = true;
+                    onFirstFrame?.();
+                  }
+                  this.latestEncodedFrame?.close();
+                  this.latestEncodedFrame = frame;
+                  this.pendingBuffer = new Uint8Array([1, 0, 0, 0]).buffer;
+                  void pumpNextFrame();
+                })
+                .catch((error) => {
+                  if (generation !== this.captureGeneration || !this.isCapturing || nativeEncodingFailed) return;
+                  nativeEncodingFailed = true;
+                  this.previewEncoderFailed = true;
+                  encodedDecoder.close();
+                  console.warn(
+                    '[NativeVideoBridge] Local H264 preview decoder failed; keeping native H264 encoder for direct P2P unless browser consumer activates:',
+                    {
+                      sessionId: this.sessionId,
+                      sourceId,
+                      error,
+                      elapsedMs: Math.round(performance.now() - captureStarted),
+                    },
+                  );
+                  if (this.hasRequiredBrowserWebRtcConsumer()) {
+                    void invoke('control_capture_encoder', {
+                      sessionId: this.sessionId,
+                      feedbackToken,
+                      disable: true,
+                    }).catch(() => {});
+                  } else {
+                    onFirstFrame?.();
+                  }
                 });
-                if (this.hasRequiredBrowserWebRtcConsumer()) {
-                  void invoke('control_capture_encoder', { sessionId: this.sessionId, feedbackToken, disable: true }).catch(() => {});
-                } else {
-                  onFirstFrame?.();
-                }
-              });
               return;
             }
             if (evt.data.byteLength > 4 && receivedNativeEncoding && !nativeEncodingFailed) {
@@ -631,7 +761,8 @@ export class NativeVideoBridge implements VideoCaptureBridge {
         };
 
         this.ws.onerror = () => fail('websocket_error');
-        this.ws.onclose = (event) => fail('websocket_closed', { code: event.code, reason: event.reason, wasClean: event.wasClean });
+        this.ws.onclose = (event) =>
+          fail('websocket_closed', { code: event.code, reason: event.reason, wasClean: event.wasClean });
       });
     } catch (error) {
       await this.stopCapture();
@@ -672,13 +803,17 @@ export class NativeVideoBridge implements VideoCaptureBridge {
         const succeed = () => {
           cleanup();
           this.hasFirstFrame = true;
+          this.syncNativeConsumerActivity();
           const frame = this.latestEncodedFrame || this.latestJpegFrame;
           logDiagnostic('INFO', 'capture.preview', 'First native preview frame decoded', {
-            sessionId: this.sessionId, sourceId, encoder: wireEncoder,
+            sessionId: this.sessionId,
+            sourceId,
+            encoder: wireEncoder,
             nativeRtpEligible: receivedNativeEncoding,
             width: frame ? ('displayWidth' in frame ? frame.displayWidth : frame.width) : undefined,
             height: frame ? ('displayHeight' in frame ? frame.displayHeight : frame.height) : undefined,
-            elapsedMs: Math.round(performance.now() - captureStarted) });
+            elapsedMs: Math.round(performance.now() - captureStarted),
+          });
           if (receivedNativeEncoding && stream.getVideoTracks()[0]) {
             registerNativeSenderSource(stream.getVideoTracks()[0], { sessionId: this.sessionId, feedbackToken });
           }
@@ -695,23 +830,46 @@ export class NativeVideoBridge implements VideoCaptureBridge {
             succeed();
             return;
           }
-          if (receivedNativeEncoding && !nativeEncodingFailed && !previewKeyframeRetried && performance.now() - started > 1200) {
+          if (
+            receivedNativeEncoding &&
+            !nativeEncodingFailed &&
+            !previewKeyframeRetried &&
+            performance.now() - started > 1200
+          ) {
             previewKeyframeRetried = true;
-            void invoke('control_capture_encoder', { sessionId: this.sessionId, feedbackToken, disable: false }).catch(() => {});
+            void invoke('control_capture_encoder', { sessionId: this.sessionId, feedbackToken, disable: false }).catch(
+              () => {},
+            );
           }
           if (receivedNativeEncoding && !nativeEncodingFailed && performance.now() - started > 3000) {
             nativeEncodingFailed = true;
             this.previewEncoderFailed = true;
             encodedDecoder.close();
             if (this.hasRequiredBrowserWebRtcConsumer()) {
-              logDiagnostic('WARN', 'capture.preview', 'Native H264 preview did not decode within 3000ms; falling back to JPEG for browser WebRTC consumer', {
-                sessionId: this.sessionId, sourceId, elapsedMs: Math.round(performance.now() - captureStarted)
-              });
-              void invoke('control_capture_encoder', { sessionId: this.sessionId, feedbackToken, disable: true }).catch(() => {});
+              logDiagnostic(
+                'WARN',
+                'capture.preview',
+                'Native H264 preview did not decode within 3000ms; falling back to JPEG for browser WebRTC consumer',
+                {
+                  sessionId: this.sessionId,
+                  sourceId,
+                  elapsedMs: Math.round(performance.now() - captureStarted),
+                },
+              );
+              void invoke('control_capture_encoder', { sessionId: this.sessionId, feedbackToken, disable: true }).catch(
+                () => {},
+              );
             } else {
-              logDiagnostic('WARN', 'capture.preview', 'Local H264 preview delayed beyond 3000ms; preserving hardware encoder for NativeVideoTransport', {
-                sessionId: this.sessionId, sourceId, elapsedMs: Math.round(performance.now() - captureStarted)
-              });
+              logDiagnostic(
+                'WARN',
+                'capture.preview',
+                'Local H264 preview delayed beyond 3000ms; preserving hardware encoder for NativeVideoTransport',
+                {
+                  sessionId: this.sessionId,
+                  sourceId,
+                  elapsedMs: Math.round(performance.now() - captureStarted),
+                },
+              );
               const track = this.activeStream?.getVideoTracks()[0];
               if (track) registerNativeSenderSource(track, { sessionId: this.sessionId, feedbackToken });
               succeed();
@@ -721,10 +879,15 @@ export class NativeVideoBridge implements VideoCaptureBridge {
           if (!this.isCapturing || performance.now() - started > 6000) {
             cleanup();
             logDiagnostic('ERROR', 'capture.preview', 'Native preview did not decode its first frame', {
-              sessionId: this.sessionId, sourceId, encoder: wireEncoder ?? 'no image payload received',
-              elapsedMs: Math.round(performance.now() - captureStarted), waitMs: Math.round(performance.now() - started),
-              capturing: this.isCapturing, nativeEncodingFailed });
-            reject(new Error(t("message.08b5364da3c6")));
+              sessionId: this.sessionId,
+              sourceId,
+              encoder: wireEncoder ?? 'no image payload received',
+              elapsedMs: Math.round(performance.now() - captureStarted),
+              waitMs: Math.round(performance.now() - started),
+              capturing: this.isCapturing,
+              nativeEncodingFailed,
+            });
+            reject(new Error(t('message.08b5364da3c6')));
             return;
           }
           timer = setTimeout(check, 50);
@@ -777,11 +940,18 @@ export class NativeVideoBridge implements VideoCaptureBridge {
   public getCurrentFps(): number {
     return this.currentFps;
   }
-  public getProcessingCost(): number { return this.processingCost; }
+  public getProcessingCost(): number {
+    return this.processingCost;
+  }
   public async updateProfile(fps: number, width: number, height: number): Promise<void> {
     if (!this.isCapturingNative() || !this.encoderFeedbackToken) return;
-    await invoke('update_capture_profile', { sessionId: this.sessionId, feedbackToken: this.encoderFeedbackToken,
-      targetFps: fps, targetWidth: width, targetHeight: height });
+    await invoke('update_capture_profile', {
+      sessionId: this.sessionId,
+      feedbackToken: this.encoderFeedbackToken,
+      targetFps: fps,
+      targetWidth: width,
+      targetHeight: height,
+    });
     this.currentFps = this.effectiveFps = fps;
     this.loadMeter?.setEffectiveFps(fps);
   }
@@ -793,12 +963,16 @@ export class NativeVideoBridge implements VideoCaptureBridge {
   /** Retain the current MediaStreamTrack while returning to generic native encoding. */
   public async disableNativeEncoding(): Promise<void> {
     if (!this.isCapturingNative() || !this.encoderFeedbackToken) return;
-    await invoke('control_capture_encoder', { sessionId: this.sessionId,
-      feedbackToken: this.encoderFeedbackToken, disable: true });
+    await invoke('control_capture_encoder', {
+      sessionId: this.sessionId,
+      feedbackToken: this.encoderFeedbackToken,
+      disable: true,
+    });
   }
 
   public async stopCapture(): Promise<void> {
-    this.disposeDiagnostics?.(); this.disposeDiagnostics = null;
+    this.disposeDiagnostics?.();
+    this.disposeDiagnostics = null;
     this.captureGeneration++;
     this.encoderFeedbackToken = null;
     this.loadMeter = null;
@@ -807,13 +981,17 @@ export class NativeVideoBridge implements VideoCaptureBridge {
     this.hasFirstFrame = false;
     this.previewEncoderFailed = false;
     this.managedConsumers = false;
+    this.lastReportedConsumersActive = null;
     this.consumers.clear();
     this.pendingBuffer = null;
     this.isDecoding = false;
 
-    this.encodedDecoder?.close(); this.encodedDecoder = null;
-    this.latestEncodedFrame?.close(); this.latestEncodedFrame = null;
-    this.jpegDecoder?.close(); this.jpegDecoder = null;
+    this.encodedDecoder?.close();
+    this.encodedDecoder = null;
+    this.latestEncodedFrame?.close();
+    this.latestEncodedFrame = null;
+    this.jpegDecoder?.close();
+    this.jpegDecoder = null;
 
     if (this.animationFrameId !== null) {
       cancelAnimationFrame(this.animationFrameId);

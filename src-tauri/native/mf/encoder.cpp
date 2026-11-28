@@ -96,6 +96,7 @@ struct Encoder {
     bool com = false, mf = false;
     HMODULE mfplat = nullptr, mfdll = nullptr;
     uint32_t width = 0, height = 0, fps = 0, bitrate = 0;
+    DXGI_FORMAT input_format = DXGI_FORMAT_UNKNOWN;
     unsigned pending = 0;
     ComPtr<ID3D11Device> device;
     ComPtr<ID3D11DeviceContext> context;
@@ -141,9 +142,30 @@ HRESULT rate_control(Encoder& e, uint32_t bitrate) {
     // HRD reservoir so full-screen app switches keep sharp UI text without QP spikes.
     const uint32_t payload = bitrate * 92 / 100;
     const uint32_t reservoir = static_cast<uint32_t>(static_cast<uint64_t>(payload) * 300 / 8000);
-    HRESULT hr = uint_property(e.codec.Get(), CODECAPI_AVEncCommonBufferSize, reservoir);
-    if (FAILED(hr)) return hr;
+    // Some hardware MFTs reject AVEncCommonBufferSize while still honoring MeanBitRate.
+    (void)uint_property(e.codec.Get(), CODECAPI_AVEncCommonBufferSize, reservoir);
     return uint_property(e.codec.Get(), CODECAPI_AVEncCommonMeanBitRate, payload);
+}
+bool create_input_surface(Encoder& e, DXGI_FORMAT format, char* error, size_t size) {
+    UINT support = 0;
+    MF_CHECK(e.enumerator->CheckVideoProcessorFormat(format, &support), "input processor support");
+    if (!(support & D3D11_VIDEO_PROCESSOR_FORMAT_SUPPORT_INPUT)) {
+        return check(MF_E_UNSUPPORTED_D3D_TYPE, "GPU input format conversion unsupported", error, size);
+    }
+    ComPtr<ID3D11Texture2D> next_tex;
+    ComPtr<ID3D11VideoProcessorInputView> next_view;
+    D3D11_TEXTURE2D_DESC td{};
+    td.Width = e.width; td.Height = e.height; td.MipLevels = 1; td.ArraySize = 1;
+    td.Format = format; td.SampleDesc.Count = 1; td.Usage = D3D11_USAGE_DEFAULT;
+    td.BindFlags = D3D11_BIND_RENDER_TARGET;
+    MF_CHECK(e.device->CreateTexture2D(&td, nullptr, &next_tex), "GPU conversion input");
+    D3D11_VIDEO_PROCESSOR_INPUT_VIEW_DESC iv{};
+    iv.ViewDimension = D3D11_VPIV_DIMENSION_TEXTURE2D;
+    MF_CHECK(e.video->CreateVideoProcessorInputView(next_tex.Get(), e.enumerator.Get(), &iv, &next_view), "GPU conversion input view");
+    e.input_texture = next_tex;
+    e.input_view = next_view;
+    e.input_format = format;
+    return true;
 }
 bool media_type(IMFMediaType* type, GUID format, Encoder& e, char* error, size_t size) {
     MF_CHECK(type->SetGUID(MF_MT_MAJOR_TYPE, MFMediaType_Video), "video major type");
@@ -171,26 +193,45 @@ bool configure(Encoder& e, IMFActivate* activation, char* error, size_t size) {
     attrs->SetUINT32(MF_LOW_LATENCY, TRUE);
     MF_CHECK(e.transform->ProcessMessage(MFT_MESSAGE_SET_D3D_MANAGER, reinterpret_cast<ULONG_PTR>(e.manager.Get())), "bind capture GPU");
     MF_CHECK(e.transform.As(&e.codec), "hardware codec controls");
-    // Require low latency. Baseline profile rules out B frames even on drivers
-    // that reject the optional B-picture count control before type negotiation.
-    MF_CHECK(bool_property(e.codec.Get(), CODECAPI_AVLowLatencyMode, true), "enable low latency");
+    // Some hardware MFTs (notably Intel QuickSync) reject ICodecAPI properties
+    // until output/input media types are set. Apply best-effort now and enforce below.
+    HRESULT low_latency_hr = bool_property(e.codec.Get(), CODECAPI_AVLowLatencyMode, true);
     uint_property(e.codec.Get(), CODECAPI_AVEncCommonRateControlMode, eAVEncCommonRateControlMode_CBR);
     uint_property(e.codec.Get(), CODECAPI_AVEncCommonQualityVsSpeed, 33);
     uint_property(e.codec.Get(), CODECAPI_AVEncMPVGOPSize, 0xffffffff);
     bool_property(e.codec.Get(), CODECAPI_AVEncCommonRealTime, true);
-    MF_CHECK(rate_control(e, e.bitrate), "low-delay hardware rate control");
+    HRESULT rc_hr = rate_control(e, e.bitrate);
     ComPtr<IMFMediaType> output, input;
     MF_CHECK(MFCreateMediaType(&output), "output media type");
     if (!media_type(output.Get(), MFVideoFormat_H264, e, error, size)) return false;
     MF_CHECK(output->SetUINT32(MF_MT_AVG_BITRATE, e.bitrate * 92 / 100), "output bitrate");
     MF_CHECK(output->SetUINT32(MF_MT_MPEG2_PROFILE, eAVEncH264VProfile_High), "high profile");
     if (FAILED(e.transform->SetOutputType(0, output.Get(), 0))) {
-        MF_CHECK(output->SetUINT32(MF_MT_MPEG2_PROFILE, eAVEncH264VProfile_Base), "baseline profile fallback");
-        MF_CHECK(e.transform->SetOutputType(0, output.Get(), 0), "H264 output negotiation");
+        if (SUCCEEDED(output->SetUINT32(MF_MT_MPEG2_PROFILE, eAVEncH264VProfile_Main))
+            && SUCCEEDED(e.transform->SetOutputType(0, output.Get(), 0))) {
+        } else {
+            MF_CHECK(output->SetUINT32(MF_MT_MPEG2_PROFILE, eAVEncH264VProfile_Base), "baseline profile fallback");
+            MF_CHECK(e.transform->SetOutputType(0, output.Get(), 0), "H264 output negotiation");
+        }
     }
     MF_CHECK(MFCreateMediaType(&input), "input media type");
     if (!media_type(input.Get(), MFVideoFormat_NV12, e, error, size)) return false;
     MF_CHECK(e.transform->SetInputType(0, input.Get(), 0), "NV12 input negotiation");
+    if (FAILED(low_latency_hr)) {
+        low_latency_hr = bool_property(e.codec.Get(), CODECAPI_AVLowLatencyMode, true);
+    }
+    if (FAILED(low_latency_hr) && !MFGetAttributeUINT32(attrs.Get(), MF_LOW_LATENCY, FALSE)) {
+        return check(low_latency_hr, "enable low latency", error, size);
+    }
+    uint_property(e.codec.Get(), CODECAPI_AVEncCommonRateControlMode, eAVEncCommonRateControlMode_CBR);
+    uint_property(e.codec.Get(), CODECAPI_AVEncCommonQualityVsSpeed, 33);
+    uint_property(e.codec.Get(), CODECAPI_AVEncMPVGOPSize, 0xffffffff);
+    bool_property(e.codec.Get(), CODECAPI_AVEncCommonRealTime, true);
+    if (FAILED(rc_hr)) {
+        MF_CHECK(rate_control(e, e.bitrate), "low-delay hardware rate control");
+    } else {
+        (void)rate_control(e, e.bitrate);
+    }
     uint_property(e.codec.Get(), CODECAPI_AVEncMPVDefaultBPictureCount, 0);
     MF_CHECK(MFCreateVideoSampleAllocatorEx(IID_PPV_ARGS(&e.allocator)), "create GPU sample pool");
     MF_CHECK(e.allocator->SetDirectXManager(e.manager.Get()), "sample GPU manager");
@@ -239,17 +280,13 @@ bool initialize(Encoder& e, ID3D11Device* device, uint32_t w, uint32_t h, uint32
     content.InputFrameRate = content.OutputFrameRate = {fps, 1}; content.Usage = D3D11_VIDEO_USAGE_PLAYBACK_NORMAL;
     MF_CHECK(e.video->CreateVideoProcessorEnumerator(&content, &e.enumerator), "video processor enumeration");
     UINT support = 0;
-    MF_CHECK(e.enumerator->CheckVideoProcessorFormat(DXGI_FORMAT_R8G8B8A8_UNORM, &support), "RGBA processor support");
-    if (!(support & D3D11_VIDEO_PROCESSOR_FORMAT_SUPPORT_INPUT)) return check(MF_E_UNSUPPORTED_D3D_TYPE, "GPU RGBA conversion unsupported", error, size);
     MF_CHECK(e.enumerator->CheckVideoProcessorFormat(DXGI_FORMAT_NV12, &support), "NV12 processor support");
     if (!(support & D3D11_VIDEO_PROCESSOR_FORMAT_SUPPORT_OUTPUT)) return check(MF_E_UNSUPPORTED_D3D_TYPE, "GPU NV12 conversion unsupported", error, size);
     MF_CHECK(e.video->CreateVideoProcessor(e.enumerator.Get(), 0, &e.processor), "GPU color converter");
-    D3D11_TEXTURE2D_DESC td{}; td.Width=w; td.Height=h; td.MipLevels=1; td.ArraySize=1;
-    td.Format=DXGI_FORMAT_R8G8B8A8_UNORM; td.SampleDesc.Count=1; td.Usage=D3D11_USAGE_DEFAULT;
-    td.BindFlags=D3D11_BIND_RENDER_TARGET;
-    MF_CHECK(device->CreateTexture2D(&td, nullptr, &e.input_texture), "GPU conversion input");
-    D3D11_VIDEO_PROCESSOR_INPUT_VIEW_DESC iv{}; iv.ViewDimension=D3D11_VPIV_DIMENSION_TEXTURE2D;
-    MF_CHECK(e.video->CreateVideoProcessorInputView(e.input_texture.Get(), e.enumerator.Get(), &iv, &e.input_view), "GPU conversion input view");
+    if (!create_input_surface(e, DXGI_FORMAT_R8G8B8A8_UNORM, error, size)
+        && !create_input_surface(e, DXGI_FORMAT_B8G8R8A8_UNORM, error, size)) {
+        return false;
+    }
     D3D11_VIDEO_PROCESSOR_COLOR_SPACE rgb{}, yuv{};
     rgb.RGB_Range=0; rgb.YCbCr_Matrix=1; yuv.YCbCr_Matrix=1; yuv.Nominal_Range=1;
     e.video_context->VideoProcessorSetStreamColorSpace(e.processor.Get(), 0, &rgb);
@@ -309,8 +346,14 @@ bool wait_event(Encoder& e, bool input, unsigned timeout_ms, char* error,size_t 
 bool encode(Encoder& e, ID3D11Texture2D* source, uint64_t timestamp, bool key, uint32_t bitrate,
     uint64_t* output_timestamp, int* output_key, char* error, size_t size) {
     D3D11_TEXTURE2D_DESC desc{}; source->GetDesc(&desc);
-    if(desc.Width!=e.width||desc.Height!=e.height||desc.Format!=DXGI_FORMAT_R8G8B8A8_UNORM||desc.SampleDesc.Count!=1)
+    if(desc.Width!=e.width||desc.Height!=e.height||desc.SampleDesc.Count!=1)
         return check(E_INVALIDARG,"capture texture geometry changed",error,size);
+    if (desc.Format != e.input_format) {
+        if ((desc.Format != DXGI_FORMAT_R8G8B8A8_UNORM && desc.Format != DXGI_FORMAT_B8G8R8A8_UNORM)
+            || !create_input_surface(e, desc.Format, error, size)) {
+            return check(E_INVALIDARG, "capture texture format changed", error, size);
+        }
+    }
     if(e.bitrate!=bitrate) {
         MF_CHECK(rate_control(e, bitrate),"live hardware bitrate/burst budget");
         e.bitrate=bitrate;

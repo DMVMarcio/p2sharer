@@ -15,10 +15,14 @@ use webrtc::{
     api::{
         interceptor_registry::register_default_interceptors, media_engine::MediaEngine, APIBuilder,
     },
-    data_channel::{data_channel_init::RTCDataChannelInit, data_channel_message::DataChannelMessage},
+    data_channel::{
+        data_channel_init::RTCDataChannelInit, data_channel_message::DataChannelMessage,
+    },
     ice_transport::{ice_candidate::RTCIceCandidateInit, ice_server::RTCIceServer},
     interceptor::registry::Registry,
-    peer_connection::policy::ice_transport_policy::RTCIceTransportPolicy,
+    peer_connection::policy::{
+        bundle_policy::RTCBundlePolicy, ice_transport_policy::RTCIceTransportPolicy,
+    },
     peer_connection::{
         configuration::RTCConfiguration, peer_connection_state::RTCPeerConnectionState,
         sdp::session_description::RTCSessionDescription, RTCPeerConnection,
@@ -31,10 +35,7 @@ use webrtc::{
     },
     rtp::{
         codecs::h264::H264Payloader,
-        extension::{
-            playout_delay_extension::PlayoutDelayExtension,
-            HeaderExtension,
-        },
+        extension::{playout_delay_extension::PlayoutDelayExtension, HeaderExtension},
         header::Header,
         packet::Packet,
         packetizer::Payloader,
@@ -79,8 +80,14 @@ fn summarize_native_ice(stats: &webrtc::stats::StatsReport) -> serde_json::Value
     let (mut local, mut remote) = (0, 0);
     for (id, report) in &stats.reports {
         let (side, candidate) = match report {
-            StatsReportType::LocalCandidate(c) => { local += 1; ("local", c) },
-            StatsReportType::RemoteCandidate(c) => { remote += 1; ("remote", c) },
+            StatsReportType::LocalCandidate(c) => {
+                local += 1;
+                ("local", c)
+            }
+            StatsReportType::RemoteCandidate(c) => {
+                remote += 1;
+                ("remote", c)
+            }
             _ => continue,
         };
         let family = match candidate.ip.parse::<std::net::IpAddr>() {
@@ -88,13 +95,26 @@ fn summarize_native_ice(stats: &webrtc::stats::StatsReport) -> serde_json::Value
             Ok(std::net::IpAddr::V6(_)) => "ipv6",
             Err(_) => "unknown",
         };
-        candidates.insert(id, serde_json::json!({ "side": side, "type": candidate.candidate_type.to_string(),
-            "network": candidate.network_type.to_string(), "family": family }));
+        candidates.insert(
+            id,
+            serde_json::json!({ "side": side, "type": candidate.candidate_type.to_string(),
+            "network": candidate.network_type.to_string(), "family": family }),
+        );
     }
-    let mut pairs: Vec<_> = stats.reports.values().filter_map(|report| match report {
-        StatsReportType::CandidatePair(pair) => Some(pair), _ => None,
-    }).collect();
-    pairs.sort_by_key(|pair| (std::cmp::Reverse(pair.nominated), std::cmp::Reverse(pair.responses_received)));
+    let mut pairs: Vec<_> = stats
+        .reports
+        .values()
+        .filter_map(|report| match report {
+            StatsReportType::CandidatePair(pair) => Some(pair),
+            _ => None,
+        })
+        .collect();
+    pairs.sort_by_key(|pair| {
+        (
+            std::cmp::Reverse(pair.nominated),
+            std::cmp::Reverse(pair.responses_received),
+        )
+    });
     serde_json::json!({ "schema": 1, "localCandidates": local, "remoteCandidates": remote,
         "candidateInventory": candidates.values().take(64).collect::<Vec<_>>(),
         "omittedCandidates": candidates.len().saturating_sub(64),
@@ -168,8 +188,9 @@ fn initial_rate(budget: u32, width: u32, height: u32, fps: u32) -> u32 {
     // Start close to the configured user budget while scaling the minimum floor
     // to picture geometry so text and edges are sharp from the first second.
     let geometry_floor = if width > 0 && height > 0 {
-        let rate = 4_000_000u64 * u64::from(width) * u64::from(height) * u64::from(fps.clamp(15, 120))
-            / (1280 * 720 * 60);
+        let rate =
+            4_000_000u64 * u64::from(width) * u64::from(height) * u64::from(fps.clamp(15, 120))
+                / (1280 * 720 * 60);
         rate.clamp(2_000_000, 16_000_000) as u32
     } else {
         2_000_000
@@ -182,14 +203,16 @@ fn initial_rate(budget: u32, width: u32, height: u32, fps: u32) -> u32 {
 /// above the encoded bitrate so delta frames flush immediately while large IDRs
 /// avoid overflowing UDP socket buffers.
 fn packet_pacing_ns(payload_bytes: usize, bitrate: u32) -> u64 {
-    let burst_bps = u64::from(bitrate).max(100_000).saturating_mul(3).clamp(50_000_000, 120_000_000);
+    let burst_bps = u64::from(bitrate)
+        .max(100_000)
+        .saturating_mul(3)
+        .clamp(50_000_000, 120_000_000);
     let wire_bits = (payload_bytes as u64).saturating_add(64).saturating_mul(8);
     wire_bits.saturating_mul(1_000_000_000) / burst_bps
 }
 
 fn native_candidate_available(ip: std::net::IpAddr) -> bool {
-    !ip.is_unspecified() && !ip.is_multicast()
-        && std::net::UdpSocket::bind((ip, 0)).is_ok()
+    !ip.is_unspecified() && !ip.is_multicast() && std::net::UdpSocket::bind((ip, 0)).is_ok()
 }
 
 /// Cap STUN URLs to at most two distinct servers so multi-interface hosts do not
@@ -325,7 +348,9 @@ pub async fn create_native_video_offer(
     if !valid_id(&id)
         || !valid_id(&stream_id)
         || !valid_id(&track_id)
-        || peer_id.as_ref().is_some_and(|p| p.is_empty() || p.len() > 240)
+        || peer_id
+            .as_ref()
+            .is_some_and(|p| p.is_empty() || p.len() > 240)
         || !(100_000..=50_000_000).contains(&bitrate)
         || ice_servers.len() > 8
     {
@@ -402,6 +427,7 @@ pub async fn create_native_video_offer(
     let pc = Arc::new(
         api.new_peer_connection(RTCConfiguration {
             ice_servers: servers,
+            bundle_policy: RTCBundlePolicy::MaxBundle,
             ice_transport_policy: if relay_only {
                 RTCIceTransportPolicy::Relay
             } else {
@@ -421,18 +447,30 @@ pub async fn create_native_video_offer(
         token: feedback_token,
         active: live.clone(),
         budget: AtomicU32::new(bitrate),
-        cap: AtomicU32::new(initial_rate(bitrate, geometry.output_width, geometry.output_height, geometry.effective_fps)),
+        cap: AtomicU32::new(initial_rate(
+            bitrate,
+            geometry.output_width,
+            geometry.output_height,
+            geometry.effective_fps,
+        )),
         bitrate: capture.bitrate.clone(),
         frames: AtomicU64::new(0),
         bytes: AtomicU64::new(0),
         keys: AtomicU64::new(0),
         gaps: AtomicU64::new(0),
-        started: Instant::now(), local_candidates: local_candidates.clone(),
-        remote_candidates: AtomicU64::new(0), remote_ice_errors: AtomicU64::new(0),
+        started: Instant::now(),
+        local_candidates: local_candidates.clone(),
+        remote_candidates: AtomicU64::new(0),
+        remote_ice_errors: AtomicU64::new(0),
         #[cfg(feature = "media-diagnostics")]
-        diagnostics: RouteDiagnostics { track: crate::media_diagnostics::opaque_id(&track_id),
-            loss: AtomicU32::new(0), rtt_us: AtomicU64::new(0), baseline_rtt_us: AtomicU64::new(0),
-            queued: AtomicBool::new(false), reports: AtomicU64::new(0) },
+        diagnostics: RouteDiagnostics {
+            track: crate::media_diagnostics::opaque_id(&track_id),
+            loss: AtomicU32::new(0),
+            rtt_us: AtomicU64::new(0),
+            baseline_rtt_us: AtomicU64::new(0),
+            queued: AtomicBool::new(false),
+            reports: AtomicU64::new(0),
+        },
     });
     let media_id = stream_id.clone();
     let track = Arc::new(TrackLocalStaticRTP::new(codec, track_id, stream_id));
@@ -447,8 +485,21 @@ pub async fn create_native_video_offer(
         }
     };
     if let Some(ref peer) = peer_id {
-        for (label, retransmits, is_dgram) in [("p2_rc_datagram", 0u16, true), ("p2_rc_input", 2u16, false)] {
-            if let Err(e) = attach_rc_channel(&pc, label, retransmits, is_dgram, peer, &media_id, &session_id, live.clone()).await {
+        for (label, retransmits, is_dgram) in
+            [("p2_rc_datagram", 0u16, true), ("p2_rc_input", 2u16, false)]
+        {
+            if let Err(e) = attach_rc_channel(
+                &pc,
+                label,
+                retransmits,
+                is_dgram,
+                peer,
+                &media_id,
+                &session_id,
+                live.clone(),
+            )
+            .await
+            {
                 let _ = pc.close().await;
                 return Err(e);
             }
@@ -486,12 +537,17 @@ pub async fn create_native_video_offer(
         let route = ice_state_route.upgrade();
         Box::pin(async move {
             if let Some(route) = route {
-                crate::logger::log_msg("INFO", "transmission.native.ice", &serde_json::json!({
-                    "routeId": id, "phase": "ice_state", "ice": state.to_string(),
-                    "elapsedMs": route.started.elapsed().as_millis(),
-                    "generatedCandidates": route.local_candidates.load(Ordering::Relaxed),
-                    "appliedCandidates": route.remote_candidates.load(Ordering::Relaxed),
-                }).to_string());
+                crate::logger::log_msg(
+                    "INFO",
+                    "transmission.native.ice",
+                    &serde_json::json!({
+                        "routeId": id, "phase": "ice_state", "ice": state.to_string(),
+                        "elapsedMs": route.started.elapsed().as_millis(),
+                        "generatedCandidates": route.local_candidates.load(Ordering::Relaxed),
+                        "appliedCandidates": route.remote_candidates.load(Ordering::Relaxed),
+                    })
+                    .to_string(),
+                );
             }
         })
     }));
@@ -506,13 +562,18 @@ pub async fn create_native_video_offer(
         let wgc_thread = state_wgc_thread.clone();
         let diagnostic_route = diagnostic_route.clone();
         Box::pin(async move {
-            crate::logger::log_msg("INFO", "transmission.native.ice",
-                &format!("Native sender state routeId={id} connection={state}"));
+            crate::logger::log_msg(
+                "INFO",
+                "transmission.native.ice",
+                &format!("Native sender state routeId={id} connection={state}"),
+            );
             if state == RTCPeerConnectionState::Connected {
                 crate::screen_sources::request_capture_keyframe(&key, &wgc_thread);
                 if let Some(route) = diagnostic_route.upgrade() {
                     let id = id.clone();
-                    tokio::spawn(async move { log_native_route(&id, &route, "connected").await; });
+                    tokio::spawn(async move {
+                        log_native_route(&id, &route, "connected").await;
+                    });
                 }
             }
             if matches!(
@@ -570,7 +631,10 @@ pub async fn create_native_video_offer(
                 }
                 if let Some(rr) = p.as_any().downcast_ref::<ReceiverReport>() {
                     #[cfg(feature = "media-diagnostics")]
-                    rtcp_value.diagnostics.reports.fetch_add(1, Ordering::Relaxed);
+                    rtcp_value
+                        .diagnostics
+                        .reports
+                        .fetch_add(1, Ordering::Relaxed);
                     if last_adjust.elapsed() >= Duration::from_millis(1000) {
                         let loss = rr
                             .reports
@@ -593,8 +657,18 @@ pub async fn create_native_video_offer(
                         {
                             let d = &rtcp_value.diagnostics;
                             d.loss.store(u32::from(loss), Ordering::Relaxed);
-                            d.rtt_us.store((rtt.unwrap_or(0.0) * 1_000_000.0) as u64, Ordering::Relaxed);
-                            d.baseline_rtt_us.store((if baseline_rtt.is_finite() { baseline_rtt * 1_000_000.0 } else { 0.0 }) as u64, Ordering::Relaxed);
+                            d.rtt_us.store(
+                                (rtt.unwrap_or(0.0) * 1_000_000.0) as u64,
+                                Ordering::Relaxed,
+                            );
+                            d.baseline_rtt_us.store(
+                                (if baseline_rtt.is_finite() {
+                                    baseline_rtt * 1_000_000.0
+                                } else {
+                                    0.0
+                                }) as u64,
+                                Ordering::Relaxed,
+                            );
                             d.queued.store(queued, Ordering::Relaxed);
                         }
                         cap = adjust_rate(
@@ -612,6 +686,7 @@ pub async fn create_native_video_offer(
         }
     });
     tokio::spawn(async move {
+        let _route_guard = capture.route_guard.clone();
         let mut rx = capture.frames;
         let mut gate = FrameGate::default();
         let mut payloader = H264Payloader::default();
@@ -630,7 +705,10 @@ pub async fn create_native_video_offer(
                 Ok(Ok(_)) | Err(_) => continue,
                 Ok(Err(tokio::sync::broadcast::error::RecvError::Lagged(_))) => {
                     gate.wait_key = true;
-                    crate::screen_sources::request_capture_keyframe(&capture.keyframe, &capture.wgc_thread_id);
+                    crate::screen_sources::request_capture_keyframe(
+                        &capture.keyframe,
+                        &capture.wgc_thread_id,
+                    );
                     continue;
                 }
                 _ => break,
@@ -645,17 +723,26 @@ pub async fn create_native_video_offer(
                 gate.wait_key = true;
                 continue;
             }
-            if capture
+            let age_us = capture
                 .load
                 .elapsed_ms()
                 .saturating_mul(1000)
-                .saturating_sub(frame.timestamp)
-                > recovery_age.limit_us(Instant::now())
-            {
+                .saturating_sub(frame.timestamp);
+            let max_age_us = if gate.wait_key && frame.key {
+                // Allow a higher latency ceiling for an initial/recovery IDR so slow hardware
+                // encoders (>100 ms/frame) do not loop forever dropping keyframes and spamming IDRs.
+                recovery_age.limit_us(Instant::now()).max(500_000)
+            } else {
+                recovery_age.limit_us(Instant::now())
+            };
+            if age_us > max_age_us {
                 gate.wait_key = true;
                 value.gaps.fetch_add(1, Ordering::Relaxed);
                 if last_key.elapsed() >= Duration::from_millis(250) {
-                    crate::screen_sources::request_capture_keyframe(&capture.keyframe, &capture.wgc_thread_id);
+                    crate::screen_sources::request_capture_keyframe(
+                        &capture.keyframe,
+                        &capture.wgc_thread_id,
+                    );
                     last_key = Instant::now();
                 }
                 continue;
@@ -664,7 +751,10 @@ pub async fn create_native_video_offer(
             if decision == Decision::Recover {
                 value.gaps.fetch_add(1, Ordering::Relaxed);
                 if last_key.elapsed() >= Duration::from_millis(250) {
-                    crate::screen_sources::request_capture_keyframe(&capture.keyframe, &capture.wgc_thread_id);
+                    crate::screen_sources::request_capture_keyframe(
+                        &capture.keyframe,
+                        &capture.wgc_thread_id,
+                    );
                     last_key = Instant::now();
                 }
                 continue;
@@ -721,7 +811,11 @@ pub async fn create_native_video_offer(
                         min_delay: 0,
                         max_delay: 0,
                     })];
-                    tokio::time::timeout_at(deadline, track.write_rtp_with_extensions(&packet, &ext)).await
+                    tokio::time::timeout_at(
+                        deadline,
+                        track.write_rtp_with_extensions(&packet, &ext),
+                    )
+                    .await
                 } else {
                     tokio::time::timeout_at(deadline, track.write_rtp(&packet)).await
                 };
@@ -734,7 +828,10 @@ pub async fn create_native_video_offer(
             }
             if !complete {
                 gate.wait_key = true;
-                crate::screen_sources::request_capture_keyframe(&capture.keyframe, &capture.wgc_thread_id);
+                crate::screen_sources::request_capture_keyframe(
+                    &capture.keyframe,
+                    &capture.wgc_thread_id,
+                );
                 send_failures += 1;
                 if send_failures >= 3 {
                     break;
@@ -764,6 +861,65 @@ pub async fn create_native_video_offer(
     Ok(sdp)
 }
 
+fn normalize_answer_sdp_ice(sdp: &str) -> String {
+    let sep = if sdp.contains("\r\n") { "\r\n" } else { "\n" };
+    let trailing_sep = sdp.ends_with('\n');
+    let raw_lines: Vec<&str> = sdp.lines().collect();
+    let mut in_media = false;
+    let mut active_section = false;
+    let mut primary_ufrag: Option<String> = None;
+    let mut primary_pwd: Option<String> = None;
+    let mut fallback_ufrag: Option<String> = None;
+    let mut fallback_pwd: Option<String> = None;
+    for line in &raw_lines {
+        if let Some(rest) = line.strip_prefix("m=") {
+            in_media = true;
+            let port = rest.split_whitespace().nth(1);
+            active_section = port != Some("0");
+            continue;
+        }
+        if let Some(val) = line.strip_prefix("a=ice-ufrag:") {
+            if !in_media || active_section {
+                if primary_ufrag.is_none() {
+                    primary_ufrag = Some(val.to_string());
+                }
+            } else if fallback_ufrag.is_none() {
+                fallback_ufrag = Some(val.to_string());
+            }
+        } else if let Some(val) = line.strip_prefix("a=ice-pwd:") {
+            if !in_media || active_section {
+                if primary_pwd.is_none() {
+                    primary_pwd = Some(val.to_string());
+                }
+            } else if fallback_pwd.is_none() {
+                fallback_pwd = Some(val.to_string());
+            }
+        }
+    }
+    let chosen_ufrag = primary_ufrag.or(fallback_ufrag);
+    let chosen_pwd = primary_pwd.or(fallback_pwd);
+    let mut out: Vec<String> = Vec::with_capacity(raw_lines.len());
+    for line in raw_lines {
+        if line.starts_with("a=ice-ufrag:") {
+            if let Some(ref u) = chosen_ufrag {
+                out.push(format!("a=ice-ufrag:{u}"));
+                continue;
+            }
+        } else if line.starts_with("a=ice-pwd:") {
+            if let Some(ref p) = chosen_pwd {
+                out.push(format!("a=ice-pwd:{p}"));
+                continue;
+            }
+        }
+        out.push(line.to_string());
+    }
+    let mut joined = out.join(sep);
+    if trailing_sep && !joined.is_empty() {
+        joined.push_str(sep);
+    }
+    joined
+}
+
 #[tauri::command]
 pub async fn answer_native_video(
     id: String,
@@ -773,10 +929,13 @@ pub async fn answer_native_video(
     if sdp.len() > 128 * 1024 {
         return Err("Answer too large".into());
     }
+    let normalized = normalize_answer_sdp_ice(&sdp);
     route(&id, &feedback_token)
         .await?
         .pc
-        .set_remote_description(RTCSessionDescription::answer(sdp).map_err(|e| e.to_string())?)
+        .set_remote_description(
+            RTCSessionDescription::answer(normalized).map_err(|e| e.to_string())?,
+        )
         .await
         .map_err(|e| e.to_string())
 }
@@ -791,8 +950,11 @@ pub async fn add_native_video_ice(
     }
     let r = route(&id, &feedback_token).await?;
     let result = r.pc.add_ice_candidate(candidate).await;
-    if result.is_ok() { r.remote_candidates.fetch_add(1, Ordering::Relaxed); }
-    else { r.remote_ice_errors.fetch_add(1, Ordering::Relaxed); }
+    if result.is_ok() {
+        r.remote_candidates.fetch_add(1, Ordering::Relaxed);
+    } else {
+        r.remote_ice_errors.fetch_add(1, Ordering::Relaxed);
+    }
     result.map_err(|e| e.to_string())
 }
 #[tauri::command]
@@ -926,8 +1088,7 @@ impl RecoveryAgeBudget {
     }
     fn limit_us(&self, now: Instant) -> u64 {
         let retired = self.completed.map_or(u64::MAX, |completed| {
-            (now.saturating_duration_since(completed).as_micros() / 5)
-                .min(u64::MAX as u128) as u64
+            (now.saturating_duration_since(completed).as_micros() / 5).min(u64::MAX as u128) as u64
         });
         100_000 + self.serialization_us.saturating_sub(retired)
     }
@@ -982,15 +1143,24 @@ mod tests {
     fn native_ice_diagnostics_allowlist_excludes_addresses_credentials_and_identifiers() {
         use webrtc::stats::{ICECandidateStats, RTCStatsType, StatsReport, StatsReportType};
         let candidate = ICECandidateStats {
-            timestamp: tokio::time::Instant::now(), stats_type: RTCStatsType::LocalCandidate,
+            timestamp: tokio::time::Instant::now(),
+            stats_type: RTCStatsType::LocalCandidate,
             id: "private-candidate-identifier".into(),
             candidate_type: webrtc::ice::candidate::CandidateType::Host,
-            deleted: false, ip: "192.0.2.25".into(),
+            deleted: false,
+            ip: "192.0.2.25".into(),
             network_type: webrtc::ice::network_type::NetworkType::Udp4,
-            port: 23456, priority: 1, relay_protocol: "udp".into(),
+            port: 23456,
+            priority: 1,
+            relay_protocol: "udp".into(),
             url: "fixture-url-not-for-logging".into(),
         };
-        let stats = StatsReport { reports: HashMap::from([("private-report-identifier".into(), StatsReportType::LocalCandidate(candidate))]) };
+        let stats = StatsReport {
+            reports: HashMap::from([(
+                "private-report-identifier".into(),
+                StatsReportType::LocalCandidate(candidate),
+            )]),
+        };
         let summary = summarize_native_ice(&stats);
         assert_eq!(summary["localCandidates"], 1);
         assert_eq!(summary["remoteCandidates"], 0);
@@ -998,7 +1168,13 @@ mod tests {
         assert_eq!(summary["candidateInventory"][0]["family"], "ipv4");
         assert_eq!(summary["candidateInventory"][0]["type"], "host");
         let serialized = summary.to_string();
-        for excluded in ["192.0.2.25", "23456", "private-candidate-identifier", "private-report-identifier", "fixture-url-not-for-logging"] {
+        for excluded in [
+            "192.0.2.25",
+            "23456",
+            "private-candidate-identifier",
+            "private-report-identifier",
+            "fixture-url-not-for-logging",
+        ] {
             assert!(!serialized.contains(excluded));
         }
     }
@@ -1006,8 +1182,12 @@ mod tests {
     fn native_candidates_require_a_bindable_unicast_address() {
         use std::net::{IpAddr, Ipv4Addr};
         assert!(native_candidate_available(IpAddr::V4(Ipv4Addr::LOCALHOST)));
-        assert!(!native_candidate_available(IpAddr::V4(Ipv4Addr::UNSPECIFIED)));
-        assert!(!native_candidate_available(IpAddr::V4(Ipv4Addr::new(224, 0, 0, 1))));
+        assert!(!native_candidate_available(IpAddr::V4(
+            Ipv4Addr::UNSPECIFIED
+        )));
+        assert!(!native_candidate_available(IpAddr::V4(Ipv4Addr::new(
+            224, 0, 0, 1
+        ))));
     }
     #[test]
     fn startup_probe_scales_to_encoded_geometry_without_exceeding_user_budget() {
@@ -1132,6 +1312,42 @@ mod tests {
         );
         assert_eq!(trimmed[1].username, "user");
         assert_eq!(trimmed[1].credential, "pass");
+    }
+    #[test]
+    fn normalize_answer_sdp_ice_unifies_conflicting_section_credentials() {
+        let conflicting = [
+            "v=0",
+            "m=video 9 UDP/TLS/RTP/SAVPF 102",
+            "a=ice-ufrag:firstUfrag",
+            "a=ice-pwd:firstPassword1234567890",
+            "m=application 9 UDP/DTLS/SCTP webrtc-datachannel",
+            "a=ice-ufrag:secondUfrag",
+            "a=ice-pwd:secondPassword1234567890",
+            "",
+        ]
+        .join("\r\n");
+        let normalized = normalize_answer_sdp_ice(&conflicting);
+        assert_eq!(normalized.matches("a=ice-ufrag:firstUfrag").count(), 2);
+        assert_eq!(
+            normalized
+                .matches("a=ice-pwd:firstPassword1234567890")
+                .count(),
+            2
+        );
+        assert!(!normalized.contains("secondUfrag"));
+        assert!(!normalized.contains("secondPassword1234567890"));
+        assert!(normalized.ends_with("\r\n"));
+
+        let clean = [
+            "v=0",
+            "a=ice-ufrag:sharedUfrag",
+            "a=ice-pwd:sharedPassword1234567890",
+            "m=video 9 UDP/TLS/RTP/SAVPF 102",
+            "m=application 9 UDP/DTLS/SCTP webrtc-datachannel",
+            "",
+        ]
+        .join("\r\n");
+        assert_eq!(normalize_answer_sdp_ice(&clean), clean);
     }
 }
 

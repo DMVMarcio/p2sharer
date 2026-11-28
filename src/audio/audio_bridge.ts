@@ -20,6 +20,7 @@ export class AudioBridge {
   private targetLead = 0.05;
   private stableChunks = 0;
   private receivedPcm = false;
+  private remoteConsumersActive = true;
 
   // Preallocated buffer cache to eliminate per-chunk allocations (200 allocs/sec)
   private byteBuffer: Uint8Array = new Uint8Array(16384);
@@ -34,7 +35,8 @@ export class AudioBridge {
   }
 
   private createAudioGraph(): void {
-    const AudioContextClass = window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
+    const AudioContextClass =
+      window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
     this.audioCtx = new AudioContextClass({ sampleRate: 48000 });
     this.recovery?.dispose();
     this.recovery = new AudioContextRecovery(this.audioCtx, undefined, 'capture');
@@ -56,7 +58,8 @@ export class AudioBridge {
   }
 
   public init(onLevel?: (level: number) => void): MediaStreamTrack | null {
-    const reusePrepared = this.prepared && !this.isCapturing && !!this.audioCtx && this.audioCtx.state !== 'closed' && !!this.destNode;
+    const reusePrepared =
+      this.prepared && !this.isCapturing && !!this.audioCtx && this.audioCtx.state !== 'closed' && !!this.destNode;
     if (!reusePrepared && this.audioCtx) this.stop();
     this.prepared = false;
     this.onLevelCallback = onLevel || null;
@@ -77,11 +80,15 @@ export class AudioBridge {
     mode: string = 'exclude',
     targetPids: number[] = [],
     targetNames: string[] = [],
-    targetSubKeys: string[] = []
+    targetSubKeys: string[] = [],
   ): Promise<MediaStreamTrack | null> {
     const track = this.init();
-    try { await this.startListening(); }
-    catch (error) { this.stop(); throw error; }
+    try {
+      await this.startListening();
+    } catch (error) {
+      this.stop();
+      throw error;
+    }
     try {
       await invoke('start_audio_capture', {
         config: {
@@ -124,8 +131,16 @@ export class AudioBridge {
     }
   }
 
+  public setRemoteConsumersActive(active: boolean): void {
+    if (this.remoteConsumersActive === active) return;
+    this.remoteConsumersActive = active;
+    if (!active) {
+      this.nextPlayTime = 0;
+    }
+  }
+
   private playPCMChunk(payload: AudioStreamPayload) {
-    if (!this.audioCtx || !this.destNode || !payload.pcm_base64) return;
+    if (!this.remoteConsumersActive || !this.audioCtx || !this.destNode || !payload.pcm_base64) return;
 
     try {
       this.recovery?.resume();
@@ -144,7 +159,11 @@ export class AudioBridge {
 
       if (!this.receivedPcm) {
         this.receivedPcm = true;
-        logDiagnostic('INFO', 'audio.capture', 'First native PCM received', { channels, sampleRate, contextState: this.audioCtx.state });
+        logDiagnostic('INFO', 'audio.capture', 'First native PCM received', {
+          channels,
+          sampleRate,
+          contextState: this.audioCtx.state,
+        });
       }
       const currentTime = this.audioCtx.currentTime;
       // Delayed IPC bursts must not overlap audio already queued for playout.
