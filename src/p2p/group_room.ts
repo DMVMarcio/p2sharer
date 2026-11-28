@@ -4518,6 +4518,7 @@ export class GroupRoomManager {
     this.cleanupStreamWatchers(peerId, '');
     this.remoteWatchRevisions.delete(peerId);
     this.nativeVideo?.stop(undefined, peerId);
+    this.nativeVideo?.clearBlocked(undefined, peerId);
     for (const entry of this.localMedia.values()) {
       this.setSenderConsumer(entry.descriptor.id, peerId, 'off');
     }
