@@ -215,6 +215,48 @@ fn native_candidate_available(ip: std::net::IpAddr) -> bool {
     !ip.is_unspecified() && !ip.is_multicast() && std::net::UdpSocket::bind((ip, 0)).is_ok()
 }
 
+/// Work around a webrtc-util 0.17 Windows bug where `v6_socket_from_adapter`
+/// converts network-byte-order `u16` words directly into `Ipv6Addr` without
+/// byte-swapping on little-endian hosts, making every enumerated IPv6 host
+/// address unbindable.
+fn repair_windows_ipv6(ip: std::net::IpAddr) -> std::net::IpAddr {
+    #[cfg(all(target_os = "windows", target_endian = "little"))]
+    if let std::net::IpAddr::V6(v6) = ip {
+        if !native_candidate_available(ip) {
+            let swapped = std::net::Ipv6Addr::from(v6.segments().map(u16::swap_bytes));
+            if native_candidate_available(std::net::IpAddr::V6(swapped)) {
+                return std::net::IpAddr::V6(swapped);
+            }
+        }
+    }
+    ip
+}
+
+fn native_vnet() -> Arc<webrtc::util::vnet::net::Net> {
+    use webrtc::util::vnet::interface::Interface;
+    use webrtc::util::vnet::net::Net;
+
+    let raw = Net::new(None);
+    let Net::Ifs(ifs) = raw else {
+        return Arc::new(raw);
+    };
+    let repaired = ifs
+        .into_iter()
+        .map(|iface| {
+            let addrs = iface
+                .addrs()
+                .iter()
+                .filter_map(|ipnet| {
+                    let ip = repair_windows_ipv6(ipnet.addr());
+                    Interface::convert(std::net::SocketAddr::new(ip, 0), None).ok()
+                })
+                .collect();
+            Interface::new(iface.name().to_owned(), addrs)
+        })
+        .collect();
+    Arc::new(Net::Ifs(repaired))
+}
+
 /// Cap STUN URLs to at most two distinct servers so multi-interface hosts do not
 /// duplicate reflexive candidates across six public endpoints while keeping all TURN servers.
 fn trim_native_ice_servers(ice_servers: Vec<IceServer>) -> Vec<RTCIceServer> {
@@ -439,6 +481,7 @@ pub async fn create_native_video_offer(
     ]);
     // Windows can enumerate addresses from detached/retired adapters. Keep only
     // addresses that can actually own a local socket, including usable LAN/VPNs.
+    setting.set_vnet(Some(native_vnet()));
     setting.set_ip_filter(Box::new(native_candidate_available));
     setting.set_ice_timeouts(
         Some(Duration::from_secs(6)),
@@ -1375,6 +1418,17 @@ mod tests {
         ]
         .join("\r\n");
         assert_eq!(normalize_answer_sdp_ice(&clean), clean);
+    }
+    #[test]
+    fn repair_windows_ipv6_unswaps_little_endian_segments() {
+        let loopback = std::net::IpAddr::V6(std::net::Ipv6Addr::LOCALHOST);
+        assert_eq!(repair_windows_ipv6(loopback), loopback);
+        #[cfg(all(target_os = "windows", target_endian = "little"))]
+        {
+            let swapped =
+                std::net::IpAddr::V6(std::net::Ipv6Addr::from([0, 0, 0, 0, 0, 0, 0, 0x0100]));
+            assert_eq!(repair_windows_ipv6(swapped), loopback);
+        }
     }
 }
 
