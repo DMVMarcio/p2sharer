@@ -433,7 +433,9 @@ pub async fn create_native_video_offer(
     let mut setting = webrtc::api::setting_engine::SettingEngine::default();
     setting.set_network_types(vec![
         webrtc::ice::network_type::NetworkType::Udp4,
+        webrtc::ice::network_type::NetworkType::Udp6,
         webrtc::ice::network_type::NetworkType::Tcp4,
+        webrtc::ice::network_type::NetworkType::Tcp6,
     ]);
     // Windows can enumerate addresses from detached/retired adapters. Keep only
     // addresses that can actually own a local socket, including usable LAN/VPNs.
