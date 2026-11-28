@@ -1,6 +1,14 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { reconcilePinnedRoomSlot, snapOverlay, resizeOverlay, streamOwner, streamSlotKey, validStreamDescriptors, type StreamDescriptor } from '../../src/core/media/media_streams.ts';
+import {
+  reconcilePinnedRoomSlot,
+  snapOverlay,
+  resizeOverlay,
+  streamOwner,
+  streamSlotKey,
+  validStreamDescriptors,
+  type StreamDescriptor,
+} from '../../src/core/media/media_streams.ts';
 import type { RoomSlotInfo } from '../../src/core/types.ts';
 import { GroupRoomManager } from '../../src/p2p/group_room.ts';
 import { MediaCoordinator } from '../../src/p2p/media_coordinator.ts';
@@ -8,10 +16,22 @@ import { NativeVideoTransport } from '../../src/p2p/native_video_transport.ts';
 import { signalingManager } from '../../src/p2p/signaling_manager.ts';
 
 test('spotlight follows its participant through stream start and stop without switching an existing selected source', () => {
-  const participant: RoomSlotInfo = { peerId: 'owner', senderName: 'Same name', isLocal: false,
-    isStreaming: false, stream: null, color: '#abcdef' };
+  const participant: RoomSlotInfo = {
+    peerId: 'owner',
+    senderName: 'Same name',
+    isLocal: false,
+    isStreaming: false,
+    stream: null,
+    color: '#abcdef',
+  };
   const other = { ...participant, peerId: 'other' };
-  const screen = { ...participant, peerId: 'owner/screen', ownerPeerId: 'owner', mediaKind: 'screen' as const, isStreaming: true };
+  const screen = {
+    ...participant,
+    peerId: 'owner/screen',
+    ownerPeerId: 'owner',
+    mediaKind: 'screen' as const,
+    isStreaming: true,
+  };
   const camera = { ...screen, peerId: 'owner/camera', mediaKind: 'camera' as const };
   const secondScreen = { ...screen, peerId: 'owner/second-screen' };
   let pinned = reconcilePinnedRoomSlot('owner', [other, participant], [other, camera, screen]);
@@ -26,7 +46,7 @@ test('spotlight follows its participant through stream start and stop without sw
   assert.equal(reconcilePinnedRoomSlot(null, [participant], [screen]), null);
 });
 
-test('native publication starts browser video immediately and retires it only after decoded confirmation', () => {
+test('native publication dispatches only audio on the room connection while negotiating and retires any legacy video after confirmation', () => {
   const manager = new GroupRoomManager('Owner', 'test', '', true);
   const stream = fakeStream('native-screen');
   const audio = { id: 'audio', kind: 'audio', stop() {} };
@@ -40,50 +60,76 @@ test('native publication starts browser video immediately and retires it only af
   internal.room = {
     addStream: () => assert.fail('Parallel publication uses independent track ownership'),
     removeTrack: (track: any, options: any) => calls.push({ kind: 'remove', track, options }),
-    addTrack: (track: any, _stream: MediaStream, options: any) => { calls.push({ kind: 'add', track, options }); return []; },
+    addTrack: (track: any, _stream: MediaStream, options: any) => {
+      calls.push({ kind: 'add', track, options });
+      return [];
+    },
   };
   internal.dispatchMediaToPeer('watcher');
-  assert.equal(calls.length, 2); assert.equal(calls[0].kind, 'add'); assert.equal(calls[0].track.kind, 'video'); assert.equal(calls[1].track, audio);
+  assert.equal(calls.length, 1);
+  assert.equal(calls[0].kind, 'add');
+  assert.equal(calls[0].track, audio);
   ready = true;
   internal.dispatchMediaToPeer('watcher');
-  assert.equal(calls[2].kind, 'remove'); assert.equal(calls[2].track, video);
-  assert.equal(calls[3].track, audio);
-  assert.ok(calls.every(call => call.options.target === 'watcher'));
-  internal.nativeVideo = null; internal.room = null; manager.stopStream();
+  assert.equal(calls[1].kind, 'remove');
+  assert.equal(calls[1].track, video);
+  assert.equal(calls[2].track, audio);
+  assert.ok(calls.every((call) => call.options.target === 'watcher'));
+  internal.nativeVideo = null;
+  internal.room = null;
+  manager.stopStream();
 });
 
 test('browser fallback dispatches only the failed media without renegotiating another source', () => {
   const manager = new GroupRoomManager('Owner', 'test', '', true);
   const internal = manager as any;
-  const screen = fakeStream('screen'), camera = fakeStream('camera');
+  const screen = fakeStream('screen'),
+    camera = fakeStream('camera');
   internal.localMedia.set('screen', { stream: screen, descriptor: descriptor('screen') });
   internal.localMedia.set('camera', { stream: camera, descriptor: descriptor('camera', 'camera') });
   const dispatched: unknown[] = [];
-  internal.nativeVideo = { dispatch: (_peer: string, stream: unknown) => {
-    assert.equal(stream, screen); return false;
-  } };
-  internal.room = { getPeers: () => ({}), addStream: (stream: unknown, options: any) => {
-    assert.equal(options.target, 'watcher'); dispatched.push(stream); return [];
-  } };
+  internal.nativeVideo = {
+    dispatch: (_peer: string, stream: unknown) => {
+      assert.equal(stream, screen);
+      return false;
+    },
+  };
+  internal.room = {
+    getPeers: () => ({}),
+    addStream: (stream: unknown, options: any) => {
+      assert.equal(options.target, 'watcher');
+      dispatched.push(stream);
+      return [];
+    },
+  };
   internal.dispatchMediaToPeer('watcher', false, 'screen');
   assert.deepEqual(dispatched, [screen]);
-  internal.nativeVideo = null; internal.room = null; manager.stopStream();
+  internal.nativeVideo = null;
+  internal.room = null;
+  manager.stopStream();
 });
 
-test('presence reuses published media and newcomer warmup touches only its connection', context => {
+test('presence reuses published media and newcomer warmup touches only its connection', (context) => {
   context.mock.timers.enable({ apis: ['setTimeout', 'Date'], now: 10_000 });
   const manager = new GroupRoomManager('Owner', 'test', '', true);
   const internal = manager as any;
   const stream = fakeStream('screen');
   const connection = () => ({ getSenders: () => [], setLocalDescription: async () => {} });
-  const existing = connection(), newcomer = connection();
+  const existing = connection(),
+    newcomer = connection();
   const peers: Record<string, unknown> = { existing, newcomer };
-  const sent: string[] = [], tuned: unknown[] = [];
+  const sent: string[] = [],
+    tuned: unknown[] = [];
   internal.localStream = stream;
   internal.localMedia.set('screen', { stream, descriptor: descriptor('screen') });
-  internal.room = { getPeers: () => peers,
-    addStream: (_stream: unknown, options: { target: string }) => { sent.push(options.target); return []; },
-    removeStream() {}, removeTrack() {},
+  internal.room = {
+    getPeers: () => peers,
+    addStream: (_stream: unknown, options: { target: string }) => {
+      sent.push(options.target);
+      return [];
+    },
+    removeStream() {},
+    removeTrack() {},
   };
   internal.peerTracker.receivePeerExchange('existing', true);
   internal.peerTracker.receivePeerExchange('newcomer', true);
@@ -99,10 +145,14 @@ test('presence reuses published media and newcomer warmup touches only its conne
     assert.deepEqual(sent, ['existing', 'newcomer']);
     context.mock.timers.tick(2100);
     assert.ok(tuned.length > 0);
-    assert.ok(tuned.every(pc => pc === newcomer));
+    assert.ok(tuned.every((pc) => pc === newcomer));
     manager.sendStreamToPeer('newcomer', true);
     manager.sendStreamToPeer('newcomer', true);
-    assert.deepEqual(sent, ['existing', 'newcomer', 'newcomer'], 'recovery resends metadata once, without parallel bursts');
+    assert.deepEqual(
+      sent,
+      ['existing', 'newcomer', 'newcomer'],
+      'recovery resends metadata once, without parallel bursts',
+    );
     peers.newcomer = connection();
     manager.sendStreamToPeer('newcomer');
     assert.equal(sent.length, 4, 'a replacement connection receives the active tracks');
@@ -113,7 +163,10 @@ test('presence reuses published media and newcomer warmup touches only its conne
     tuned.length = 0;
     context.mock.timers.tick(2100);
     assert.equal(tuned.length, 0, 'stopping media retires scheduled sender work');
-  } finally { internal.room = null; manager.stopStream(); }
+  } finally {
+    internal.room = null;
+    manager.stopStream();
+  }
 });
 
 test('native sender HUD measures transmitted frames rather than preview repeats or requested FPS', async (context) => {
@@ -141,35 +194,52 @@ test('native sender HUD measures transmitted frames rather than preview repeats 
 test('native video and ordinary audio merge into the same advertised slot without replacing another source', () => {
   const original = globalThis.MediaStream;
   class TestStream extends EventTarget {
-    id = crypto.randomUUID(); private tracks: any[];
-    constructor(tracks: any[]) { super(); this.tracks = tracks; }
-    getTracks() { return this.tracks; } getVideoTracks() { return this.tracks.filter(t=>t.kind==='video'); }
-    getAudioTracks() { return this.tracks.filter(t=>t.kind==='audio'); }
-    addTrack(track: any) { this.tracks.push(track); this.dispatchEvent(new Event('addtrack')); }
+    id = crypto.randomUUID();
+    private tracks: any[];
+    constructor(tracks: any[]) {
+      super();
+      this.tracks = tracks;
+    }
+    getTracks() {
+      return this.tracks;
+    }
+    getVideoTracks() {
+      return this.tracks.filter((t) => t.kind === 'video');
+    }
+    getAudioTracks() {
+      return this.tracks.filter((t) => t.kind === 'audio');
+    }
+    addTrack(track: any) {
+      this.tracks.push(track);
+      this.dispatchEvent(new Event('addtrack'));
+    }
   }
   Object.assign(globalThis, { MediaStream: TestStream });
   try {
-    const manager = new GroupRoomManager('Viewer','test','',false); const internal = manager as any;
-    internal.peerTracker.receivePeerExchange('owner',true,'Owner');
-    internal.remoteDescriptors.set('owner',[descriptor('screen'),descriptor('camera','camera')]);
-    internal.remoteMediaRevisions.set('owner',1);
-    const audio = { id:'audio', kind:'audio', readyState:'live' }, video = { id:'native',kind:'video',readyState:'live' };
-    const camera = { id:'camera',kind:'video',readyState:'live' };
-    internal.receivePeerStream(new TestStream([camera]),'owner',descriptor('camera','camera'));
-    internal.receivePeerStream(new TestStream([audio]),'owner',descriptor('screen'));
-    internal.receivePeerStream(new TestStream([video]),'owner',descriptor('screen'));
-    const media=internal.remoteMedia.get('owner'); assert.deepEqual(media.get('screen').getTracks(),[video,audio]);
-    assert.equal(media.get('camera').getVideoTracks()[0],camera);
+    const manager = new GroupRoomManager('Viewer', 'test', '', false);
+    const internal = manager as any;
+    internal.peerTracker.receivePeerExchange('owner', true, 'Owner');
+    internal.remoteDescriptors.set('owner', [descriptor('screen'), descriptor('camera', 'camera')]);
+    internal.remoteMediaRevisions.set('owner', 1);
+    const audio = { id: 'audio', kind: 'audio', readyState: 'live' },
+      video = { id: 'native', kind: 'video', readyState: 'live' };
+    const camera = { id: 'camera', kind: 'video', readyState: 'live' };
+    internal.receivePeerStream(new TestStream([camera]), 'owner', descriptor('camera', 'camera'));
+    internal.receivePeerStream(new TestStream([audio]), 'owner', descriptor('screen'));
+    internal.receivePeerStream(new TestStream([video]), 'owner', descriptor('screen'));
+    const media = internal.remoteMedia.get('owner');
+    assert.deepEqual(media.get('screen').getTracks(), [video, audio]);
+    assert.equal(media.get('camera').getVideoTracks()[0], camera);
     const stable = media.get('screen');
     for (let index = 0; index < 10; index++) {
       internal.receivePeerStream(new TestStream([video, audio]), 'owner', descriptor('screen'));
       internal.receivePeerStream(new TestStream([audio]), 'owner', descriptor('screen'));
       assert.equal(media.get('screen'), stable, 'Repeated presence must not reset playback or pointing');
     }
-    const replacement={id:'generic-fallback',kind:'video',readyState:'live'};
-    internal.receivePeerStream(new TestStream([replacement]),'owner',descriptor('screen'));
-    assert.deepEqual(media.get('screen').getTracks(),[replacement,audio]);
-    assert.equal(media.get('camera').getVideoTracks()[0],camera);
+    const replacement = { id: 'generic-fallback', kind: 'video', readyState: 'live' };
+    internal.receivePeerStream(new TestStream([replacement]), 'owner', descriptor('screen'));
+    assert.deepEqual(media.get('screen').getTracks(), [replacement, audio]);
+    assert.equal(media.get('camera').getVideoTracks()[0], camera);
     const cameraStream = media.get('camera');
     cameraStream.addTrack({ id: 'late-audio', kind: 'audio', readyState: 'live' });
     assert.equal(media.get('camera'), cameraStream, 'Late tracks must preserve the observed container');
@@ -180,8 +250,11 @@ test('native video and ordinary audio merge into the same advertised slot withou
     internal.room.onPeerTrack(audio, browserStream, 'owner', descriptor('screen'));
     const lateVideo = { id: 'late-browser-video', kind: 'video', readyState: 'live' };
     browserStream.addTrack(lateVideo);
-    assert.deepEqual(media.get('screen').getTracks(), [lateVideo, audio],
-      'Browser fallback must observe late video even when only audio had track metadata');
+    assert.deepEqual(
+      media.get('screen').getTracks(),
+      [lateVideo, audio],
+      'Browser fallback must observe late video even when only audio had track metadata',
+    );
     const playing = media.get('screen');
     internal.receivePeerStream(new TestStream([]), 'owner', descriptor('screen'));
     assert.equal(media.get('screen'), playing, 'An empty cached stream must not replace playable video');
@@ -189,23 +262,54 @@ test('native video and ordinary audio merge into the same advertised slot withou
     internal.nativeVideo = { receiving: () => true };
     internal.receivePeerStream(new TestStream([nativeTrack]), 'owner', descriptor('screen'));
     internal.room.onPeerStream(browserStream, 'owner', descriptor('screen'));
-    assert.equal(media.get('screen').getVideoTracks()[0], nativeTrack,
-      'Late browser metadata must preserve confirmed native video');
+    assert.equal(
+      media.get('screen').getVideoTracks()[0],
+      nativeTrack,
+      'Late browser metadata must preserve confirmed native video',
+    );
     browserStream.addTrack({ id: 'later-audio', kind: 'audio', readyState: 'live' });
-    assert.equal(media.get('screen').getVideoTracks()[0], nativeTrack,
-      'An existing browser addtrack observer must also respect the native handoff');
+    assert.equal(
+      media.get('screen').getVideoTracks()[0],
+      nativeTrack,
+      'An existing browser addtrack observer must also respect the native handoff',
+    );
     internal.nativeVideo = null;
     internal.room = null;
-  } finally { Object.assign(globalThis,{MediaStream:original}); }
+  } finally {
+    Object.assign(globalThis, { MediaStream: original });
+  }
 });
 
-const descriptor = (id: string, kind: 'screen' | 'camera' = 'screen'): StreamDescriptor =>
-  ({ id, kind, label: kind, videoTrackId: `${id}-video`, fps: 60, bitrate: 8000 });
+const descriptor = (id: string, kind: 'screen' | 'camera' = 'screen'): StreamDescriptor => ({
+  id,
+  kind,
+  label: kind,
+  videoTrackId: `${id}-video`,
+  fps: 60,
+  bitrate: 8000,
+});
 function fakeStream(id: string) {
-  const track = { id: `${id}-video`, kind: 'video', readyState: 'live', stop() { this.readyState = 'ended'; } };
+  const track = {
+    id: `${id}-video`,
+    kind: 'video',
+    readyState: 'live',
+    stop() {
+      this.readyState = 'ended';
+    },
+  };
   let tracks = [track];
-  return { id, getTracks: () => tracks, getVideoTracks: () => tracks, getAudioTracks: () => [],
-    addTrack: (item: typeof track) => { tracks.push(item); }, removeTrack: (item: typeof track) => { tracks = tracks.filter((entry) => entry !== item); } } as unknown as MediaStream;
+  return {
+    id,
+    getTracks: () => tracks,
+    getVideoTracks: () => tracks,
+    getAudioTracks: () => [],
+    addTrack: (item: typeof track) => {
+      tracks.push(item);
+    },
+    removeTrack: (item: typeof track) => {
+      tracks = tracks.filter((entry) => entry !== item);
+    },
+  } as unknown as MediaStream;
 }
 
 test('stream slots keep their identity when cameras and screens reorder', () => {
@@ -230,9 +334,15 @@ test('camera occupies the main participant card; adding screens produces indepen
   manager.shareStream(fakeStream('screen'), 8_000_000, 60, descriptor('screen'));
   manager.shareStream(fakeStream('screen2'), 8_000_000, 60, descriptor('screen2'));
   const slots = manager.getAllRoomSlots();
-  assert.deepEqual(slots.map((slot) => slot.mediaKind), ['screen', 'screen', 'camera']);
+  assert.deepEqual(
+    slots.map((slot) => slot.mediaKind),
+    ['screen', 'screen', 'camera'],
+  );
   assert.ok(slots.every((slot) => slot.ownerPeerId === 'local'));
-  assert.deepEqual(slots.map(slot => slot.pointerEligible), [true, true, false]);
+  assert.deepEqual(
+    slots.map((slot) => slot.pointerEligible),
+    [true, true, false],
+  );
   const remainingTrack = slots[1].stream!.getVideoTracks()[0];
   manager.stopStream('screen');
   assert.equal(remainingTrack.readyState, 'live');
@@ -252,10 +362,24 @@ test('live source replacement preserves stream identity and leaves other senders
   const old = first.getVideoTracks()[0];
   const other = second.getVideoTracks()[0];
   const replacement = fakeStream('replacement').getVideoTracks()[0];
-  const sender = { track: old, async replaceTrack(track: MediaStreamTrack) { this.track = track; } };
-  const otherSender = { track: other, async replaceTrack(track: MediaStreamTrack) { this.track = track; } };
+  const sender = {
+    track: old,
+    async replaceTrack(track: MediaStreamTrack) {
+      this.track = track;
+    },
+  };
+  const otherSender = {
+    track: other,
+    async replaceTrack(track: MediaStreamTrack) {
+      this.track = track;
+    },
+  };
   (manager as any).room = { getPeers: () => ({ peer: { getSenders: () => [sender, otherSender] } }) };
-  await manager.replaceMediaTrack('screen', replacement, { ...descriptor('screen'), videoTrackId: replacement.id, fps: 30 });
+  await manager.replaceMediaTrack('screen', replacement, {
+    ...descriptor('screen'),
+    videoTrackId: replacement.id,
+    fps: 30,
+  });
   assert.equal(sender.track, replacement);
   assert.equal(otherSender.track, other);
   assert.equal(old.readyState, 'ended');
@@ -271,10 +395,27 @@ test('failed live replacement rolls back already replaced peers without stopping
   const old = stream.getVideoTracks()[0];
   manager.shareStream(stream, 8_000_000, 60, descriptor('screen'));
   const replacement = fakeStream('replacement').getVideoTracks()[0];
-  const sender = { track: old, async replaceTrack(track: MediaStreamTrack) { this.track = track; } };
-  (manager as any).room = { getPeers: () => ({ first: { getSenders: () => [sender] }, second: {
-    getSenders: () => [{ track: old, replaceTrack: async () => { throw new Error('encoder rejected replacement'); } }],
-  } }) };
+  const sender = {
+    track: old,
+    async replaceTrack(track: MediaStreamTrack) {
+      this.track = track;
+    },
+  };
+  (manager as any).room = {
+    getPeers: () => ({
+      first: { getSenders: () => [sender] },
+      second: {
+        getSenders: () => [
+          {
+            track: old,
+            replaceTrack: async () => {
+              throw new Error('encoder rejected replacement');
+            },
+          },
+        ],
+      },
+    }),
+  };
   await assert.rejects(manager.replaceMediaTrack('screen', replacement, descriptor('screen')));
   assert.equal(sender.track, old);
   assert.equal(old.readyState, 'live');
@@ -285,9 +426,15 @@ test('failed live replacement rolls back already replaced peers without stopping
 
 test('per-stream encoding changes leave camera FPS and bitrate independent', async () => {
   const settings: any[] = [{ encodings: [{}] }, { encodings: [{}] }];
-  const pc = { signalingState: 'stable', getSenders: () => ['screen', 'camera'].map((id, index) => ({
-    track: { id, kind: 'video' }, getParameters: () => settings[index], setParameters: async () => {},
-  })) } as unknown as RTCPeerConnection;
+  const pc = {
+    signalingState: 'stable',
+    getSenders: () =>
+      ['screen', 'camera'].map((id, index) => ({
+        track: { id, kind: 'video' },
+        getParameters: () => settings[index],
+        setParameters: async () => {},
+      })),
+  } as unknown as RTCPeerConnection;
   await MediaCoordinator.applySenderBitrate(pc, 15_000_000, 60, 'screen');
   await MediaCoordinator.applySenderBitrate(pc, 3_000_000, 30, 'camera');
   assert.equal(settings[0].encodings[0].maxBitrate, 15_000_000);
@@ -298,15 +445,33 @@ test('per-stream encoding changes leave camera FPS and bitrate independent', asy
 
 test('stopping the audio-bearing screen transfers audio to a remaining screen', () => {
   const manager = new GroupRoomManager('Owner', 'test', '', true);
-  const audio = { id: 'desktop-audio', kind: 'audio', readyState: 'live', stop() { this.readyState = 'ended'; },
-    clone() { return { ...this, id: 'desktop-audio-clone' }; } };
+  const audio = {
+    id: 'desktop-audio',
+    kind: 'audio',
+    readyState: 'live',
+    stop() {
+      this.readyState = 'ended';
+    },
+    clone() {
+      return { ...this, id: 'desktop-audio-clone' };
+    },
+  };
   const firstVideo = fakeStream('first').getVideoTracks()[0];
   const secondVideo = fakeStream('second').getVideoTracks()[0];
   function media(id: string, initial: any[]) {
     let tracks = initial;
-    return { id, getTracks: () => tracks, getVideoTracks: () => tracks.filter((track) => track.kind === 'video'),
-      getAudioTracks: () => tracks.filter((track) => track.kind === 'audio'), addTrack: (track: any) => { tracks.push(track); },
-      removeTrack: (track: any) => { tracks = tracks.filter((entry) => entry !== track); } } as MediaStream;
+    return {
+      id,
+      getTracks: () => tracks,
+      getVideoTracks: () => tracks.filter((track) => track.kind === 'video'),
+      getAudioTracks: () => tracks.filter((track) => track.kind === 'audio'),
+      addTrack: (track: any) => {
+        tracks.push(track);
+      },
+      removeTrack: (track: any) => {
+        tracks = tracks.filter((entry) => entry !== track);
+      },
+    } as MediaStream;
   }
   const first = media('first', [firstVideo, audio]);
   const second = media('second', [secondVideo]);
@@ -333,7 +498,8 @@ test('overlay gravity snaps near corners and side centers while retaining free p
 test('all overlay resize corners preserve the opposite anchor and portrait edge insets', () => {
   const initial = { x: 0.3, y: 0.3, width: 0.2 };
   for (const corner of ['nw', 'ne', 'sw', 'se'] as const) {
-    const left = corner.endsWith('w'), top = corner.startsWith('n');
+    const left = corner.endsWith('w'),
+      top = corner.startsWith('n');
     const result = resizeOverlay(initial, corner, left ? -0.05 : 0.05, top ? -0.05 : 0.05, 16 / 9, 16 / 9);
     assert.ok(Math.abs(result.width - 0.25) < 1e-8);
     assert.ok(Math.abs(result.x + (left ? result.width : 0) - initial.x - (left ? initial.width : 0)) < 1e-8);
@@ -341,7 +507,7 @@ test('all overlay resize corners preserve the opposite anchor and portrait edge 
   }
   const portrait = resizeOverlay(initial, 'se', 5, 5, 9 / 16, 16 / 9);
   assert.ok(portrait.x + portrait.width <= 0.98 + 1e-8);
-  assert.ok(portrait.y + portrait.width * (16 / 9) / (9 / 16) <= 0.98 + 1e-8);
+  assert.ok(portrait.y + (portrait.width * (16 / 9)) / (9 / 16) <= 0.98 + 1e-8);
 });
 
 test('remote screen and camera streams reconcile without fake participants or stale resurrection', async () => {
@@ -349,21 +515,41 @@ test('remote screen and camera streams reconcile without fake participants or st
   const originalJoin = signalingManager.joinRoom;
   const originalLeave = signalingManager.leaveRoom;
   const originalReannounce = signalingManager.reannounce;
-  const room: any = { makeAction(name: string) {
-    const action = { send: async () => {} }; actions.set(name, action); return action;
-  }, getPeers: () => ({}), removeStream: () => {}, leave: async () => {}, addStream: () => [],
-    onPeerJoin: () => {}, onPeerLeave: () => {}, onPeerStream: () => {} };
+  const room: any = {
+    makeAction(name: string) {
+      const action = { send: async () => {} };
+      actions.set(name, action);
+      return action;
+    },
+    getPeers: () => ({}),
+    removeStream: () => {},
+    leave: async () => {},
+    addStream: () => [],
+    onPeerJoin: () => {},
+    onPeerLeave: () => {},
+    onPeerStream: () => {},
+  };
   (signalingManager as any).joinRoom = () => room;
   (signalingManager as any).leaveRoom = async () => {};
   (signalingManager as any).reannounce = async () => {};
   const manager = new GroupRoomManager('Viewer', 'multi-receive-test', '', true);
   try {
-    await manager.join({ onStreamsUpdate: () => {}, onSlotsUpdate: () => {}, onPeersUpdate: () => {}, onStatusChange: () => {}, onChat: () => {} });
+    await manager.join({
+      onStreamsUpdate: () => {},
+      onSlotsUpdate: () => {},
+      onPeersUpdate: () => {},
+      onStatusChange: () => {},
+      onChat: () => {},
+    });
     room.onPeerJoin('owner');
     actions.get('presence').onMessage({ username: 'Owner', isStreaming: true }, { peerId: 'owner' });
     const status = actions.get('stream_status').onMessage;
-    status({ isStreaming: true, revision: 1, streams: [descriptor('screen'), descriptor('camera', 'camera')] }, { peerId: 'owner' });
-    const screen = fakeStream('screen'); const camera = fakeStream('camera');
+    status(
+      { isStreaming: true, revision: 1, streams: [descriptor('screen'), descriptor('camera', 'camera')] },
+      { peerId: 'owner' },
+    );
+    const screen = fakeStream('screen');
+    const camera = fakeStream('camera');
     room.onPeerStream(screen, 'owner', descriptor('screen'));
     room.onPeerStream(camera, 'owner', descriptor('camera', 'camera'));
     const remote = manager.getAllRoomSlots().filter((slot) => !slot.isLocal);
@@ -373,7 +559,10 @@ test('remote screen and camera streams reconcile without fake participants or st
     assert.equal(remote[1].stream, camera);
     assert.equal(manager.getConnectedPeers().length, 1);
     status({ isStreaming: true, revision: 2, streams: [descriptor('screen')] }, { peerId: 'owner' });
-    status({ isStreaming: true, revision: 1, streams: [descriptor('screen'), descriptor('camera', 'camera')] }, { peerId: 'owner' });
+    status(
+      { isStreaming: true, revision: 1, streams: [descriptor('screen'), descriptor('camera', 'camera')] },
+      { peerId: 'owner' },
+    );
     room.onPeerStream(camera, 'owner', descriptor('camera', 'camera'));
     assert.equal(manager.getAllRoomSlots().filter((slot) => !slot.isLocal).length, 1);
     status({ isStreaming: false, revision: 3, streams: [] }, { peerId: 'owner' });
@@ -401,11 +590,19 @@ test('stopStream removes addTrack-owned tracks and stream recovery requests rene
       return action;
     },
     getPeers: () => ({ viewer: { getSenders: () => [] } }),
-    addTrack: (track: any) => { addedTracks.push(track); return [Promise.resolve()]; },
-    removeTrack: (track: any) => { removedTracks.push(track); },
+    addTrack: (track: any) => {
+      addedTracks.push(track);
+      return [Promise.resolve()];
+    },
+    removeTrack: (track: any) => {
+      removedTracks.push(track);
+    },
     addStream: () => [Promise.resolve()],
     removeStream: () => {},
-    renegotiate: (peerId: string) => { renegotiatedPeers.push(peerId); return [Promise.resolve()]; },
+    renegotiate: (peerId: string) => {
+      renegotiatedPeers.push(peerId);
+      return [Promise.resolve()];
+    },
     leave: async () => {},
     onPeerJoin: () => {},
     onPeerLeave: () => {},
@@ -416,7 +613,13 @@ test('stopStream removes addTrack-owned tracks and stream recovery requests rene
   (signalingManager as any).reannounce = async () => {};
   const manager = new GroupRoomManager('Broadcaster', 'stop-renegotiate-test', '', true);
   try {
-    await manager.join({ onStreamsUpdate: () => {}, onSlotsUpdate: () => {}, onPeersUpdate: () => {}, onStatusChange: () => {}, onChat: () => {} });
+    await manager.join({
+      onStreamsUpdate: () => {},
+      onSlotsUpdate: () => {},
+      onPeersUpdate: () => {},
+      onStatusChange: () => {},
+      onChat: () => {},
+    });
     room.onPeerJoin('viewer');
     const stream = fakeStream('screen');
     const videoTrack = stream.getVideoTracks()[0];
@@ -445,8 +648,16 @@ test('replaceMediaTrack clears blocked native routes and dispatches the replacem
   const replacement = fakeStream('monitor2').getVideoTracks()[0];
   manager.shareStream(stream, 8_000_000, 60, descriptor('screen'));
   internal.peerTracker.receivePeerExchange('viewer', true, 'Viewer');
-  const sender = { track: oldTrack, async replaceTrack(track: MediaStreamTrack) { this.track = track; } };
-  internal.room = { getPeers: () => ({ viewer: { getSenders: () => [sender] } }), makeAction: () => ({ send: async () => {} }) };
+  const sender = {
+    track: oldTrack,
+    async replaceTrack(track: MediaStreamTrack) {
+      this.track = track;
+    },
+  };
+  internal.room = {
+    getPeers: () => ({ viewer: { getSenders: () => [sender] } }),
+    makeAction: () => ({ send: async () => {} }),
+  };
 
   const transport = new NativeVideoTransport({
     rtc: () => ({}),
@@ -456,7 +667,8 @@ test('replaceMediaTrack clears blocked native routes and dispatches the replacem
     fallback: () => {},
   });
   (transport as any).blocked.add('viewer/screen');
-  const dispatched: Array<{ peer: string; stream: MediaStream; track: MediaStreamTrack; blockedAtDispatch: boolean }> = [];
+  const dispatched: Array<{ peer: string; stream: MediaStream; track: MediaStreamTrack; blockedAtDispatch: boolean }> =
+    [];
   transport.dispatch = (peer, targetStream, desc) => {
     dispatched.push({
       peer,

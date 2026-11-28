@@ -380,22 +380,39 @@ bool encode(Encoder& e, ID3D11Texture2D* source, uint64_t timestamp, bool key, u
     // Require single-frame low-latency output. A driver that buffers unexpectedly
     // must fall back, rather than increasing the streaming queue indefinitely.
     if(!wait_event(e,false,350,error,size)) return false;
-    MFT_OUTPUT_STREAM_INFO info{};
-    MF_CHECK(e.transform->GetOutputStreamInfo(0,&info),"H264 output allocation model");
-    ComPtr<IMFSample> supplied;
-    if(!(info.dwFlags&MFT_OUTPUT_STREAM_PROVIDES_SAMPLES)) {
-        MF_CHECK(MFCreateSample(&supplied),"H264 output sample");
-        ComPtr<IMFMediaBuffer> compressed;
-        if(info.cbSize>16*1024*1024) return check(E_INVALIDARG,"H264 output limit",error,size);
-        MF_CHECK(MFCreateAlignedMemoryBuffer(info.cbSize?info.cbSize:4*1024*1024,info.cbAlignment?info.cbAlignment-1:0,&compressed),"H264 output buffer");
-        MF_CHECK(supplied->AddBuffer(compressed.Get()),"H264 output sample buffer");
-    }
-    MFT_OUTPUT_DATA_BUFFER result{}; result.pSample=supplied.Get(); DWORD status=0;
-    HRESULT hr=e.transform->ProcessOutput(0,1,&result,&status);
-    if(result.pEvents) result.pEvents->Release();
     ComPtr<IMFSample> output;
-    if(supplied) output=supplied; else output.Attach(result.pSample);
-    MF_CHECK(hr,"retrieve H264 frame");
+    for (int attempt = 0; attempt < 3; ++attempt) {
+        MFT_OUTPUT_STREAM_INFO info{};
+        MF_CHECK(e.transform->GetOutputStreamInfo(0,&info),"H264 output allocation model");
+        ComPtr<IMFSample> supplied;
+        if(!(info.dwFlags&MFT_OUTPUT_STREAM_PROVIDES_SAMPLES)) {
+            MF_CHECK(MFCreateSample(&supplied),"H264 output sample");
+            ComPtr<IMFMediaBuffer> compressed;
+            if(info.cbSize>16*1024*1024) return check(E_INVALIDARG,"H264 output limit",error,size);
+            MF_CHECK(MFCreateAlignedMemoryBuffer(info.cbSize?info.cbSize:4*1024*1024,info.cbAlignment?info.cbAlignment-1:0,&compressed),"H264 output buffer");
+            MF_CHECK(supplied->AddBuffer(compressed.Get()),"H264 output sample buffer");
+        }
+        MFT_OUTPUT_DATA_BUFFER result{}; result.pSample=supplied.Get(); DWORD status=0;
+        HRESULT hr=e.transform->ProcessOutput(0,1,&result,&status);
+        if(result.pEvents) result.pEvents->Release();
+        if(hr==MF_E_TRANSFORM_STREAM_CHANGE) {
+            if(!supplied && result.pSample) result.pSample->Release();
+            // Hardware MFTs (notably Intel QuickSync) return MF_E_TRANSFORM_STREAM_CHANGE
+            // on the first output to publish the negotiated H264 type with SPS/PPS.
+            ComPtr<IMFMediaType> updated;
+            MF_CHECK(e.transform->GetOutputAvailableType(0,0,&updated),"negotiate updated H264 output type");
+            MF_CHECK(e.transform->SetOutputType(0,updated.Get(),0),"apply updated H264 output type");
+            continue;
+        }
+        if(hr==MF_E_TRANSFORM_NEED_MORE_INPUT) {
+            if(!supplied && result.pSample) result.pSample->Release();
+            if(!wait_event(e,false,350,error,size)) return false;
+            continue;
+        }
+        if(supplied) output=supplied; else output.Attach(result.pSample);
+        MF_CHECK(hr,"retrieve H264 frame");
+        break;
+    }
     if(!output) return check(E_UNEXPECTED,"empty H264 output sample",error,size);
     --e.pending;
     LONGLONG time=0; MF_CHECK(output->GetSampleTime(&time),"encoded capture timestamp");

@@ -4933,13 +4933,16 @@ export class GroupRoomManager {
       );
       if (this.nativeVideo?.dispatch(peerId, entry.stream, entry.descriptor, forceNativeRestart)) {
         const nativeReady = this.nativeVideo.sending(peerId, entry.descriptor.id);
-        this.setSenderConsumer(entry.descriptor.id, peerId, nativeReady ? 'off' : 'probing');
+        this.setSenderConsumer(entry.descriptor.id, peerId, 'off');
         if (nativeReady && typeof room.removeTrack === 'function') {
           for (const video of entry.stream.getVideoTracks()) room.removeTrack(video, { target: peerId });
         }
-        // Start on the established room connection while native ICE negotiates.
-        // Per-track ownership lets the ready acknowledgement retire only video.
-        const tracks = nativeReady ? entry.stream.getAudioTracks() : entry.stream.getTracks();
+        // Keep the room connection for stream audio only while native H.264
+        // negotiates so starting a share does not fire overlapping video+audio
+        // SDP renegotiations (which can cause m-line order mismatches). If
+        // native setup fails, the transport's fallback callback publishes
+        // browser video on the room connection.
+        const tracks = entry.stream.getAudioTracks();
         const operations: Promise<unknown>[] = [];
         if (typeof room.addTrack === 'function') {
           for (const track of tracks) {
@@ -4978,13 +4981,11 @@ export class GroupRoomManager {
     if (!this.room || !this.localMedia.has(mediaId)) return;
     for (const peerId of this.peerTracker.directConnectedPeers) {
       if (this.authority && (!this.localAdmitted || !this.isAdmittedPeer(peerId))) continue;
-      const mode = this.nativeVideo?.sending(peerId, mediaId)
-        ? 'off'
-        : this.nativeVideo?.isBlocked?.(peerId, mediaId)
-          ? 'required'
-          : this.nativeVideo?.hasOutgoing?.(peerId, mediaId)
-            ? 'probing'
-            : 'required';
+      const mode =
+        this.nativeVideo?.sending(peerId, mediaId) ||
+        (!this.nativeVideo?.isBlocked?.(peerId, mediaId) && this.nativeVideo?.hasOutgoing?.(peerId, mediaId))
+          ? 'off'
+          : 'required';
       this.setSenderConsumer(mediaId, peerId, mode);
     }
   }
