@@ -399,9 +399,12 @@ bool encode(Encoder& e, ID3D11Texture2D* source, uint64_t timestamp, bool key, u
             if(!supplied && result.pSample) result.pSample->Release();
             // Hardware MFTs (notably Intel QuickSync) return MF_E_TRANSFORM_STREAM_CHANGE
             // on the first output to publish the negotiated H264 type with SPS/PPS.
+            // Async MFTs require waiting for the next METransformHaveOutput event before
+            // calling ProcessOutput again (otherwise they return E_UNEXPECTED).
             ComPtr<IMFMediaType> updated;
             MF_CHECK(e.transform->GetOutputAvailableType(0,0,&updated),"negotiate updated H264 output type");
             MF_CHECK(e.transform->SetOutputType(0,updated.Get(),0),"apply updated H264 output type");
+            if(!wait_event(e,false,350,error,size)) return false;
             continue;
         }
         if(hr==MF_E_TRANSFORM_NEED_MORE_INPUT) {
